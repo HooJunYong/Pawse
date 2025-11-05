@@ -1,6 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 void main() {
   runApp(MyApp());
@@ -21,7 +22,7 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> fetchMessage() async {
-    final url = Uri.parse("http://192.168.1.18:8000/");
+    final url = Uri.parse("http://192.168.1.114:8000/");
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
