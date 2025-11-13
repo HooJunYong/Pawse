@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-void main() {
+Future<void> main() async {
+  await dotenv.load(fileName: ".env");
   runApp(MyApp());
 }
 
@@ -21,7 +23,8 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> fetchMessage() async {
-    final url = Uri.parse("http://192.168.1.18:8000/");
+    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+    final url = Uri.parse("$baseUrl/");
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
