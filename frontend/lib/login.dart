@@ -2,8 +2,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 // Generated Figma layout wrapped into a reusable widget.
-class LoginWidget extends StatelessWidget {
+class LoginWidget extends StatefulWidget {
   const LoginWidget({Key? key}) : super(key: key);
+
+  @override
+  State<LoginWidget> createState() => _LoginWidgetState();
+}
+
+class _LoginWidgetState extends State<LoginWidget> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      final email = _emailController.text.trim();
+      // For now just show a SnackBar. Replace with real auth call later.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Logging in as $email')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,30 +169,33 @@ class LoginWidget extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 0),
-                          // Email field label + placeholder box
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                          // Email field label + input
+                          Form(
+                            key: _formKey,
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
-                                const Text(
-                                  'Email',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(
-                                    color: Color.fromRGBO(75, 85, 99, 1),
-                                    fontFamily: 'Nunito',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.normal,
-                                    height: 1.4285714285714286,
+                                const Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    'Email',
+                                    textAlign: TextAlign.left,
+                                    style: TextStyle(
+                                      color: Color.fromRGBO(75, 85, 99, 1),
+                                      fontFamily: 'Nunito',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.normal,
+                                      height: 1.4285714285714286,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 4.5),
+                                const SizedBox(height: 8),
                                 Container(
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(12),
                                     boxShadow: const [BoxShadow(
-                                      color: Color.fromRGBO(0, 0, 0, 0.25),
-                                      offset: Offset(0, 4),
+                                      color: Color.fromRGBO(0, 0, 0, 0.06),
+                                      offset: Offset(0, 2),
                                       blurRadius: 4,
                                     )],
                                     color: const Color.fromRGBO(255, 255, 255, 1),
@@ -174,116 +204,100 @@ class LoginWidget extends StatelessWidget {
                                       width: 1,
                                     ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
-                                  child: Row(
-                                    children: const <Widget>[
-                                      Expanded(
-                                        child: Text(
-                                          'you@example.com',
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(
-                                            color: Color.fromRGBO(156, 163, 175, 1),
-                                            fontFamily: 'Nunito',
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                            height: 1,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: TextFormField(
+                                    controller: _emailController,
+                                    keyboardType: TextInputType.emailAddress,
+                                    decoration: const InputDecoration(
+                                      hintText: 'you@example.com',
+                                      border: InputBorder.none,
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.trim().isEmpty) {
+                                        return 'Please enter your email';
+                                      }
+                                      if (!RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(value.trim())) {
+                                        return 'Enter a valid email';
+                                      }
+                                      return null;
+                                    },
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 16),
-                          // Password label + placeholder
+                          // Password label + input
+                          const Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Password',
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                color: Color.fromRGBO(75, 85, 99, 1),
+                                fontFamily: 'Nunito',
+                                fontSize: 14,
+                                fontWeight: FontWeight.normal,
+                                height: 1.4285714285714286,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                const Text(
-                                  'Password',
-                                  textAlign: TextAlign.left,
-                                  style: TextStyle(
-                                    color: Color.fromRGBO(75, 85, 99, 1),
-                                    fontFamily: 'Nunito',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.normal,
-                                    height: 1.4285714285714286,
-                                  ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: const [BoxShadow(
+                                color: Color.fromRGBO(0, 0, 0, 0.06),
+                                offset: Offset(0, 2),
+                                blurRadius: 4,
+                              )],
+                              color: const Color.fromRGBO(255, 255, 255, 1),
+                              border: Border.all(
+                                color: const Color.fromRGBO(229, 231, 235, 1),
+                                width: 1,
+                              ),
+                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            child: TextFormField(
+                              controller: _passwordController,
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
+                                hintText: 'Enter your password',
+                                border: InputBorder.none,
+                                suffixIcon: IconButton(
+                                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                 ),
-                                const SizedBox(height: 4.5),
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: const [BoxShadow(
-                                      color: Color.fromRGBO(0, 0, 0, 0.25),
-                                      offset: Offset(0, 4),
-                                      blurRadius: 4,
-                                    )],
-                                    color: const Color.fromRGBO(255, 255, 255, 1),
-                                    border: Border.all(
-                                      color: const Color.fromRGBO(229, 231, 235, 1),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
-                                  child: Row(
-                                    children: const <Widget>[
-                                      Expanded(
-                                        child: Text(
-                                          '••••••••',
-                                          textAlign: TextAlign.left,
-                                          style: TextStyle(
-                                            color: Color.fromRGBO(156, 163, 175, 1),
-                                            fontFamily: 'Nunito',
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.normal,
-                                            height: 1,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter your password';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
                             ),
                           ),
                           const SizedBox(height: 0),
                           // Log In button
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 32),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: <Widget>[
-                                Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(9999),
-                                    boxShadow: const [BoxShadow(
-                                      color: Color.fromRGBO(0, 0, 0, 0.25),
-                                      offset: Offset(0, 4),
-                                      blurRadius: 4,
-                                    )],
-                                    color: const Color.fromRGBO(66, 32, 6, 1),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
-                                  child: const Center(
-                                    child: Text(
-                                      'Log In',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Color.fromRGBO(255, 255, 255, 1),
-                                        fontFamily: 'Nunito',
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.normal,
-                                        height: 1.5555555555555556,
-                                      ),
-                                    ),
-                                  ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 24),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
                                 ),
-                              ],
+                                onPressed: _submit,
+                                child: const Text(
+                                  'Log In',
+                                  style: TextStyle(fontSize: 18, fontFamily: 'Nunito'),
+                                ),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 0),
