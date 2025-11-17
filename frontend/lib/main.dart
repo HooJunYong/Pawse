@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'screens/homepage.dart';
 
 Future<void> main() async {
   await dotenv.load(fileName: ".env");
@@ -46,10 +47,11 @@ class _MyAppState extends State<MyApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(title: const Text('AI Mental Health Companion')),
-        body: Center(child: Text(message)),
-      ),
+      // home: Scaffold(
+      //   appBar: AppBar(title: const Text('AI Mental Health Companion')),
+      //   body: Center(child: Text(message)),
+      // ),
+      home: const HomeScreen(),
     );
   }
 }
