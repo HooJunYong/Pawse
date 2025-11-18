@@ -1,11 +1,9 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
-from dotenv import load_dotenv
+from fastapi import FastAPI  # type: ignore
+from .signup import router as signup_router
+from .login import router as login_router
+from .db import db  # Import shared db (ensures indexes are created)
+from starlette.middleware.cors import CORSMiddleware  # type: ignore
 import os
-
-# Load environment variables
-load_dotenv()
 
 app = FastAPI(title="AI Mental Health Companion API")
 
@@ -19,12 +17,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB connection from .env
-mongodb_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-database_name = os.getenv("DATABASE_NAME", "pawse_db")
-
-client = MongoClient(mongodb_uri)
-db = client[database_name]
+# Include auth routes
+app.include_router(signup_router)
+app.include_router(login_router)
 
 @app.get("/")
 def root():
@@ -35,8 +30,29 @@ def get_users():
     users = list(db.users.find({}, {"_id": 0}))
     return {"users": users}
 
+@app.get("/health/db")
+def db_health():
+    """Check MongoDB connection and collection status"""
+    try:
+        ping_result = db.command("ping")
+        collections = db.list_collection_names()
+        users_count = db.users.count_documents({})
+        profiles_count = db.user_profile.count_documents({})
+        return {
+            "status": "connected",
+            "ping": ping_result.get("ok"),
+            "database": db.name,
+            "collections": collections,
+            "counts": {
+                "users": users_count,
+                "user_profile": profiles_count
+            }
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 if __name__ == "__main__":
-    import uvicorn
+    import uvicorn  # type: ignore
     host = os.getenv("BACKEND_HOST", "0.0.0.0")
     port = int(os.getenv("BACKEND_PORT", 8000))
     uvicorn.run(app, host=host, port=port)

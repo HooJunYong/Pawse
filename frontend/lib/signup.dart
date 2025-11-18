@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 // A new SignupWidget that matches the style of your LoginWidget
 class SignupWidget extends StatefulWidget {
@@ -30,15 +34,59 @@ class _SignupWidgetState extends State<SignupWidget> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
       final email = _emailController.text.trim();
-      // For now just show a SnackBar. Replace with real auth call later.
+      final password = _passwordController.text;
+      final firstName = _firstNameController.text.trim();
+      final lastName = _lastNameController.text.trim();
+
+      // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Creating account for $email')),
+        const SnackBar(content: Text('Creating account...')),
       );
-      // You could pop back to login after success
-      // Navigator.of(context).pop();
+
+      try {
+        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+        final response = await http.post(
+          Uri.parse('$apiUrl/signup'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': email,
+            'password': password,
+            'first_name': firstName,
+            'last_name': lastName,
+          }),
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 201) {
+          // Success
+          final data = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Account created successfully! Welcome ${data['first_name']}')),
+          );
+          // Navigate back to login
+          Navigator.of(context).pop();
+        } else if (response.statusCode == 409) {
+          // Email already exists
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email already registered. Please login.')),
+          );
+        } else {
+          // Other error
+          final error = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${error['detail'] ?? 'Unknown error'}')),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to connect to server: $e')),
+        );
+      }
     }
   }
 

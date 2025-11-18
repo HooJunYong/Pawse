@@ -5,7 +5,7 @@ echo ==========================================
 
 REM ---- Start FastAPI backend in new terminal ----
 echo Starting FastAPI backend...
-start cmd /k "cd /d %~dp0backend && call venv\Scripts\activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
+start cmd /k "cd /d %~dp0backend && call venv\Scripts\activate && pip install -r requirements.txt && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000"
 
 REM ---- Start Flutter frontend in new terminal ----
 echo Starting Flutter frontend...

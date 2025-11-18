@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 import 'forgetpassword.dart';
 import 'signup.dart';
@@ -24,13 +28,110 @@ class _LoginWidgetState extends State<LoginWidget> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
       final email = _emailController.text.trim();
-      // For now just show a SnackBar. Replace with real auth call later.
+      final password = _passwordController.text;
+
+      // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Logging in as $email')),
+        const SnackBar(content: Text('Logging in...')),
       );
+
+      try {
+        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+        final response = await http.post(
+          Uri.parse('$apiUrl/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'email': email,
+            'password': password,
+          }),
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          // Success
+          final data = jsonDecode(response.body);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Welcome back! Logged in as ${data['email']}')),
+          );
+          // TODO: Navigate to home page or store user session
+          // For now, just clear the form
+          _emailController.clear();
+          _passwordController.clear();
+        } else if (response.statusCode == 401) {
+          // Invalid credentials - show popup dialog
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Login Failed'),
+                content: const Text('Invalid email or password. Please try again.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else if (response.statusCode == 403) {
+          // User inactive - show popup dialog
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Account Inactive'),
+                content: const Text('Your account is inactive. Please contact support.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          // Other error - show popup dialog
+          final error = jsonDecode(response.body);
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text('Login Error'),
+                content: Text(error['detail'] ?? 'An unknown error occurred.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
+                  ),
+                ],
+              );
+            },
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Connection Error'),
+              content: Text('Failed to connect to server:\n$e'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
+      }
     }
   }
 
