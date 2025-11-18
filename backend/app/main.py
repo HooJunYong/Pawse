@@ -1,8 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
+from app.mongodb_connection import get_database
 
 # Load environment variables
 load_dotenv()
@@ -19,12 +19,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# MongoDB connection from .env
-mongodb_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-database_name = os.getenv("DATABASE_NAME", "pawse_db")
-
-client = MongoClient(mongodb_uri)
-db = client[database_name]
+# Get MongoDB database connection
+db = get_database()
 
 @app.get("/")
 def root():
