@@ -1,6 +1,8 @@
 from fastapi import FastAPI  # type: ignore
 from .signup import router as signup_router
 from .login import router as login_router
+from .profile import router as profile_router
+from .editprofile import router as editprofile_router
 from .db import db  # Import shared db (ensures indexes are created)
 from starlette.middleware.cors import CORSMiddleware  # type: ignore
 import os
@@ -20,6 +22,8 @@ app.add_middleware(
 # Include auth routes
 app.include_router(signup_router)
 app.include_router(login_router)
+app.include_router(editprofile_router)  # Register editprofile before profile (more specific routes first)
+app.include_router(profile_router)
 
 @app.get("/")
 def root():

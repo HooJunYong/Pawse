@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import 'forgetpassword.dart';
+import 'profile.dart';
 import 'signup.dart';
 
 // Generated Figma layout wrapped into a reusable widget.
@@ -52,15 +53,25 @@ class _LoginWidgetState extends State<LoginWidget> {
         if (!mounted) return;
 
         if (response.statusCode == 200) {
-          // Success
+          // Success - parse user_id and navigate to profile page
           final data = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Welcome back! Logged in as ${data['email']}')),
+          final userId = data['user_id'] as String?;
+          if (userId == null || userId.isEmpty) {
+            showDialog(
+              context: context,
+              builder: (context) => const AlertDialog(
+                title: Text('Login Error'),
+                content: Text('Missing user ID in response.'),
+              ),
+            );
+            return;
+          }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Profile(userId: userId),
+            ),
           );
-          // TODO: Navigate to home page or store user session
-          // For now, just clear the form
-          _emailController.clear();
-          _passwordController.clear();
         } else if (response.statusCode == 401) {
           // Invalid credentials - show popup dialog
           showDialog(
