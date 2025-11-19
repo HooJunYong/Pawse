@@ -1,38 +1,164 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 import os
+import logging
+
 from app.mongodb_connection import get_database
+from app.routes import session_router, message_router, companion_router
+from app.config import get_settings
 
 # Load environment variables
 load_dotenv()
 
-app = FastAPI(title="AI Mental Health Companion API")
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# CORS Configuration from .env
+# Get settings
+settings = get_settings()
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
+
+# Create FastAPI app
+app = FastAPI(
+    title="AI Mental Health Companion API",
+    description="Backend API for AI Chat Module with Gemini integration",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS Configuration
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Global exception handler
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global exception: {str(exc)}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error occurred"}
+    )
+
+# Include routers
+app.include_router(session_router)
+app.include_router(message_router)
+app.include_router(companion_router)
+
 # Get MongoDB database connection
 db = get_database()
 
-@app.get("/")
-def root():
-    return {"message": "Backend is running!"}
 
-@app.get("/users")
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database indexes and perform startup tasks"""
+    logger.info("Starting AI Mental Health Companion API...")
+    
+    try:
+        # Create indexes for better query performance
+        db.chat_sessions.create_index("session_id", unique=True)
+        db.chat_sessions.create_index("user_id")
+        db.chat_sessions.create_index([("user_id", 1), ("start_time", -1)])
+        
+        db.chat_messages.create_index("message_id", unique=True)
+        db.chat_messages.create_index("session_id", unique=True)
+        
+        db.ai_companions.create_index("companion_id", unique=True)
+        db.ai_companions.create_index("is_active")
+        
+        db.personalities.create_index("personality_id", unique=True)
+        db.personalities.create_index("is_active")
+        
+        logger.info("Database indexes created successfully")
+        logger.info("API started successfully!")
+        
+    except Exception as e:
+        logger.error(f"Error during startup: {str(e)}")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup tasks on shutdown"""
+    logger.info("Shutting down AI Mental Health Companion API...")
+
+
+@app.get("/", tags=["Health"])
+@limiter.limit("60/minute")
+async def root(request: Request):
+    """Root endpoint - API health check"""
+    return {
+        "message": "AI Mental Health Companion API is running!",
+        "version": "1.0.0",
+        "status": "healthy",
+        "endpoints": {
+            "docs": "/docs",
+            "sessions": "/api/chat/session",
+            "messages": "/api/chat/message",
+            "companions": "/api/companions",
+            "personalities": "/api/personalities"
+        }
+    }
+
+
+@app.get("/health", tags=["Health"])
+async def health_check():
+    """Health check endpoint"""
+    try:
+        # Check database connection
+        db.command("ping")
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "gemini_api_configured": bool(settings.gemini_api_key)
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/users", tags=["Legacy"])
 def get_users():
+    """Legacy endpoint - Get all users"""
     users = list(db.users.find({}, {"_id": 0}))
     return {"users": users}
+
 
 if __name__ == "__main__":
     import uvicorn
     host = os.getenv("BACKEND_HOST", "0.0.0.0")
     port = int(os.getenv("BACKEND_PORT", 8000))
-    uvicorn.run(app, host=host, port=port)
+    
+    logger.info(f"Starting server on {host}:{port}")
+    uvicorn.run(
+        "app.main:app",
+        host=host,
+        port=port,
+        reload=True,
+        log_level="info"
+    )
