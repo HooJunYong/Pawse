@@ -1,11 +1,5 @@
-import os
-from dotenv import load_dotenv  # type: ignore
 from pymongo import MongoClient  # type: ignore
-
-load_dotenv()
-
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "pawse_db")
+from ..config.settings import MONGODB_URI, DATABASE_NAME
 
 client = MongoClient(MONGODB_URI)
 db = client[DATABASE_NAME]
@@ -15,3 +9,6 @@ db.users.create_index("email", unique=True)
 db.users.create_index("user_id", unique=True)
 db.user_profile.create_index("user_id")
 db.user_login_events.create_index("user_id")
+db.therapist_profile.create_index("user_id", unique=True)
+db.therapist_profile.create_index("license_number", unique=True)
+db.therapist_profile.create_index("verification_status")

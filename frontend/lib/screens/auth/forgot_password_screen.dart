@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'otp.dart';
+import 'otp_screen.dart';
 
 class ForgotPasswordWidget extends StatefulWidget {
   const ForgotPasswordWidget({Key? key}) : super(key: key);

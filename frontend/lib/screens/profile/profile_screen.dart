@@ -4,9 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import 'changepassword.dart';
-import 'editprofile.dart';
-import 'login.dart';
+import '../auth/login_screen.dart';
+import 'change_password_screen.dart';
+import 'edit_profile_screen.dart';
+import 'join_therapist_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -245,7 +246,18 @@ class _ProfileState extends State<Profile> {
                       _buildMenuItem(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
                       _buildMenuItem(icon: Icons.email_outlined, title: 'Contact Us', onTap: () {}),
                       _buildMenuItem(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () {}),
-                      _buildMenuItem(icon: Icons.person_add_outlined, title: 'Join as a Therapist', onTap: () {}),
+                      _buildMenuItem(
+                        icon: Icons.person_add_outlined,
+                        title: 'Join as a Therapist',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => JoinTherapist(userId: widget.userId),
+                            ),
+                          );
+                        },
+                      ),
                       const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,

@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import 'forgetpassword.dart';
-import 'profile.dart';
-import 'signup.dart';
+import '../profile/profile_screen.dart';
+import 'forgot_password_screen.dart';
+import 'signup_screen.dart';
 
 // Generated Figma layout wrapped into a reusable widget.
 class LoginWidget extends StatefulWidget {

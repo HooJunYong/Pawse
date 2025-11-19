@@ -1,29 +1,28 @@
 from fastapi import FastAPI  # type: ignore
-from .signup import router as signup_router
-from .login import router as login_router
-from .profile import router as profile_router
-from .editprofile import router as editprofile_router
-from .db import db  # Import shared db (ensures indexes are created)
 from starlette.middleware.cors import CORSMiddleware  # type: ignore
-import os
+from .models.database import db
+from .routes.auth_routes import router as auth_router
+from .routes.profile_routes import router as profile_router
+from .routes.password_routes import router as password_router
+from .routes.therapist_routes import router as therapist_router
+from .config.settings import ALLOWED_ORIGINS, BACKEND_HOST, BACKEND_PORT
 
 app = FastAPI(title="AI Mental Health Companion API")
 
-# CORS Configuration from .env
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# CORS Configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include auth routes
-app.include_router(signup_router)
-app.include_router(login_router)
-app.include_router(editprofile_router)  # Register editprofile before profile (more specific routes first)
-app.include_router(profile_router)
+# Include routers
+app.include_router(auth_router, tags=["Authentication"])
+app.include_router(profile_router, tags=["Profile"])
+app.include_router(password_router, tags=["Password"])
+app.include_router(therapist_router, tags=["Therapist"])
 
 @app.get("/")
 def root():
@@ -31,6 +30,7 @@ def root():
 
 @app.get("/users")
 def get_users():
+    """Get all users (for development/testing)"""
     users = list(db.users.find({}, {"_id": 0}))
     return {"users": users}
 
@@ -57,6 +57,4 @@ def db_health():
 
 if __name__ == "__main__":
     import uvicorn  # type: ignore
-    host = os.getenv("BACKEND_HOST", "0.0.0.0")
-    port = int(os.getenv("BACKEND_PORT", 8000))
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=BACKEND_HOST, port=BACKEND_PORT)

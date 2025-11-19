@@ -22,6 +22,53 @@ class _ChangePasswordState extends State<ChangePassword> {
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
 
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Error',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Nunito',
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color.fromRGBO(249, 115, 22, 1),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _currentPasswordController.dispose();
@@ -31,14 +78,33 @@ class _ChangePasswordState extends State<ChangePassword> {
   }
 
   Future<void> _updatePassword() async {
-    if (!_formKey.currentState!.validate()) {
+    // Check if current password is empty
+    if (_currentPasswordController.text.isEmpty) {
+      _showErrorDialog('Please enter your current password');
       return;
     }
 
+    // Check if new password is empty
+    if (_newPasswordController.text.isEmpty) {
+      _showErrorDialog('Please enter a new password');
+      return;
+    }
+
+    // Check if new password meets minimum length
+    if (_newPasswordController.text.length < 6) {
+      _showErrorDialog('Password must be at least 6 characters');
+      return;
+    }
+
+    // Check if new password is same as current password
+    if (_newPasswordController.text == _currentPasswordController.text) {
+      _showErrorDialog('New password must be different from current password');
+      return;
+    }
+
+    // Check if passwords match
     if (_newPasswordController.text != _confirmPasswordController.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('New passwords do not match')),
-      );
+      _showErrorDialog('New passwords do not match');
       return;
     }
 
@@ -93,7 +159,6 @@ class _ChangePasswordState extends State<ChangePassword> {
     required TextEditingController controller,
     required bool obscureText,
     required VoidCallback onToggleVisibility,
-    required String? Function(String?) validator,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,10 +173,9 @@ class _ChangePasswordState extends State<ChangePassword> {
           ),
         ),
         const SizedBox(height: 8),
-        TextFormField(
+        TextField(
           controller: controller,
           obscureText: obscureText,
-          validator: validator,
           decoration: InputDecoration(
             filled: true,
             fillColor: Colors.white,
@@ -230,12 +294,6 @@ class _ChangePasswordState extends State<ChangePassword> {
                       onToggleVisibility: () {
                         setState(() => _obscureCurrentPassword = !_obscureCurrentPassword);
                       },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter your current password';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 16),
                     _buildPasswordField(
@@ -245,15 +303,6 @@ class _ChangePasswordState extends State<ChangePassword> {
                       onToggleVisibility: () {
                         setState(() => _obscureNewPassword = !_obscureNewPassword);
                       },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please enter a new password';
-                        }
-                        if (value.length < 6) {
-                          return 'Password must be at least 6 characters';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 16),
                     _buildPasswordField(
@@ -262,15 +311,6 @@ class _ChangePasswordState extends State<ChangePassword> {
                       obscureText: _obscureConfirmPassword,
                       onToggleVisibility: () {
                         setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);
-                      },
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'Please confirm your password';
-                        }
-                        if (value != _newPasswordController.text) {
-                          return 'Passwords do not match';
-                        }
-                        return null;
                       },
                     ),
                     const SizedBox(height: 32),
