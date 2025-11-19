@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, status # type: ignore
 from pydantic import BaseModel, EmailStr # type: ignore
 from datetime import datetime
+from .timezone import now_my
 import uuid
 import os
 import base64
@@ -63,7 +64,7 @@ def signup(payload: SignupRequest):
 
 	user_id = str(uuid.uuid4())
 	logger.info(f"Creating new user: {user_id} / {payload.email}")
-	now = datetime.utcnow()
+	now = now_my()
 	password_hash = hash_password(payload.password)
 
 	user_doc = {

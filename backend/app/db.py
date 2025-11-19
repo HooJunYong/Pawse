@@ -14,3 +14,4 @@ db = client[DATABASE_NAME]
 db.users.create_index("email", unique=True)
 db.users.create_index("user_id", unique=True)
 db.user_profile.create_index("user_id")
+db.user_login_events.create_index("user_id")
