@@ -53,6 +53,47 @@ class _JoinTherapistState extends State<JoinTherapist> {
     'Chinese',
   ];
 
+  bool _isLoading = true;
+  bool _hasExistingApplication = false;
+  Map<String, dynamic>? _existingData;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingApplication();
+  }
+
+  Future<void> _checkExistingApplication() async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/therapist/profile/${widget.userId}'),
+      );
+
+      if (response.statusCode == 200) {
+        // Application exists
+        final data = jsonDecode(response.body);
+        setState(() {
+          _hasExistingApplication = true;
+          _existingData = data;
+          _isLoading = false;
+        });
+      } else {
+        // No application found
+        setState(() {
+          _hasExistingApplication = false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      // No application or error
+      setState(() {
+        _hasExistingApplication = false;
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     _firstNameController.dispose();
@@ -549,7 +590,46 @@ class _JoinTherapistState extends State<JoinTherapist> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
+    // Show loading indicator while checking
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
+        appBar: AppBar(
+          backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
+            onPressed: () => Navigator.pop(context),
+          ),
+          title: const Text(
+            'Join as a Therapist',
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontWeight: FontWeight.bold,
+              color: Color.fromRGBO(66, 32, 6, 1),
+            ),
+          ),
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(
+            color: Color.fromRGBO(249, 115, 22, 1),
+          ),
+        ),
+      );
+    }
+
+    // If application exists, show verification status screen
+    if (_hasExistingApplication && _existingData != null) {
+      return TherapistVerificationStatus(
+        firstName: _existingData!['first_name'] ?? '',
+        lastName: _existingData!['last_name'] ?? '',
+        email: _existingData!['email'] ?? '',
+      );
+    }
+
+    // Otherwise, show the application form
     return Scaffold(
       backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
       appBar: AppBar(
