@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     
     # Gemini API settings
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
     
     # CORS settings
     allowed_origins: list = ["*"]
