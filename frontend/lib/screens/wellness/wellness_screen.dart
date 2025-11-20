@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../profile/profile_screen.dart';
+
 class WellnessScreen extends StatefulWidget {
   final String userId;
   const WellnessScreen({super.key, required this.userId});
@@ -209,7 +211,81 @@ class _WellnessScreenState extends State<WellnessScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
+      bottomNavigationBar: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 375,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(32),
+                topRight: Radius.circular(32),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.home_outlined),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {},
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.military_tech_outlined),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {},
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(249, 115, 22, 1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.favorite),
+                        color: Colors.white,
+                        onPressed: () {},
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.person_outline),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => Profile(userId: widget.userId),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -323,52 +399,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
               ],
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 12,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home, false),
-              _buildNavItem(Icons.chat_bubble_outline, false),
-              _buildNavItem(Icons.menu, false),
-              _buildNavItem(Icons.close, false),
-              _buildNavItem(Icons.self_improvement, true),
-              _buildNavItem(Icons.person_outline, false),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, bool isActive) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isActive ? const Color.fromRGBO(249, 115, 22, 1) : Colors.transparent,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        icon,
-        color: isActive ? Colors.white : const Color.fromRGBO(66, 32, 6, 1),
-        size: 24,
       ),
     );
   }

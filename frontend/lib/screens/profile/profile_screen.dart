@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../auth/login_screen.dart';
+import '../wellness/wellness_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'join_therapist_screen.dart';
@@ -347,7 +348,14 @@ class _ProfileState extends State<Profile> {
                     IconButton(
                       icon: const Icon(Icons.favorite_outline),
                       color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => WellnessScreen(userId: widget.userId),
+                          ),
+                        );
+                      },
                     ),
                     Container(
                       decoration: BoxDecoration(
