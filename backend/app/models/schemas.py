@@ -62,6 +62,7 @@ class TherapistApplicationRequest(BaseModel):
 class LoginResponse(BaseModel):
     user_id: str
     email: EmailStr
+    user_type: str
     last_login: datetime
 
 class SignupResponse(BaseModel):
@@ -96,6 +97,7 @@ class TherapistProfileResponse(BaseModel):
     first_name: str
     last_name: str
     email: str
+    contact_number: Optional[str] = None
     bio: str
     office_name: Optional[str] = None
     office_address: Optional[str] = None
@@ -108,6 +110,7 @@ class TherapistProfileResponse(BaseModel):
     profile_picture_url: Optional[str] = None
     verification_status: str
     verified_at: Optional[datetime] = None
+    rejection_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -115,3 +118,71 @@ class TherapistApplicationResponse(BaseModel):
     success: bool
     message: str
     application_id: str
+
+# Therapist Availability Schemas
+class AvailabilitySlot(BaseModel):
+    start_time: str  # Format: "HH:MM AM/PM"
+    end_time: str    # Format: "HH:MM AM/PM"
+
+class SetAvailabilityRequest(BaseModel):
+    user_id: str
+    day_of_week: str  # monday, tuesday, etc.
+    slots: list[AvailabilitySlot]
+    is_available: bool = True
+    availability_date: Optional[str] = None  # Specific date (YYYY-MM-DD) or None for recurring
+
+class AvailabilityResponse(BaseModel):
+    availability_id: str
+    user_id: str
+    day_of_week: str
+    start_time: str
+    end_time: str
+    is_available: bool
+    availability_date: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+class TherapistScheduleResponse(BaseModel):
+    date: str
+    sessions: list[dict]
+    availability_slots: list[dict] = []  # Add availability slots to schedule
+
+# Therapy Session Schemas
+class SessionResponse(BaseModel):
+    session_id: str
+    user_id: str
+    therapist_user_id: str
+    scheduled_at: datetime
+    duration_minutes: int
+    session_fee: float
+    session_type: str
+    session_status: str
+    session_notes: Optional[str] = None
+    user_rating: Optional[int] = None
+    user_feedback: Optional[str] = None
+    created_at: datetime
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
+
+# Dashboard Schemas
+class DashboardAppointment(BaseModel):
+    time: str  # Format: "2:00"
+    period: str  # Format: "PM" or "AM"
+    name: str  # Client name
+    session: str  # Session description
+
+class UpcomingAvailability(BaseModel):
+    date: str  # YYYY-MM-DD
+    day_name: str  # Monday, Tuesday, etc.
+    slots: list[dict]  # List of {availability_id, start_time, end_time}
+
+class TherapistDashboardResponse(BaseModel):
+    therapist_name: str
+    today_appointments: list[DashboardAppointment]
+    total_today: int
+    upcoming_availability: list[UpcomingAvailability] = []  # Next 5 days with availability
+
+class EditAvailabilityRequest(BaseModel):
+    start_time: str
+    end_time: str
+

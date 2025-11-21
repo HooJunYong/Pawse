@@ -1,15 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../therapist/therapist_dashboard.dart';
+import 'join_therapist_screen.dart';
+
 class TherapistVerificationStatus extends StatelessWidget {
   final String firstName;
   final String lastName;
   final String email;
+  final String verificationStatus;
+  final String? rejectionReason;
+  final String userId;
   
   const TherapistVerificationStatus({
     super.key,
     required this.firstName,
     required this.lastName,
     required this.email,
+    required this.userId,
+    this.verificationStatus = 'pending',
+    this.rejectionReason,
   });
 
   @override
@@ -40,7 +49,7 @@ class TherapistVerificationStatus extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Success Icon
+                // Status Icon
                 Container(
                   width: 120,
                   height: 120,
@@ -55,18 +64,30 @@ class TherapistVerificationStatus extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.check_circle,
-                    color: Color.fromRGBO(249, 115, 22, 1),
+                  child: Icon(
+                    verificationStatus == 'approved' 
+                      ? Icons.check_circle 
+                      : verificationStatus == 'rejected'
+                        ? Icons.cancel
+                        : Icons.schedule,
+                    color: verificationStatus == 'approved'
+                      ? const Color.fromRGBO(34, 197, 94, 1)
+                      : verificationStatus == 'rejected'
+                        ? const Color.fromRGBO(220, 38, 38, 1)
+                        : const Color.fromRGBO(249, 115, 22, 1),
                     size: 80,
                   ),
                 ),
                 const SizedBox(height: 32),
                 
                 // Title
-                const Text(
-                  'Application Submitted!',
-                  style: TextStyle(
+                Text(
+                  verificationStatus == 'approved'
+                    ? 'Application Approved!'
+                    : verificationStatus == 'rejected'
+                      ? 'Application Rejected'
+                      : 'Application Submitted!',
+                  style: const TextStyle(
                     fontSize: 24,
                     fontFamily: 'Nunito',
                     fontWeight: FontWeight.bold,
@@ -76,10 +97,14 @@ class TherapistVerificationStatus extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 
-                // Success Message
+                // Status Message
                 Text(
-                  'Thank you for submitting your therapist application. We have received your information and will review it shortly.',
-                  style: TextStyle(
+                  verificationStatus == 'approved'
+                    ? 'Congratulations! Your therapist application has been approved. You can now start offering your services on the platform.'
+                    : verificationStatus == 'rejected'
+                      ? 'Unfortunately, your application has been rejected. Please review the reason below and feel free to reapply after addressing the concerns.'
+                      : 'Thank you for submitting your therapist application. We have received your information and will review it shortly.',
+                  style: const TextStyle(
                     fontSize: 14,
                     fontFamily: 'Nunito',
                     color: Color.fromRGBO(107, 114, 128, 1),
@@ -121,20 +146,83 @@ class TherapistVerificationStatus extends StatelessWidget {
                       const SizedBox(height: 12),
                       _buildDetailRow('Email', email),
                       const SizedBox(height: 12),
-                      _buildDetailRow('Status', 'Pending', isPending: true),
+                      _buildDetailRow(
+                        'Status', 
+                        verificationStatus == 'approved' ? 'Approved' : verificationStatus == 'rejected' ? 'Rejected' : 'Pending',
+                        isPending: verificationStatus == 'pending',
+                        isApproved: verificationStatus == 'approved',
+                        isRejected: verificationStatus == 'rejected',
+                      ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 24),
                 
+                // Rejection Reason Card (only show if rejected)
+                if (verificationStatus == 'rejected' && rejectionReason != null && rejectionReason!.isNotEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 24),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(254, 226, 226, 1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color.fromRGBO(220, 38, 38, 0.3),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: Color.fromRGBO(220, 38, 38, 1),
+                              size: 20,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Rejection Reason',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Nunito',
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromRGBO(127, 29, 29, 1),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          rejectionReason!,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'Nunito',
+                            color: Color.fromRGBO(127, 29, 29, 1),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                
                 // Status Badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                   decoration: BoxDecoration(
-                    color: const Color.fromRGBO(254, 243, 199, 1),
+                    color: verificationStatus == 'approved'
+                      ? const Color.fromRGBO(220, 252, 231, 1)
+                      : verificationStatus == 'rejected'
+                        ? const Color.fromRGBO(254, 226, 226, 1)
+                        : const Color.fromRGBO(254, 243, 199, 1),
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
-                      color: const Color.fromRGBO(249, 115, 22, 0.3),
+                      color: verificationStatus == 'approved'
+                        ? const Color.fromRGBO(34, 197, 94, 0.3)
+                        : verificationStatus == 'rejected'
+                          ? const Color.fromRGBO(220, 38, 38, 0.3)
+                          : const Color.fromRGBO(249, 115, 22, 0.3),
                       width: 1,
                     ),
                   ),
@@ -144,19 +232,31 @@ class TherapistVerificationStatus extends StatelessWidget {
                       Container(
                         width: 8,
                         height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color.fromRGBO(249, 115, 22, 1),
+                        decoration: BoxDecoration(
+                          color: verificationStatus == 'approved'
+                            ? const Color.fromRGBO(34, 197, 94, 1)
+                            : verificationStatus == 'rejected'
+                              ? const Color.fromRGBO(220, 38, 38, 1)
+                              : const Color.fromRGBO(249, 115, 22, 1),
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text(
-                        'Verification Pending',
+                      Text(
+                        verificationStatus == 'approved'
+                          ? 'Verified Therapist'
+                          : verificationStatus == 'rejected'
+                            ? 'Application Rejected'
+                            : 'Verification Pending',
                         style: TextStyle(
                           fontSize: 14,
                           fontFamily: 'Nunito',
                           fontWeight: FontWeight.w600,
-                          color: Color.fromRGBO(146, 64, 14, 1),
+                          color: verificationStatus == 'approved'
+                            ? const Color.fromRGBO(21, 128, 61, 1)
+                            : verificationStatus == 'rejected'
+                              ? const Color.fromRGBO(127, 29, 29, 1)
+                              : const Color.fromRGBO(146, 64, 14, 1),
                         ),
                       ),
                     ],
@@ -199,30 +299,129 @@ class TherapistVerificationStatus extends StatelessWidget {
                 ),
                 const SizedBox(height: 32),
                 
-                // Back Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                // Action Buttons based on status
+                if (verificationStatus == 'approved')
+                  // Go to Therapist Dashboard Button for approved
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(34, 197, 94, 1),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
                       ),
-                      elevation: 4,
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TherapistDashboard(
+                              userId: userId,
+                            ),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        'Go to Therapist Dashboard',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text(
-                      'Back to Profile',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontFamily: 'Nunito',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                  )
+                else if (verificationStatus == 'rejected')
+                  // Resubmit Button for rejected
+                  Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color.fromRGBO(249, 115, 22, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 4,
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => JoinTherapist(
+                                  userId: userId,
+                                ),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Resubmit Application',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: const BorderSide(
+                              color: Color.fromRGBO(66, 32, 6, 1),
+                            ),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text(
+                            'Back to Profile',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromRGBO(66, 32, 6, 1),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  // Back to Profile for pending
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Back to Profile',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -231,7 +430,7 @@ class TherapistVerificationStatus extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, {bool isPending = false}) {
+  Widget _buildDetailRow(String label, String value, {bool isPending = false, bool isApproved = false, bool isRejected = false}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -243,20 +442,28 @@ class TherapistVerificationStatus extends StatelessWidget {
             color: Color.fromRGBO(107, 114, 128, 1),
           ),
         ),
-        isPending
+        (isPending || isApproved || isRejected)
             ? Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color.fromRGBO(254, 243, 199, 1),
+                  color: isApproved
+                    ? const Color.fromRGBO(220, 252, 231, 1)
+                    : isRejected
+                      ? const Color.fromRGBO(254, 226, 226, 1)
+                      : const Color.fromRGBO(254, 243, 199, 1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontFamily: 'Nunito',
                     fontWeight: FontWeight.w600,
-                    color: Color.fromRGBO(146, 64, 14, 1),
+                    color: isApproved
+                      ? const Color.fromRGBO(21, 128, 61, 1)
+                      : isRejected
+                        ? const Color.fromRGBO(127, 29, 29, 1)
+                        : const Color.fromRGBO(146, 64, 14, 1),
                   ),
                 ),
               )

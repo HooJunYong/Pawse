@@ -328,6 +328,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
                 firstName: _firstNameController.text,
                 lastName: _lastNameController.text,
                 email: _emailController.text,
+                userId: widget.userId,
               ),
             ),
           );
@@ -620,13 +621,23 @@ class _JoinTherapistState extends State<JoinTherapist> {
       );
     }
 
-    // If application exists, show verification status screen
+    // If application exists and NOT rejected, show verification status screen
+    // If rejected, user can resubmit by seeing the form
     if (_hasExistingApplication && _existingData != null) {
-      return TherapistVerificationStatus(
-        firstName: _existingData!['first_name'] ?? '',
-        lastName: _existingData!['last_name'] ?? '',
-        email: _existingData!['email'] ?? '',
-      );
+      final status = _existingData!['verification_status'] ?? 'pending';
+      
+      // Show status screen only for pending or approved applications
+      if (status == 'pending' || status == 'approved') {
+        return TherapistVerificationStatus(
+          firstName: _existingData!['first_name'] ?? '',
+          lastName: _existingData!['last_name'] ?? '',
+          email: _existingData!['email'] ?? '',
+          userId: widget.userId,
+          verificationStatus: status,
+          rejectionReason: _existingData!['rejection_reason'],
+        );
+      }
+      // For rejected status, continue to show the form below for resubmission
     }
 
     // Otherwise, show the application form

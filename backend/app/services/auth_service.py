@@ -89,7 +89,12 @@ def authenticate_user(payload: LoginRequest) -> LoginResponse:
         "user_id": user["user_id"],
         "login_at": now,
     })
-    return LoginResponse(user_id=user["user_id"], email=user["email"], last_login=now)
+    return LoginResponse(
+        user_id=user["user_id"], 
+        email=user["email"], 
+        user_type=user.get("user_type", "user"),
+        last_login=now
+    )
 
 def get_login_history(user_id: str, limit: int = 20) -> LoginHistoryResponse:
     """Get user login history"""

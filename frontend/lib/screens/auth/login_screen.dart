@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../admin/admin_therapist_management.dart';
 import '../profile/profile_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -53,9 +54,11 @@ class _LoginWidgetState extends State<LoginWidget> {
         if (!mounted) return;
 
         if (response.statusCode == 200) {
-          // Success - parse user_id and navigate to profile page
+          // Success - parse user_id and user_type, navigate accordingly
           final data = jsonDecode(response.body);
           final userId = data['user_id'] as String?;
+          final userType = data['user_type'] as String?;
+          
           if (userId == null || userId.isEmpty) {
             showDialog(
               context: context,
@@ -66,12 +69,23 @@ class _LoginWidgetState extends State<LoginWidget> {
             );
             return;
           }
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => Profile(userId: userId),
-            ),
-          );
+          
+          // Redirect based on user type
+          if (userType == 'admin') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AdminTherapistManagement(adminUserId: userId),
+              ),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Profile(userId: userId),
+              ),
+            );
+          }
         } else if (response.statusCode == 401) {
           // Invalid credentials - show popup dialog
           showDialog(
