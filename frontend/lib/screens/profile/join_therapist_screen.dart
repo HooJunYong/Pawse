@@ -10,7 +10,12 @@ import 'therapist_verification_status_screen.dart';
 
 class JoinTherapist extends StatefulWidget {
   final String userId;
-  const JoinTherapist({super.key, required this.userId});
+  final bool isResubmission;
+  const JoinTherapist({
+    super.key,
+    required this.userId,
+    this.isResubmission = false,
+  });
 
   @override
   State<JoinTherapist> createState() => _JoinTherapistState();
@@ -47,11 +52,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
 
   // Selected languages
   final Set<String> _selectedLanguages = {};
-  final List<String> _languages = [
-    'English',
-    'Bahasa Melayu',
-    'Chinese',
-  ];
+  final List<String> _languages = ['English', 'Bahasa Melayu', 'Chinese'];
 
   bool _isLoading = true;
   bool _hasExistingApplication = false;
@@ -76,6 +77,12 @@ class _JoinTherapistState extends State<JoinTherapist> {
         setState(() {
           _hasExistingApplication = true;
           _existingData = data;
+
+          // Pre-fill form if this is a resubmission
+          if (widget.isResubmission) {
+            _prefillForm(data);
+          }
+
           _isLoading = false;
         });
       } else {
@@ -92,6 +99,68 @@ class _JoinTherapistState extends State<JoinTherapist> {
         _isLoading = false;
       });
     }
+  }
+
+  void _prefillForm(Map<String, dynamic> data) {
+    setState(() {
+      _firstNameController.text = data['first_name'] ?? '';
+      _lastNameController.text = data['last_name'] ?? '';
+      _emailController.text = data['email'] ?? '';
+      _contactController.text = data['contact_number'] ?? '';
+      _licenseController.text = data['license_number'] ?? '';
+      _bioController.text = data['bio'] ?? '';
+      _officeNameController.text = data['office_name'] ?? '';
+      _addressController.text = data['office_address'] ?? '';
+      _cityController.text = data['city'] ?? '';
+      _selectedState = data['state'] ?? 'Select';
+      _zipController.text = data['zip']?.toString() ?? '';
+      _hourlyRateController.text = data['hourly_rate']?.toString() ?? '';
+
+      // Pre-fill specializations
+      if (data['specializations'] != null) {
+        _selectedSpecializations.clear();
+        _selectedSpecializations.addAll(
+          List<String>.from(data['specializations']),
+        );
+      }
+
+      // Pre-fill languages with mapping
+      if (data['languages_spoken'] != null) {
+        // Changed from 'languages' to 'languages_spoken'
+        _selectedLanguages.clear();
+        final List<String> backendLangs = List<String>.from(
+          data['languages_spoken'],
+        ); // Changed here too
+
+        // Create a normalization map for language variations
+        final languageMap = {
+          'english': 'English',
+          'bahasa melayu': 'Bahasa Melayu',
+          'bahasa': 'Bahasa Melayu',
+          'malay': 'Bahasa Melayu',
+          'chinese': 'Chinese',
+          'mandarin': 'Chinese',
+        };
+
+        for (final backendLang in backendLangs) {
+          final normalized = backendLang.toString().trim().toLowerCase();
+          final mappedLang = languageMap[normalized];
+
+          if (mappedLang != null && _languages.contains(mappedLang)) {
+            _selectedLanguages.add(mappedLang);
+          }
+        }
+      }
+      // Pre-fill profile picture if exists
+      if (data['profile_picture'] != null &&
+          data['profile_picture'].toString().isNotEmpty) {
+        try {
+          _imageBytes = base64Decode(data['profile_picture']);
+        } catch (e) {
+          // If decoding fails, leave it empty
+        }
+      }
+    });
   }
 
   @override
@@ -122,7 +191,10 @@ class _JoinTherapistState extends State<JoinTherapist> {
           child: Wrap(
             children: [
               ListTile(
-                leading: const Icon(Icons.photo_library, color: Color.fromRGBO(66, 32, 6, 1)),
+                leading: const Icon(
+                  Icons.photo_library,
+                  color: Color.fromRGBO(66, 32, 6, 1),
+                ),
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.pop(context);
@@ -130,7 +202,10 @@ class _JoinTherapistState extends State<JoinTherapist> {
                 },
               ),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color.fromRGBO(66, 32, 6, 1)),
+                leading: const Icon(
+                  Icons.camera_alt,
+                  color: Color.fromRGBO(66, 32, 6, 1),
+                ),
                 title: const Text('Take Photo'),
                 onTap: () {
                   Navigator.pop(context);
@@ -140,14 +215,20 @@ class _JoinTherapistState extends State<JoinTherapist> {
               if (_imageBytes != null)
                 ListTile(
                   leading: const Icon(Icons.delete, color: Colors.red),
-                  title: const Text('Remove Photo', style: TextStyle(color: Colors.red)),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(color: Colors.red),
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     _deleteImage();
                   },
                 ),
               ListTile(
-                leading: const Icon(Icons.close, color: Color.fromRGBO(107, 114, 128, 1)),
+                leading: const Icon(
+                  Icons.close,
+                  color: Color.fromRGBO(107, 114, 128, 1),
+                ),
                 title: const Text('Cancel'),
                 onTap: () => Navigator.pop(context),
               ),
@@ -166,7 +247,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
         maxHeight: 800,
         imageQuality: 85,
       );
-      
+
       if (pickedFile != null) {
         final bytes = await pickedFile.readAsBytes();
         setState(() {
@@ -175,9 +256,9 @@ class _JoinTherapistState extends State<JoinTherapist> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to pick image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to pick image: $e')));
       }
     }
   }
@@ -208,9 +289,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
           ),
         ),
         backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -304,15 +383,22 @@ class _JoinTherapistState extends State<JoinTherapist> {
           'contact_number': _contactController.text,
           'license_number': _licenseController.text,
           'bio': _bioController.text,
-          'office_name': _officeNameController.text.isNotEmpty ? _officeNameController.text : null,
-          'office_address': _addressController.text.isNotEmpty ? _addressController.text : null,
+          'office_name': _officeNameController.text.isNotEmpty
+              ? _officeNameController.text
+              : null,
+          'office_address': _addressController.text.isNotEmpty
+              ? _addressController.text
+              : null,
           'city': _cityController.text.isNotEmpty ? _cityController.text : null,
           'state': _selectedState != 'Select' ? _selectedState : null,
-          'zip': _zipController.text.isNotEmpty ? int.tryParse(_zipController.text) : null,
+          'zip': _zipController.text.isNotEmpty
+              ? int.tryParse(_zipController.text)
+              : null,
           'specializations': _selectedSpecializations.toList(),
           'languages': _selectedLanguages.toList(),
           'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0,
-          if (_imageBytes != null) 'profile_picture': base64Encode(_imageBytes!),
+          if (_imageBytes != null)
+            'profile_picture': base64Encode(_imageBytes!),
         }),
       );
 
@@ -379,17 +465,26 @@ class _JoinTherapistState extends State<JoinTherapist> {
             fillColor: Colors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
+              borderSide: const BorderSide(
+                color: Color.fromRGBO(229, 231, 235, 1),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
+              borderSide: const BorderSide(
+                color: Color.fromRGBO(229, 231, 235, 1),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(249, 115, 22, 1)),
+              borderSide: const BorderSide(
+                color: Color.fromRGBO(249, 115, 22, 1),
+              ),
             ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
           ),
           style: const TextStyle(
             fontSize: 14,
@@ -441,38 +536,42 @@ class _JoinTherapistState extends State<JoinTherapist> {
                 fontSize: 14,
                 color: Color.fromRGBO(66, 32, 6, 1),
               ),
-              icon: const Icon(Icons.arrow_drop_down, color: Color.fromRGBO(66, 32, 6, 1)),
-              items: [
-                'Select',
-                'Johor',
-                'Kedah',
-                'Kelantan',
-                'Kuala Lumpur',
-                'Labuan',
-                'Malacca',
-                'Negeri Sembilan',
-                'Pahang',
-                'Penang',
-                'Perak',
-                'Perlis',
-                'Putrajaya',
-                'Sabah',
-                'Sarawak',
-                'Selangor',
-                'Terengganu'
-              ].map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      color: value == 'Select' 
-                        ? const Color.fromRGBO(156, 163, 175, 1)
-                        : const Color.fromRGBO(66, 32, 6, 1),
-                    ),
-                  ),
-                );
-              }).toList(),
+              icon: const Icon(
+                Icons.arrow_drop_down,
+                color: Color.fromRGBO(66, 32, 6, 1),
+              ),
+              items:
+                  [
+                    'Select',
+                    'Johor',
+                    'Kedah',
+                    'Kelantan',
+                    'Kuala Lumpur',
+                    'Labuan',
+                    'Malacca',
+                    'Negeri Sembilan',
+                    'Pahang',
+                    'Penang',
+                    'Perak',
+                    'Perlis',
+                    'Putrajaya',
+                    'Sabah',
+                    'Sarawak',
+                    'Selangor',
+                    'Terengganu',
+                  ].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(
+                        value,
+                        style: TextStyle(
+                          color: value == 'Select'
+                              ? const Color.fromRGBO(156, 163, 175, 1)
+                              : const Color.fromRGBO(66, 32, 6, 1),
+                        ),
+                      ),
+                    );
+                  }).toList(),
               onChanged: (String? newValue) {
                 setState(() {
                   _selectedState = newValue ?? 'Select';
@@ -496,10 +595,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: const Color(0xFFFED7AA),
-              border: Border.all(
-                color: const Color(0xFFF97316),
-                width: 3,
-              ),
+              border: Border.all(color: const Color(0xFFF97316), width: 3),
             ),
             child: _imageBytes != null
                 ? ClipOval(
@@ -564,9 +660,14 @@ class _JoinTherapistState extends State<JoinTherapist> {
             return GestureDetector(
               onTap: () => onToggle(item),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color.fromRGBO(249, 115, 22, 1) : Colors.white,
+                  color: isSelected
+                      ? const Color.fromRGBO(249, 115, 22, 1)
+                      : Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: isSelected
@@ -579,7 +680,9 @@ class _JoinTherapistState extends State<JoinTherapist> {
                   style: TextStyle(
                     fontSize: 14,
                     fontFamily: 'Nunito',
-                    color: isSelected ? Colors.white : const Color.fromRGBO(66, 32, 6, 1),
+                    color: isSelected
+                        ? Colors.white
+                        : const Color.fromRGBO(66, 32, 6, 1),
                   ),
                 ),
               ),
@@ -601,7 +704,10 @@ class _JoinTherapistState extends State<JoinTherapist> {
           backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
+            icon: const Icon(
+              Icons.arrow_back,
+              color: Color.fromRGBO(66, 32, 6, 1),
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           title: const Text(
@@ -621,23 +727,21 @@ class _JoinTherapistState extends State<JoinTherapist> {
       );
     }
 
-    // If application exists and NOT rejected, show verification status screen
-    // If rejected, user can resubmit by seeing the form
-    if (_hasExistingApplication && _existingData != null) {
+    // If application exists and NOT a resubmission, show verification status screen
+    // The status screen will handle showing the resubmit button for rejected applications
+    if (_hasExistingApplication &&
+        _existingData != null &&
+        !widget.isResubmission) {
       final status = _existingData!['verification_status'] ?? 'pending';
-      
-      // Show status screen only for pending or approved applications
-      if (status == 'pending' || status == 'approved') {
-        return TherapistVerificationStatus(
-          firstName: _existingData!['first_name'] ?? '',
-          lastName: _existingData!['last_name'] ?? '',
-          email: _existingData!['email'] ?? '',
-          userId: widget.userId,
-          verificationStatus: status,
-          rejectionReason: _existingData!['rejection_reason'],
-        );
-      }
-      // For rejected status, continue to show the form below for resubmission
+
+      return TherapistVerificationStatus(
+        firstName: _existingData!['first_name'] ?? '',
+        lastName: _existingData!['last_name'] ?? '',
+        email: _existingData!['email'] ?? '',
+        userId: widget.userId,
+        verificationStatus: status,
+        rejectionReason: _existingData!['rejection_reason'],
+      );
     }
 
     // Otherwise, show the application form
@@ -647,12 +751,37 @@ class _JoinTherapistState extends State<JoinTherapist> {
         backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+          onPressed: () {
+            // If this is a resubmission and user goes back, return to status screen
+            if (widget.isResubmission && _existingData != null) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TherapistVerificationStatus(
+                    firstName: _existingData!['first_name'] ?? '',
+                    lastName: _existingData!['last_name'] ?? '',
+                    email: _existingData!['email'] ?? '',
+                    userId: widget.userId,
+                    verificationStatus:
+                        _existingData!['verification_status'] ?? 'rejected',
+                    rejectionReason: _existingData!['rejection_reason'],
+                  ),
+                ),
+              );
+            } else {
+              Navigator.pop(context);
+            }
+          },
         ),
-        title: const Text(
-          'Join as a Therapist',
-          style: TextStyle(
+        title: Text(
+          widget.isResubmission
+              ? 'Resubmit Application'
+              : 'Join as a Therapist',
+          style: const TextStyle(
             fontFamily: 'Nunito',
             fontWeight: FontWeight.bold,
             color: Color.fromRGBO(66, 32, 6, 1),
@@ -751,9 +880,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: _buildStateDropdown(),
-                        ),
+                        Expanded(child: _buildStateDropdown()),
                       ],
                     ),
                     const SizedBox(height: 16),

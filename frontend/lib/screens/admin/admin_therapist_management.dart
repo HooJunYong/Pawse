@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../auth/login_screen.dart';
+
 class AdminTherapistManagement extends StatefulWidget {
   final String adminUserId;
   const AdminTherapistManagement({super.key, required this.adminUserId});
@@ -584,10 +586,7 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
       appBar: AppBar(
         backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Therapist Applications',
           style: TextStyle(
@@ -600,6 +599,17 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Color.fromRGBO(66, 32, 6, 1)),
             onPressed: _loadPendingApplications,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color.fromRGBO(66, 32, 6, 1)),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginWidget()),
+                (route) => false,
+              );
+            },
+            tooltip: 'Logout',
           ),
         ],
       ),

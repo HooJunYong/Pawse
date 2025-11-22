@@ -177,3 +177,42 @@ def update_therapist_verification_status(user_id: str, status: str, rejection_re
         "user_id": user_id,
         "status": status
     }
+
+
+def get_therapist_dashboard_data(user_id: str) -> dict:
+    """Get therapist dashboard data including appointments and availability"""
+    # Get user basic info
+    user = db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Get therapist profile
+    therapist = db.therapist_profile.find_one({"user_id": user_id}, {"_id": 0})
+    if not therapist:
+        raise HTTPException(status_code=404, detail="Therapist profile not found")
+    
+    # Check if therapist is approved
+    if therapist.get("verification_status") != "approved":
+        raise HTTPException(status_code=403, detail="Therapist not approved")
+    
+    # Get therapist name
+    first_name = therapist.get("first_name", "")
+    last_name = therapist.get("last_name", "")
+    therapist_name = f"Dr. {first_name} {last_name}".strip()
+    
+    # TODO: Get today's appointments from appointments collection
+    # For now, return empty lists
+    today_appointments = []
+    
+    # TODO: Get upcoming availability from schedules collection
+    upcoming_availability = []
+    
+    return {
+        "therapist_name": therapist_name,
+        "today_appointments": today_appointments,
+        "upcoming_availability": upcoming_availability,
+        "total_clients": 0,  # TODO: Calculate from appointments
+        "sessions_completed": 0,  # TODO: Calculate from appointments
+        "hours_available": 0,  # TODO: Calculate from schedules
+    }
+

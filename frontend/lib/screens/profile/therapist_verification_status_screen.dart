@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../therapist/therapist_dashboard.dart';
+import '../therapist/therapist_dashboard_screen.dart';
 import 'join_therapist_screen.dart';
 
 class TherapistVerificationStatus extends StatelessWidget {
@@ -317,7 +317,7 @@ class TherapistVerificationStatus extends StatelessWidget {
                         Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => TherapistDashboard(
+                            builder: (context) => TherapistDashboardScreen(
                               userId: userId,
                             ),
                           ),
@@ -355,6 +355,7 @@ class TherapistVerificationStatus extends StatelessWidget {
                               MaterialPageRoute(
                                 builder: (context) => JoinTherapist(
                                   userId: userId,
+                                  isResubmission: true,
                                 ),
                               ),
                             );

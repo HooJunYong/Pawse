@@ -371,19 +371,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SetAvailabilityScreen(
-                              userId: widget.userId,
-                              selectedDate: _selectedDate,
-                            ),
-                          ),
-                        );
-                        // Reload schedule after returning
-                        _loadSchedule();
-                      },
+                      onPressed: _editAvailabilitySlot,
                       child: const Text(
                         'Set Availability',
                         style: TextStyle(

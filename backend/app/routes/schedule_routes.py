@@ -11,7 +11,8 @@ from ..services.schedule_service import (
     get_therapist_schedule,
     get_today_sessions,
     get_therapist_dashboard,
-    edit_availability_slot
+    edit_availability_slot,
+    get_therapist_schedule_for_month,
 )
 
 router = APIRouter()
@@ -38,6 +39,11 @@ def delete_availability(availability_id: str, user_id: str = Query(...)):
 def get_schedule(user_id: str, date: str = Query(..., description="Date in YYYY-MM-DD format")):
     """Get therapist schedule for a specific date"""
     return get_therapist_schedule(user_id, date)
+
+@router.get("/therapist/schedule/{user_id}/month")
+def get_schedule_for_month(user_id: str, year: int, month: int):
+    """Get all scheduled dates for a therapist in a given month"""
+    return get_therapist_schedule_for_month(user_id, year, month)
 
 @router.get("/therapist/today-sessions/{user_id}")
 def get_sessions_today(user_id: str):

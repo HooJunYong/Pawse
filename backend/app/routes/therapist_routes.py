@@ -6,7 +6,8 @@ from ..services.therapist_service import (
     get_therapist_profile,
     get_all_verified_therapists,
     get_pending_therapists,
-    update_therapist_verification_status
+    update_therapist_verification_status,
+    get_therapist_dashboard_data
 )
 
 router = APIRouter()
@@ -42,3 +43,9 @@ def verify_therapist(
     if body and "rejection_reason" in body:
         rejection_reason = body["rejection_reason"]
     return update_therapist_verification_status(user_id, status, rejection_reason)
+
+@router.get("/therapist/dashboard/{user_id}")
+def get_dashboard(user_id: str):
+    """Get therapist dashboard data"""
+    return get_therapist_dashboard_data(user_id)
+

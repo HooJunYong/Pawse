@@ -351,3 +351,60 @@ def edit_availability_slot(availability_id: str, user_id: str, payload: EditAvai
         "success": True,
         "message": "Availability slot updated successfully"
     }
+
+def get_therapist_schedule_for_month(user_id: str, year: int, month: int) -> dict:
+    """Get all dates in a month that have either an appointment or availability"""
+    
+    # Validate month and year
+    if not (1 <= month <= 12):
+        raise HTTPException(status_code=400, detail="Month must be between 1 and 12")
+    if not (2000 <= year <= 2100):
+        raise HTTPException(status_code=400, detail="Year must be between 2000 and 2100")
+
+    # Get start and end of the month
+    start_of_month = datetime(year, month, 1)
+    if month == 12:
+        end_of_month = datetime(year + 1, 1, 1)
+    else:
+        end_of_month = datetime(year, month + 1, 1)
+
+    # --- Get dates with sessions ---
+    sessions = db.therapy_session.find({
+        "therapist_user_id": user_id,
+        "scheduled_at": {
+            "$gte": start_of_month,
+            "$lt": end_of_month
+        }
+    })
+    
+    scheduled_dates = {session["scheduled_at"].strftime("%Y-%m-%d") for session in sessions}
+
+    # --- Get dates with specific availability ---
+    specific_availability = db.therapist_availability.find({
+        "user_id": user_id,
+        "availability_date": {
+            "$gte": start_of_month.strftime("%Y-%m-%d"),
+            "$lt": end_of_month.strftime("%Y-%m-%d")
+        }
+    })
+    
+    for avail in specific_availability:
+        scheduled_dates.add(avail["availability_date"])
+        
+    # --- Get dates from recurring availability ---
+    recurring_availability = db.therapist_availability.find({
+        "user_id": user_id,
+        "availability_date": None
+    })
+    
+    recurring_days = {avail["day_of_week"].lower() for avail in recurring_availability}
+    
+    if recurring_days:
+        # Iterate through the month to find matching days of the week
+        current_day = start_of_month
+        while current_day < end_of_month:
+            if current_day.strftime("%A").lower() in recurring_days:
+                scheduled_dates.add(current_day.strftime("%Y-%m-%d"))
+            current_day += __import__('datetime').timedelta(days=1)
+
+    return {"scheduled_dates": sorted(list(scheduled_dates))}

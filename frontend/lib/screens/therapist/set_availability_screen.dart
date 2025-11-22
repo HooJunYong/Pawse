@@ -134,18 +134,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
   }
 
   Future<void> _saveAvailability() async {
-    // Check if there are any time slots
-    if (_timeSlots.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add at least one time slot'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    // Show loading
+    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -174,24 +163,32 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context); // Close loading
+        Navigator.pop(context); // Close loading dialog
+
+        final message = _timeSlots.isNotEmpty
+            ? 'Availability saved successfully'
+            : 'Availability cleared for the selected date';
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
               _applyToAllThursdays
-                  ? 'Availability saved for all ${_getDayName()}s this month'
-                  : 'Availability saved successfully',
+                  ? 'Availability updated for all ${_getDayName()}s this month'
+                  : message,
             ),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context); // Go back to schedule
+        Navigator.pop(context); // Go back to schedule screen
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading
+        Navigator.pop(context); // Close loading dialog
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error saving availability: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -209,7 +206,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         'user_id': widget.userId,
         'day_of_week': _getDayOfWeek(),
         'slots': slots,
-        'is_available': true,
+        'is_available': slots.isNotEmpty,
         'availability_date': dateStr,
       }),
     );
