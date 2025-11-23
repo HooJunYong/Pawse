@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import 'set_availability_screen.dart';
+import 'therapist_dashboard_screen.dart';
+import 'therapist_profile_screen.dart';
 
 class ManageScheduleScreen extends StatefulWidget {
   final String userId;
@@ -20,9 +22,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   DateTime _selectedDate = DateTime.now();
   List<Map<String, dynamic>> _sessions = [];
   List<Map<String, dynamic>> _availabilitySlots = [];
-  Set<String> _datesWithSchedule =
-      {}; // Track dates with availability or sessions
-  bool _isLoading = false;
+  Set<String> _datesWithSchedule = {};
+  bool _isLoading = true;
+  int _selectedIndex = 2; // Calendar is selected by default
 
   @override
   void initState() {
@@ -32,90 +34,80 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   Future<void> _loadSchedule() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
 
-      final response = await http.get(
+      // Load schedule for the day (includes both sessions and availability)
+      final scheduleResponse = await http.get(
         Uri.parse('$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'),
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (mounted) {
         setState(() {
-          _sessions = (data['sessions'] as List).cast<Map<String, dynamic>>();
-          _availabilitySlots = (data['availability_slots'] as List? ?? [])
-              .cast<Map<String, dynamic>>();
-          _isLoading = false;
-        });
-      } else {
-        setState(() {
-          _sessions = [];
-          _availabilitySlots = [];
+          if (scheduleResponse.statusCode == 200) {
+            final scheduleData = jsonDecode(scheduleResponse.body);
+            _sessions = List<Map<String, dynamic>>.from(
+              scheduleData['sessions'] ?? [],
+            );
+            _availabilitySlots = List<Map<String, dynamic>>.from(
+              scheduleData['availability_slots'] ?? [],
+            );
+          } else {
+            _sessions = [];
+            _availabilitySlots = [];
+          }
+
           _isLoading = false;
         });
       }
     } catch (e) {
-      setState(() {
-        _sessions = [];
-        _availabilitySlots = [];
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading schedule: $e')),
+        );
+      }
     }
   }
 
   Future<void> _loadMonthSchedule() async {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-      final lastDay = DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
+      final year = _selectedDate.year;
+      final month = _selectedDate.month;
 
-      final scheduledDates = <String>{};
+      final response = await http.get(
+        Uri.parse('$apiUrl/therapist/schedule/${widget.userId}/month?year=$year&month=$month'),
+      );
 
-      // Check each day in the month
-      for (int day = 1; day <= lastDay.day; day++) {
-        final checkDate = DateTime(
-          _selectedDate.year,
-          _selectedDate.month,
-          day,
-        );
-        final dateStr = DateFormat('yyyy-MM-dd').format(checkDate);
-
-        final response = await http.get(
-          Uri.parse(
-            '$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr',
-          ),
-        );
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final sessions = data['sessions'] as List? ?? [];
-          final availability = data['availability_slots'] as List? ?? [];
-
-          if (sessions.isNotEmpty || availability.isNotEmpty) {
-            scheduledDates.add(dateStr);
-          }
-        }
+      if (response.statusCode == 200 && mounted) {
+        final data = jsonDecode(response.body);
+        final dates = List<String>.from(data['scheduled_dates'] ?? []);
+        setState(() {
+          _datesWithSchedule = dates.toSet();
+        });
       }
-
-      setState(() {
-        _datesWithSchedule = scheduledDates;
-      });
     } catch (e) {
-      // Silently fail - calendar will still work without highlighting
+      // Silently fail - not critical
     }
   }
 
-  void _changeMonth(int direction) {
+  void _changeMonth(int delta) {
     setState(() {
       _selectedDate = DateTime(
         _selectedDate.year,
-        _selectedDate.month + direction,
-        _selectedDate.day,
+        _selectedDate.month + delta,
+        1,
       );
     });
-    _loadMonthSchedule(); // Reload month data when changing months
+    _loadMonthSchedule();
   }
 
   void _selectDate(DateTime date) {
@@ -163,6 +155,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
+
                   // Calendar
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -205,11 +198,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                           ],
                         ),
                         const SizedBox(height: 16),
+
                         // Day Labels
                         Padding(
-                          padding: const EdgeInsets.only(
-                            left: 12,
-                          ), // 👈 adjust the padding you want
+                          padding: const EdgeInsets.only(left: 12),
                           child: Row(
                             children: [
                               ...['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(
@@ -224,12 +216,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                                           fontSize: 12,
                                           fontFamily: 'Nunito',
                                           fontWeight: FontWeight.w600,
-                                          color: Color.fromRGBO(
-                                            107,
-                                            114,
-                                            128,
-                                            1,
-                                          ),
+                                          color: Color.fromRGBO(107, 114, 128, 1),
                                         ),
                                       ),
                                     ),
@@ -240,11 +227,12 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                             ],
                           ),
                         ),
-
                         const SizedBox(height: 8),
+
                         // Calendar Grid
                         _buildCalendarGrid(),
                         const SizedBox(height: 16),
+
                         // Legend
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -255,20 +243,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: const Color.fromRGBO(
-                                      249,
-                                      115,
-                                      22,
-                                      0.2,
-                                    ),
+                                    color: const Color.fromRGBO(249, 115, 22, 0.2),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: const Color.fromRGBO(
-                                        249,
-                                        115,
-                                        22,
-                                        0.5,
-                                      ),
+                                      color: const Color.fromRGBO(249, 115, 22, 0.5),
                                       width: 2,
                                     ),
                                   ),
@@ -325,7 +303,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Sessions List (includes booked sessions and available slots)
+                  // Sessions List
                   if (_isLoading)
                     const Center(
                       child: CircularProgressIndicator(
@@ -353,11 +331,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                     // Show booked sessions
                     ..._sessions.map((session) => _buildSessionCard(session)),
                     // Show available time slots
-                    ..._availabilitySlots.map(
-                      (slot) => _buildAvailabilityCard(slot),
-                    ),
+                    ..._availabilitySlots.map((slot) => _buildAvailabilityCard(slot)),
                   ],
-
                   const SizedBox(height: 24),
 
                   // Set Availability Button
@@ -400,20 +375,96 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           ),
         ),
       ),
+      bottomNavigationBar: _buildBottomNavigationBar(),
+    );
+  }
+
+  Widget _buildBottomNavigationBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          width: 375,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(32),
+              topRight: Radius.circular(32),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  // Home Button
+                  IconButton(
+                    icon: const Icon(Icons.home_outlined),
+                    color: const Color.fromRGBO(107, 114, 128, 1),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TherapistDashboardScreen(userId: widget.userId),
+                        ),
+                      );
+                    },
+                  ),
+                  // Chat Button
+                  IconButton(
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    color: const Color.fromRGBO(107, 114, 128, 1),
+                    onPressed: () {
+                      // Navigate to chat
+                    },
+                  ),
+                  // Calendar Button (Active)
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(249, 115, 22, 1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      color: Colors.white,
+                      onPressed: () {
+                        // Already on schedule screen
+                      },
+                    ),
+                  ),
+                  // Profile Button
+                  IconButton(
+                    icon: const Icon(Icons.person),
+                    color: const Color.fromRGBO(107, 114, 128, 1),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TherapistProfileScreen(userId: widget.userId),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildCalendarGrid() {
-    final firstDayOfMonth = DateTime(
-      _selectedDate.year,
-      _selectedDate.month,
-      1,
-    );
-    final lastDayOfMonth = DateTime(
-      _selectedDate.year,
-      _selectedDate.month + 1,
-      0,
-    );
+    final firstDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
+    final lastDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
 
@@ -428,12 +479,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_selectedDate.year, _selectedDate.month, day);
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
-      final isSelected =
-          date.year == _selectedDate.year &&
+      final isSelected = date.year == _selectedDate.year &&
           date.month == _selectedDate.month &&
           date.day == _selectedDate.day;
-      final isToday =
-          date.year == DateTime.now().year &&
+      final isToday = date.year == DateTime.now().year &&
           date.month == DateTime.now().month &&
           date.day == DateTime.now().day;
       final hasSchedule = _datesWithSchedule.contains(dateStr);
@@ -448,8 +497,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
               color: isSelected
                   ? const Color.fromRGBO(249, 115, 22, 1)
                   : hasSchedule
-                  ? const Color.fromRGBO(249, 115, 22, 0.2)
-                  : Colors.transparent,
+                      ? const Color.fromRGBO(249, 115, 22, 0.2)
+                      : Colors.transparent,
               shape: BoxShape.circle,
               border: hasSchedule && !isSelected
                   ? Border.all(
@@ -468,8 +517,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                   color: isSelected
                       ? Colors.white
                       : hasSchedule
-                      ? const Color.fromRGBO(249, 115, 22, 1)
-                      : const Color.fromRGBO(66, 32, 6, 1),
+                          ? const Color.fromRGBO(249, 115, 22, 1)
+                          : const Color.fromRGBO(66, 32, 6, 1),
                 ),
               ),
             ),
@@ -478,7 +527,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
       );
     }
 
-    return Wrap(spacing: 8, runSpacing: 8, children: dayWidgets);
+    return Padding(
+      padding: const EdgeInsets.only(left: 12),
+      child: Wrap(spacing: 8, runSpacing: 8, children: dayWidgets),
+    );
   }
 
   Widget _buildSessionCard(Map<String, dynamic> session) {

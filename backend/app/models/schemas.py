@@ -58,6 +58,22 @@ class TherapistApplicationRequest(BaseModel):
     hourly_rate: float
     profile_picture: Optional[str] = None  # base64 encoded
 
+class UpdateTherapistProfileRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    contact_number: Optional[str] = None
+    bio: Optional[str] = None
+    office_name: Optional[str] = None
+    office_address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[int] = None
+    hourly_rate: Optional[float] = None
+    profile_picture_base64: Optional[str] = None
+    profile_picture_url: Optional[str] = None
+    delete_profile_picture: Optional[bool] = False
+
 # Response Models
 class LoginResponse(BaseModel):
     user_id: str

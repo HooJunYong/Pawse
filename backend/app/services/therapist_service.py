@@ -3,8 +3,9 @@ import logging
 from typing import Optional
 from fastapi import HTTPException
 from ..models.database import db
-from ..models.schemas import TherapistApplicationRequest, TherapistApplicationResponse, TherapistProfileResponse
+from ..models.schemas import TherapistApplicationRequest, TherapistApplicationResponse, TherapistProfileResponse, UpdateTherapistProfileRequest
 from ..config.timezone import now_my
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -215,4 +216,63 @@ def get_therapist_dashboard_data(user_id: str) -> dict:
         "sessions_completed": 0,  # TODO: Calculate from appointments
         "hours_available": 0,  # TODO: Calculate from schedules
     }
+
+
+def update_therapist_profile(user_id: str, payload: UpdateTherapistProfileRequest) -> TherapistProfileResponse:
+    """Update therapist profile"""
+    therapist = db.therapist_profile.find_one({"user_id": user_id})
+    if not therapist:
+        raise HTTPException(status_code=404, detail="Therapist profile not found")
+    
+    now = now_my()
+    update_data: dict = {"updated_at": now}
+    
+    # Update basic fields if provided
+    if payload.first_name is not None:
+        update_data["first_name"] = payload.first_name
+    if payload.last_name is not None:
+        update_data["last_name"] = payload.last_name
+    if payload.email is not None:
+        update_data["email"] = payload.email
+    if payload.contact_number is not None:
+        update_data["contact_number"] = payload.contact_number
+    if payload.bio is not None:
+        update_data["bio"] = payload.bio
+    if payload.office_name is not None:
+        update_data["office_name"] = payload.office_name
+    if payload.office_address is not None:
+        update_data["office_address"] = payload.office_address
+    if payload.city is not None:
+        update_data["city"] = payload.city
+    if payload.state is not None:
+        update_data["state"] = payload.state
+    if payload.zip is not None:
+        update_data["zip"] = payload.zip
+    if payload.hourly_rate is not None:
+        update_data["hourly_rate"] = payload.hourly_rate
+    
+    # Handle profile picture
+    if payload.delete_profile_picture:
+        update_data["profile_picture_url"] = None
+    elif payload.profile_picture_base64:
+        # Store base64 image directly
+        update_data["profile_picture_url"] = payload.profile_picture_base64
+    elif payload.profile_picture_url is not None:
+        update_data["profile_picture_url"] = payload.profile_picture_url
+    
+    try:
+        db.therapist_profile.update_one(
+            {"user_id": user_id},
+            {"$set": update_data}
+        )
+        logger.info(f"Therapist profile updated: {user_id}")
+        
+        # Return updated profile
+        updated_therapist = db.therapist_profile.find_one({"user_id": user_id}, {"_id": 0})
+        if not updated_therapist:
+            raise HTTPException(status_code=404, detail="Updated profile not found")
+        return TherapistProfileResponse(**updated_therapist)  # type: ignore
+    except Exception as e:
+        logger.error(f"Failed to update therapist profile: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update profile")
 

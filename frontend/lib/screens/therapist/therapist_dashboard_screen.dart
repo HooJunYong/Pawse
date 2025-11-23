@@ -18,7 +18,7 @@ class TherapistDashboardScreen extends StatefulWidget {
 
 class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   List<Map<String, dynamic>> _todaysAppointments = [];
-  List<Map<String, dynamic>> _upcomingAvailability = [];
+  List<Map<String, dynamic>> _upcomingSchedule = [];
   String _therapistName = '';
   int _selectedIndex = 0;
   bool _isLoading = true;
@@ -53,22 +53,11 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
       // final appointmentsResponse = await http.get(
       //   Uri.parse('$apiUrl/therapist/appointments/today/${widget.userId}'),
       // );
-      
-      // Load upcoming availability
-      final availabilityResponse = await http.get(
-        Uri.parse('$apiUrl/therapist/availability/${widget.userId}'),
-      );
-
-      if (availabilityResponse.statusCode == 200) {
-        final availabilityData = jsonDecode(availabilityResponse.body);
-        setState(() {
-          _upcomingAvailability = List<Map<String, dynamic>>.from(availabilityData);
-        });
-      }
 
       setState(() {
         _isLoading = false;
       });
+      await _loadUpcomingSchedule();
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -78,6 +67,82 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
           SnackBar(content: Text('Error loading dashboard: $e')),
         );
       }
+    }
+  }
+
+  Future<void> _loadUpcomingSchedule() async {
+    final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+    final List<Map<String, dynamic>> scheduleData = [];
+    final now = DateTime.now();
+    
+    for (int i = 0; i < 5; i++) {
+      final date = now.add(Duration(days: i));
+      final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      
+      try {
+        final response = await http.get(
+          Uri.parse('$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'),
+        );
+        
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          final sessions = List<Map<String, dynamic>>.from(data['sessions'] ?? []);
+          final availabilitySlots = List<Map<String, dynamic>>.from(data['availability_slots'] ?? []);
+          
+          for (var slot in availabilitySlots) {
+            bool isBooked = false;
+            String? clientName;
+            
+            for (var session in sessions) {
+              final sessionTime = DateTime.parse(session['scheduled_at']);
+              final slotStart = _parseTimeWithDate(dateStr, slot['start_time']);
+              if (sessionTime.isAtSameMomentAs(slotStart)) {
+                isBooked = true;
+                clientName = session['client_name'];
+                break;
+              }
+            }
+            
+            scheduleData.add({
+              'date': dateStr,
+              'start_time': slot['start_time'],
+              'end_time': slot['end_time'],
+              'availability_id': slot['availability_id'],
+              'is_booked': isBooked,
+              'client_name': clientName,
+            });
+          }
+        }
+      } catch (e) {
+        continue;
+      }
+    }
+    
+    if (mounted) {
+      setState(() {
+        _upcomingSchedule = scheduleData;
+      });
+    }
+  }
+
+  DateTime _parseTimeWithDate(String dateStr, String timeStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final timeParts = timeStr.split(':');
+      final hourStr = timeParts[0];
+      final minutePart = timeParts[1].split(' ');
+      final minuteStr = minutePart[0];
+      
+      int hour = int.parse(hourStr);
+      final minute = int.parse(minuteStr);
+      
+      final isPM = timeStr.toLowerCase().contains('pm');
+      if (isPM && hour < 12) hour += 12;
+      if (!isPM && hour == 12) hour = 0;
+      
+      return DateTime(date.year, date.month, date.day, hour, minute);
+    } catch (e) {
+      return DateTime.parse(dateStr);
     }
   }
 
@@ -175,22 +240,29 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
 
                   // Appointment Cards or Empty State
                   _todaysAppointments.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
+                      ? Container(
+                          padding: const EdgeInsets.all(32),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Center(
                             child: Column(
                               children: [
                                 Icon(
                                   Icons.calendar_today_outlined,
-                                  size: 64,
+                                  size: 48,
                                   color: Colors.grey[300],
                                 ),
-                                const SizedBox(height: 16),
+                                const SizedBox(height: 12),
                                 Text(
                                   'No appointments scheduled for today',
                                   style: TextStyle(
+                                    fontSize: 14,
+                                    fontFamily: 'Nunito',
                                     color: Colors.grey[600],
                                   ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             ),
@@ -215,22 +287,27 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                               child: Row(
                                 children: [
                                   // Time
-                                  SizedBox(
-                                    width: 50,
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          appointment['time'] ?? '',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontFamily: 'Nunito',
-                                            fontWeight: FontWeight.bold,
-                                            color: Color.fromRGBO(249, 115, 22, 1),
-                                          ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        appointment['time'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontFamily: 'Nunito',
+                                          fontWeight: FontWeight.bold,
+                                          color: Color.fromRGBO(249, 115, 22, 1),
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                      Text(
+                                        appointment['period'] ?? '',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontFamily: 'Nunito',
+                                          color: Color.fromRGBO(107, 114, 128, 1),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(width: 16),
                                   // Details
@@ -247,10 +324,11 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                             color: Color.fromRGBO(66, 32, 6, 1),
                                           ),
                                         ),
+                                        const SizedBox(height: 2),
                                         Text(
                                           appointment['type'] ?? '',
                                           style: const TextStyle(
-                                            fontSize: 14,
+                                            fontSize: 13,
                                             fontFamily: 'Nunito',
                                             color: Color.fromRGBO(107, 114, 128, 1),
                                           ),
@@ -265,7 +343,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                         ),
                   const SizedBox(height: 32),
 
-                  // Quick Actions
+                  // Quick Actions (moved up)
                   const Text(
                     'Quick Actions',
                     style: TextStyle(
@@ -315,10 +393,11 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Upcoming Scheduled Days
-                  if (_upcomingAvailability.isNotEmpty) ...[
-                    const Text(
-                      'Upcoming Scheduled Days',
+                  // Upcoming Schedule (Next 5 Days) - moved below Quick Actions
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Upcoming Schedule (Next 5 Days)',
                       style: TextStyle(
                         fontSize: 18,
                         fontFamily: 'Nunito',
@@ -326,9 +405,133 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                         color: Color.fromRGBO(66, 32, 6, 1),
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    ..._upcomingAvailability.map((availability) => _buildAvailabilityCard(availability)),
-                  ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  _upcomingSchedule.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'No upcoming schedule',
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                color: Color.fromRGBO(107, 114, 128, 1),
+                              ),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: _upcomingSchedule.map((schedule) {
+                            final date = DateTime.parse(schedule['date']);
+                            final dateStr = "${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.weekday%7]}, ${date.month}/${date.day}";
+                            final isBooked = schedule['is_booked'] ?? false;
+                            
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isBooked
+                                      ? const Color.fromRGBO(34, 197, 94, 0.3)
+                                      : const Color.fromRGBO(249, 115, 22, 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          dateStr,
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontFamily: 'Nunito',
+                                            fontWeight: FontWeight.bold,
+                                            color: Color.fromRGBO(66, 32, 6, 1),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${schedule['start_time']} - ${schedule['end_time']}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontFamily: 'Nunito',
+                                            color: Color.fromRGBO(107, 114, 128, 1),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: isBooked
+                                                    ? const Color.fromRGBO(34, 197, 94, 0.1)
+                                                    : const Color.fromRGBO(249, 115, 22, 0.1),
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                              child: Text(
+                                                isBooked ? 'Booked' : 'Available',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  fontFamily: 'Nunito',
+                                                  fontWeight: FontWeight.w600,
+                                                  color: isBooked
+                                                      ? const Color.fromRGBO(34, 197, 94, 1)
+                                                      : const Color.fromRGBO(249, 115, 22, 1),
+                                                ),
+                                              ),
+                                            ),
+                                            if (isBooked && schedule['client_name'] != null) ...[
+                                              const SizedBox(width: 8),
+                                              Flexible(
+                                                child: Text(
+                                                  '• ${schedule['client_name']}',
+                                                  style: const TextStyle(
+                                                    fontSize: 11,
+                                                    fontFamily: 'Nunito',
+                                                    color: Color.fromRGBO(107, 114, 128, 1),
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined, size: 20),
+                                    color: const Color.fromRGBO(249, 115, 22, 1),
+                                    onPressed: () async {
+                                      await Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ManageScheduleScreen(userId: widget.userId),
+                                        ),
+                                      );
+                                      await _loadUpcomingSchedule();
+                                    },
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                  const SizedBox(height: 32),
                 ],
               ),
             ),
@@ -360,49 +563,27 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // Home Button
+                    // Home Button (Active)
                     Container(
                       decoration: BoxDecoration(
-                        color: _selectedIndex == 0
-                            ? const Color.fromRGBO(249, 115, 22, 1)
-                            : Colors.transparent,
+                        color: const Color.fromRGBO(249, 115, 22, 1),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: IconButton(
-                        icon: Icon(
-                          Icons.home_outlined,
-                          color: _selectedIndex == 0
-                              ? Colors.white
-                              : const Color.fromRGBO(107, 114, 128, 1),
-                        ),
-                        onPressed: () {
-                          if (_selectedIndex != 0) {
-                            setState(() {
-                              _selectedIndex = 0;
-                            });
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TherapistDashboardScreen(userId: widget.userId),
-                              ),
-                            );
-                          }
-                        },
+                        icon: const Icon(Icons.home_outlined),
+                        color: Colors.white,
+                        onPressed: () {},
                       ),
                     ),
-                    // Chat Button (no orange circle)
+                    // Chat Button
                     IconButton(
                       icon: const Icon(Icons.chat_bubble_outline),
-                      color: _selectedIndex == 1
-                          ? const Color.fromRGBO(249, 115, 22, 1)
-                          : const Color.fromRGBO(107, 114, 128, 1),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
                       onPressed: () {
-                        setState(() {
-                          _selectedIndex = 1;
-                        });
+                        // Navigate to chat
                       },
                     ),
-                    // Calendar Button (no orange circle)
+                    // Calendar Button
                     IconButton(
                       icon: const Icon(Icons.calendar_today_outlined),
                       color: const Color.fromRGBO(107, 114, 128, 1),
@@ -418,34 +599,17 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                       },
                     ),
                     // Profile Button
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _selectedIndex == 2
-                            ? const Color.fromRGBO(249, 115, 22, 1)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          Icons.person,
-                          color: _selectedIndex == 2
-                              ? Colors.white
-                              : const Color.fromRGBO(107, 114, 128, 1),
-                        ),
-                        onPressed: () {
-                          if (_selectedIndex != 2) {
-                            setState(() {
-                              _selectedIndex = 2;
-                            });
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => TherapistProfileScreen(userId: widget.userId),
-                              ),
-                            );
-                          }
-                        },
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.person),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TherapistProfileScreen(userId: widget.userId),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -508,210 +672,5 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildAvailabilityCard(Map<String, dynamic> availability) {
-    final date = (availability['date'] ?? '') as String;
-    final dayName = (availability['day_name'] ?? '') as String;
-    final slots = (availability['slots'] ?? []) as List;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    dayName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontFamily: 'Nunito',
-                      fontWeight: FontWeight.bold,
-                      color: Color.fromRGBO(66, 32, 6, 1),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    date,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontFamily: 'Nunito',
-                      color: Color.fromRGBO(107, 114, 128, 1),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...slots.map((slot) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.access_time,
-                      size: 16,
-                      color: Color.fromRGBO(249, 115, 22, 1),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${(slot['start_time'] ?? '') as String} - ${(slot['end_time'] ?? '') as String}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontFamily: 'Nunito',
-                        color: Color.fromRGBO(66, 32, 6, 1),
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 18),
-                      color: const Color.fromRGBO(249, 115, 22, 1),
-                      onPressed: () => _editAvailabilitySlot(slot['availability_id'], slot),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 18),
-                      color: Colors.red,
-                      onPressed: () => _deleteAvailabilitySlot(slot['availability_id']),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _editAvailabilitySlot(String availabilityId, Map<String, dynamic> slot) async {
-    final startController = TextEditingController(text: slot['start_time']);
-    final endController = TextEditingController(text: slot['end_time']);
-
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Availability'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: startController,
-              decoration: const InputDecoration(
-                labelText: 'Start Time (HH:MM AM/PM)',
-                hintText: '09:00 AM',
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: endController,
-              decoration: const InputDecoration(
-                labelText: 'End Time (HH:MM AM/PM)',
-                hintText: '05:00 PM',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-
-    if (result == true) {
-      try {
-        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-        final response = await http.put(
-          Uri.parse('$apiUrl/therapist/availability/$availabilityId?user_id=${widget.userId}'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'start_time': startController.text,
-            'end_time': endController.text,
-          }),
-        );
-
-        if (response.statusCode == 200 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Availability updated successfully')),
-          );
-          _loadDashboardData();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _deleteAvailabilitySlot(String availabilityId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Availability'),
-        content: const Text('Are you sure you want to delete this availability slot?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm == true) {
-      try {
-        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-        final response = await http.delete(
-          Uri.parse('$apiUrl/therapist/availability/$availabilityId?user_id=${widget.userId}'),
-        );
-
-        if (response.statusCode == 200 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Availability deleted successfully')),
-          );
-          _loadDashboardData();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
-    }
   }
 }

@@ -7,348 +7,348 @@ import 'package:http/http.dart' as http;
 import '../profile/profile_screen.dart';
 import 'manage_schedule_screen.dart';
 import 'therapist_dashboard_screen.dart';
+import 'therapist_edit_profile_screen.dart';
 
 class TherapistProfileScreen extends StatefulWidget {
-	final String userId;
+  final String userId;
 
-	const TherapistProfileScreen({Key? key, required this.userId}) : super(key: key);
+  const TherapistProfileScreen({Key? key, required this.userId}) : super(key: key);
 
-	@override
-	State<TherapistProfileScreen> createState() => _TherapistProfileScreenState();
+  @override
+  State<TherapistProfileScreen> createState() => _TherapistProfileScreenState();
 }
 
 class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
-	// Theme colors copied from therapist_dashboard
-	static const Color _background = Color.fromRGBO(247, 244, 242, 1);
-	static const Color _accent = Color.fromRGBO(249, 115, 22, 1);
-	static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
+  // Theme colors
+  static const Color _background = Color.fromRGBO(247, 244, 242, 1);
+  static const Color _accent = Color.fromRGBO(249, 115, 22, 1);
+  static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
 
-	late Future<Map<String, dynamic>> _profileFuture;
-	int _selectedIndex = 2; // Profile is selected
+  late Future<Map<String, dynamic>> _profileFuture;
+  int _selectedIndex = 2; // Profile is selected
 
-	@override
-	void initState() {
-		super.initState();
-		_profileFuture = _fetchProfile();
-	}
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _fetchProfile();
+  }
 
-	Future<Map<String, dynamic>> _fetchProfile() async {
-		final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-		final resp = await http.get(Uri.parse('$apiUrl/therapist/profile/${widget.userId}'));
+  Future<Map<String, dynamic>> _fetchProfile() async {
+    final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+    final resp = await http.get(Uri.parse('$apiUrl/therapist/profile/${widget.userId}'));
     
-		if (resp.statusCode == 200) {
-			return jsonDecode(resp.body) as Map<String, dynamic>;
-		}
-		throw Exception('Failed to load therapist profile (${resp.statusCode})');
-	}
+    if (resp.statusCode == 200) {
+      return jsonDecode(resp.body) as Map<String, dynamic>;
+    }
+    throw Exception('Failed to load therapist profile (${resp.statusCode})');
+  }
 
-	Widget _initialsCircle(String initials) {
-		return Container(
-			decoration: BoxDecoration(
-				shape: BoxShape.circle,
-				border: Border.all(
-					color: _accent,
-					width: 3,
-				),
-			),
-			child: CircleAvatar(
-				radius: 48,
-				backgroundColor: const Color(0xFFFED7AA),
-				child: Text(
-					initials,
-					style: const TextStyle(
-						fontSize: 40,
-						fontFamily: 'Nunito',
-						fontWeight: FontWeight.bold,
-						color: Color.fromRGBO(66, 32, 6, 1),
-					),
-				),
-			),
-		);
-	}
-	@override
-	Widget build(BuildContext context) {
-		return Scaffold(
-			backgroundColor: _background,
-			body: SafeArea(
-				child: Center(
-					child: SingleChildScrollView(
-						child: Container(
-							width: 375,
-							decoration: const BoxDecoration(
-								borderRadius: BorderRadius.all(Radius.circular(40)),
-								color: Color.fromRGBO(247, 244, 242, 1),
-							),
-							padding: const EdgeInsets.all(32),
-							child: FutureBuilder<Map<String, dynamic>>(
-								future: _profileFuture,
-								builder: (context, snapshot) {
-									if (snapshot.connectionState != ConnectionState.done) {
-										return const Center(child: CircularProgressIndicator());
-									}
-									if (snapshot.hasError) {
-										return Column(
-											mainAxisSize: MainAxisSize.min,
-											children: [
-												const Icon(Icons.error_outline, size: 48, color: Colors.red),
-												const SizedBox(height: 16),
-												const Text(
-													'Failed to load profile',
-													style: TextStyle(
-														fontSize: 18,
-														fontFamily: 'Nunito',
-														color: Color.fromRGBO(66, 32, 6, 1),
-													),
-												),
-												const SizedBox(height: 8),
-												Text('${snapshot.error}', style: const TextStyle(fontSize: 12)),
-												const SizedBox(height: 24),
-												ElevatedButton(
-													onPressed: () {
-														setState(() => _profileFuture = _fetchProfile());
-													},
-													child: const Text('Retry'),
-												),
-											],
-										);
-								}
+  Widget _initialsCircle(String initials) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: _accent,
+          width: 3,
+        ),
+      ),
+      child: CircleAvatar(
+        radius: 48,
+        backgroundColor: const Color(0xFFFED7AA),
+        child: Text(
+          initials,
+          style: const TextStyle(
+            fontSize: 40,
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+      ),
+    );
+  }
 
-								final data = snapshot.data!;
-								// Extract first_name and last_name from backend and add Dr. prefix
-								final firstName = (data['first_name'] as String?) ?? '';
-								final lastName = (data['last_name'] as String?) ?? '';
-								final fullName = 'Dr. $firstName $lastName'.trim();
-								// Generate initials from first and last name
-								final initials = (firstName.isNotEmpty ? firstName[0] : '') + (lastName.isNotEmpty ? lastName[0] : '');
-								final profilePictureUrl = data['profile_picture_url'] as String?;									Widget avatarWidget;
-									if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
-										avatarWidget = Container(
-											decoration: BoxDecoration(
-												shape: BoxShape.circle,
-												border: Border.all(
-													color: _accent,
-													width: 3,
-												),
-											),
-											child: CircleAvatar(
-												radius: 48,
-												backgroundColor: const Color(0xFFFED7AA),
-												backgroundImage: NetworkImage(profilePictureUrl),
-											),
-										);
-									} else {
-										avatarWidget = _initialsCircle(initials);
-									}
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _background,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: Container(
+              width: 375,
+              decoration: const BoxDecoration(
+                borderRadius: BorderRadius.all(Radius.circular(40)),
+                color: Color.fromRGBO(247, 244, 242, 1),
+              ),
+              padding: const EdgeInsets.all(32),
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _profileFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (snapshot.hasError) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Failed to load profile',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontFamily: 'Nunito',
+                            color: Color.fromRGBO(66, 32, 6, 1),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('${snapshot.error}', style: const TextStyle(fontSize: 12)),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: () {
+                            setState(() => _profileFuture = _fetchProfile());
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    );
+                  }
 
-									return Column(
-										mainAxisSize: MainAxisSize.min,
-										children: [
-											const SizedBox(height: 20),
-											avatarWidget,
-											const SizedBox(height: 16),
-											Text(
-												fullName,
-												style: const TextStyle(
-													fontSize: 24,
-													fontFamily: 'Nunito',
-													fontWeight: FontWeight.bold,
-													color: Color.fromRGBO(66, 32, 6, 1),
-												),
-											),
-											const SizedBox(height: 32),
-											_buildMenuItem(
-												icon: Icons.edit_outlined,
-												title: 'Edit Profile',
-												onTap: () {
-													// navigate to edit profile if exists
-												},
-											),
-											_buildMenuItem(icon: Icons.notifications_outlined, title: 'Notifications', onTap: () {}),
-											_buildMenuItem(icon: Icons.lock_outline, title: 'Change Password', onTap: () {}),
-											_buildMenuItem(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
-											_buildMenuItem(icon: Icons.email_outlined, title: 'Contact Us', onTap: () {}),
-											_buildMenuItem(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () {}),
-											const SizedBox(height: 24),
-											SizedBox(
-												width: double.infinity,
-												child: ElevatedButton(
-													style: ElevatedButton.styleFrom(
-														backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-														padding: const EdgeInsets.symmetric(vertical: 16),
-														shape: RoundedRectangleBorder(
-															borderRadius: BorderRadius.circular(9999),
-													),
-												),
-												onPressed: () {
-													// Navigate back to user profile screen (logout from therapist mode)
-													Navigator.pushReplacement(
-														context,
-														MaterialPageRoute(
-															builder: (context) => Profile(userId: widget.userId),
-														),
-													);
-												},
-												child: const Text(
-														'Log Out',
-														style: TextStyle(
-															fontSize: 16,
-															fontFamily: 'Nunito',
-															fontWeight: FontWeight.bold,
-															color: Colors.white,
-														),
-													),
-												),
-											),
-											const SizedBox(height: 20),
-										],
-									);
-								},
-							),
-						),
-					),
-				),
-			),
-			bottomNavigationBar: Row(
-				mainAxisAlignment: MainAxisAlignment.center,
-				children: [
-					Container(
-						width: 375,
-						decoration: BoxDecoration(
-							color: Colors.white,
-							borderRadius: const BorderRadius.only(
-								topLeft: Radius.circular(32),
-								topRight: Radius.circular(32),
-							),
-							boxShadow: [
-								BoxShadow(
-									color: Colors.black.withOpacity(0.1),
-									blurRadius: 8,
-									offset: const Offset(0, -2),
-								),
-							],
-						),
-						child: SafeArea(
-							child: Padding(
-								padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-								child: Row(
-									mainAxisAlignment: MainAxisAlignment.spaceAround,
-									children: [
-										// Home Button
-										Container(
-											decoration: BoxDecoration(
-												color: _selectedIndex == 0
-													? const Color.fromRGBO(249, 115, 22, 1)
-													: Colors.transparent,
-												borderRadius: BorderRadius.circular(20),
-											),
-											child: IconButton(
-												icon: Icon(
-													Icons.home_outlined,
-													color: _selectedIndex == 0
-														? Colors.white
-														: const Color.fromRGBO(107, 114, 128, 1),
-												),
-												onPressed: () {
-													Navigator.pushReplacement(
-														context,
-														MaterialPageRoute(
-															builder: (context) => TherapistDashboardScreen(userId: widget.userId),
-														),
-													);
-												},
-											),
-										),
-										// Chat Button
-										IconButton(
-											icon: const Icon(Icons.chat_bubble_outline),
-											color: _selectedIndex == 1
-												? const Color.fromRGBO(249, 115, 22, 1)
-												: const Color.fromRGBO(107, 114, 128, 1),
-											onPressed: () {
-												setState(() {
-													_selectedIndex = 1;
-												});
-											},
-										),
-										// Calendar Button
-										IconButton(
-											icon: const Icon(Icons.calendar_today_outlined),
-											color: _selectedIndex == 3
-													? const Color.fromRGBO(249, 115, 22, 1)
-													: const Color.fromRGBO(107, 114, 128, 1),
-											onPressed: () {
-												setState(() {
-													_selectedIndex = 3;
-												});
-												Navigator.pushReplacement(
-													context,
-													MaterialPageRoute(
-														builder: (context) => ManageScheduleScreen(userId: widget.userId),
-													),
-												);
-											},
-										),
-										// Profile Button
-										Container(
-											decoration: BoxDecoration(
-												color: _selectedIndex == 2
-													? const Color.fromRGBO(249, 115, 22, 1)
-													: Colors.transparent,
-												borderRadius: BorderRadius.circular(20),
-											),
-											child: IconButton(
-												icon: Icon(
-													Icons.person,
-													color: _selectedIndex == 2
-														? Colors.white
-														: const Color.fromRGBO(107, 114, 128, 1),
-												),
-												onPressed: () {
-													// Already on profile screen, do nothing or refresh
-												},
-											),
-										),
-									],
-								),
-							),
-						),
-					),
-				],
-			),
-		);
-	}
+                  final data = snapshot.data!;
+                  final firstName = (data['first_name'] as String?) ?? '';
+                  final lastName = (data['last_name'] as String?) ?? '';
+                  final fullName = 'Dr. $firstName $lastName'.trim();
+                  final initials = (firstName.isNotEmpty ? firstName[0] : '') + 
+                                   (lastName.isNotEmpty ? lastName[0] : '');
+                  final profilePictureUrl = data['profile_picture_url'] as String?;
+                  
+                  Widget avatarWidget;
+                  if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
+                    avatarWidget = Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: _accent,
+                          width: 3,
+                        ),
+                      ),
+                      child: CircleAvatar(
+                        radius: 48,
+                        backgroundColor: const Color(0xFFFED7AA),
+                        backgroundImage: NetworkImage(profilePictureUrl),
+                      ),
+                    );
+                  } else {
+                    avatarWidget = _initialsCircle(initials);
+                  }
 
-	Widget _buildMenuItem({
-		required IconData icon,
-		required String title,
-		required VoidCallback onTap,
-	}) {
-		return Container(
-			margin: const EdgeInsets.only(bottom: 12),
-			decoration: BoxDecoration(
-				color: Colors.white,
-				borderRadius: BorderRadius.circular(12),
-				boxShadow: [
-					BoxShadow(
-						color: Colors.black.withOpacity(0.05),
-						blurRadius: 4,
-						offset: const Offset(0, 2),
-					),
-				],
-			),
-			child: ListTile(
-				leading: Icon(icon, color: _textPrimary, size: 20),
-				title: Text(
-					title,
-					style: const TextStyle(
-						fontSize: 15,
-						fontFamily: 'Nunito',
-						color: Color.fromRGBO(66, 32, 6, 1),
-					),
-				),
-				trailing: const Icon(Icons.chevron_right, color: Color.fromRGBO(107, 114, 128, 1)),
-				onTap: onTap,
-			),
-		);
-	}
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 20),
+                      avatarWidget,
+                      const SizedBox(height: 16),
+                      Text(
+                        fullName,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Color.fromRGBO(66, 32, 6, 1),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Menu Items
+                      _buildMenuItem(
+                        icon: Icons.edit_outlined,
+                        title: 'Edit Profile',
+                        onTap: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TherapistEditProfileScreen(userId: widget.userId),
+                            ),
+                          );
+                          if (result == true) {
+                            setState(() => _profileFuture = _fetchProfile());
+                          }
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.help_outline,
+                        title: 'Help & Support',
+                        onTap: () {},
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.email_outlined,
+                        title: 'Contact Us',
+                        onTap: () {},
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy Policy',
+                        onTap: () {},
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // Logout Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => Profile(userId: widget.userId),
+                              ),
+                            );
+                          },
+                          child: const Text(
+                            'Log Out',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 375,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(32),
+                topRight: Radius.circular(32),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // Home Button
+                    IconButton(
+                      icon: const Icon(Icons.home_outlined),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => TherapistDashboardScreen(userId: widget.userId),
+                          ),
+                        );
+                      },
+                    ),
+                    // Chat Button
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {
+                        // Navigate to chat
+                      },
+                    ),
+                    // Calendar Button
+                    IconButton(
+                      icon: const Icon(Icons.calendar_today_outlined),
+                      color: const Color.fromRGBO(107, 114, 128, 1),
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ManageScheduleScreen(userId: widget.userId),
+                          ),
+                        );
+                      },
+                    ),
+                    // Profile Button (Active)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: const Color.fromRGBO(249, 115, 22, 1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.person),
+                        color: Colors.white,
+                        onPressed: () {
+                          // Already on profile screen
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: _textPrimary, size: 20),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontFamily: 'Nunito',
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: Color.fromRGBO(107, 114, 128, 1),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
 }
