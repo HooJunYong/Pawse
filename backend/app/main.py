@@ -6,6 +6,7 @@ from .routes.profile_routes import router as profile_router
 from .routes.password_routes import router as password_router
 from .routes.therapist_routes import router as therapist_router
 from .routes.schedule_routes import router as schedule_router
+from .routes.journal_routes import router as journal_router
 from .config.settings import ALLOWED_ORIGINS, BACKEND_HOST, BACKEND_PORT
 
 app = FastAPI(title="AI Mental Health Companion API")
@@ -25,6 +26,7 @@ app.include_router(profile_router, tags=["Profile"])
 app.include_router(password_router, tags=["Password"])
 app.include_router(therapist_router, tags=["Therapist"])
 app.include_router(schedule_router, tags=["Schedule"])
+app.include_router(journal_router, tags=["Journal"])
 
 @app.get("/")
 def root():
