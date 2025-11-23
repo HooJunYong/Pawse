@@ -1,0 +1,742 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+
+import '../auth/login_screen.dart';
+
+class AdminTherapistManagement extends StatefulWidget {
+  final String adminUserId;
+  const AdminTherapistManagement({super.key, required this.adminUserId});
+
+  @override
+  State<AdminTherapistManagement> createState() => _AdminTherapistManagementState();
+}
+
+class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
+  List<Map<String, dynamic>> _pendingApplications = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPendingApplications();
+  }
+
+  Future<void> _loadPendingApplications() async {
+    setState(() => _isLoading = true);
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/therapist/pending'),
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _pendingApplications = data.cast<Map<String, dynamic>>();
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          _showErrorDialog('Failed to load applications');
+        }
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        _showErrorDialog('Error: $e');
+      }
+    }
+  }
+
+  Future<void> _approveApplication(String userId, String firstName, String lastName) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.put(
+        Uri.parse('$apiUrl/therapist/verify/$userId?status=approved'),
+      );
+
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+
+        if (response.statusCode == 200) {
+          _showSuccessDialog('$firstName $lastName has been approved as a therapist!');
+          _loadPendingApplications(); // Refresh list
+        } else {
+          _showErrorDialog('Failed to approve application');
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        _showErrorDialog('Error: $e');
+      }
+    }
+  }
+
+  Future<void> _rejectApplication(String userId, String firstName, String lastName) async {
+    final TextEditingController reasonController = TextEditingController();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Reject Application',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Please provide a reason for rejecting $firstName $lastName\'s application:',
+              style: const TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 14,
+                color: Color.fromRGBO(107, 114, 128, 1),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: reasonController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                hintText: 'e.g., License number is invalid...',
+                hintStyle: const TextStyle(
+                  color: Color.fromRGBO(156, 163, 175, 1),
+                  fontFamily: 'Nunito',
+                ),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color.fromRGBO(249, 115, 22, 1)),
+                ),
+              ),
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'Nunito',
+                color: Color.fromRGBO(66, 32, 6, 1),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                color: Color.fromRGBO(107, 114, 128, 1),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromRGBO(220, 38, 38, 1),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () {
+              if (reasonController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please provide a reason'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return;
+              }
+              Navigator.pop(context, reasonController.text);
+            },
+            child: const Text(
+              'Reject',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      try {
+        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+        final response = await http.put(
+          Uri.parse('$apiUrl/therapist/verify/$userId?status=rejected'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'rejection_reason': result}),
+        );
+
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+
+          if (response.statusCode == 200) {
+            _showSuccessDialog('Application rejected');
+            _loadPendingApplications(); // Refresh list
+          } else {
+            _showErrorDialog('Failed to reject application');
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context);
+          _showErrorDialog('Error: $e');
+        }
+      }
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Error',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(220, 38, 38, 1),
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Nunito',
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                color: Color.fromRGBO(249, 115, 22, 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Success',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(34, 197, 94, 1),
+          ),
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(
+            fontFamily: 'Nunito',
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'OK',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                color: Color.fromRGBO(249, 115, 22, 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showApplicationDetails(Map<String, dynamic> application) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color.fromRGBO(247, 244, 242, 1),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color.fromRGBO(209, 213, 219, 1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Application Details',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Color.fromRGBO(66, 32, 6, 1),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      _buildDetailCard('Personal Information', [
+                        _buildDetailRow('Name', '${application['first_name']} ${application['last_name']}'),
+                        _buildDetailRow('Email', application['email'] ?? 'N/A'),
+                        _buildDetailRow('Contact', application['contact_number'] ?? 'N/A'),
+                        _buildDetailRow('License Number', application['license_number'] ?? 'N/A'),
+                      ]),
+                      const SizedBox(height: 16),
+                      _buildDetailCard('Office Information', [
+                        _buildDetailRow('Office Name', application['office_name'] ?? 'N/A'),
+                        _buildDetailRow('Address', application['office_address'] ?? 'N/A'),
+                        _buildDetailRow('City', application['city'] ?? 'N/A'),
+                        _buildDetailRow('State', application['state'] ?? 'N/A'),
+                        _buildDetailRow('Zip Code', application['zip']?.toString() ?? 'N/A'),
+                      ]),
+                      const SizedBox(height: 16),
+                      _buildDetailCard('Professional Details', [
+                        _buildDetailRow('Hourly Rate', 'RM ${application['hourly_rate']?.toString() ?? '0'}'),
+                        _buildChipRow('Specializations', (application['specializations'] as List?)?.cast<String>() ?? []),
+                        _buildChipRow('Languages', (application['languages_spoken'] as List?)?.cast<String>() ?? []),
+                      ]),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Bio',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Nunito',
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromRGBO(66, 32, 6, 1),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              application['bio'] ?? 'No bio provided',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Nunito',
+                                color: Color.fromRGBO(107, 114, 128, 1),
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromRGBO(220, 38, 38, 1),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _rejectApplication(
+                                  application['user_id'],
+                                  application['first_name'],
+                                  application['last_name'],
+                                );
+                              },
+                              child: const Text(
+                                'Reject',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromRGBO(34, 197, 94, 1),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _approveApplication(
+                                  application['user_id'],
+                                  application['first_name'],
+                                  application['last_name'],
+                                );
+                              },
+                              child: const Text(
+                                'Approve',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailCard(String title, List<Widget> children) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 16,
+              fontFamily: 'Nunito',
+              fontWeight: FontWeight.bold,
+              color: Color.fromRGBO(66, 32, 6, 1),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'Nunito',
+                color: Color.fromRGBO(107, 114, 128, 1),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.w600,
+                color: Color.fromRGBO(66, 32, 6, 1),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChipRow(String label, List<String> items) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Nunito',
+              color: Color.fromRGBO(107, 114, 128, 1),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: items.map((item) => Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color.fromRGBO(254, 243, 199, 1),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: const Color.fromRGBO(249, 115, 22, 0.3),
+                ),
+              ),
+              child: Text(
+                item,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.w600,
+                  color: Color.fromRGBO(146, 64, 14, 1),
+                ),
+              ),
+            )).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
+      appBar: AppBar(
+        backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        title: const Text(
+          'Therapist Applications',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color.fromRGBO(66, 32, 6, 1),
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Color.fromRGBO(66, 32, 6, 1)),
+            onPressed: _loadPendingApplications,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color.fromRGBO(66, 32, 6, 1)),
+            onPressed: () {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (context) => const LoginWidget()),
+                (route) => false,
+              );
+            },
+            tooltip: 'Logout',
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Color.fromRGBO(249, 115, 22, 1),
+              ),
+            )
+          : _pendingApplications.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.inbox_outlined,
+                        size: 80,
+                        color: Colors.grey[400],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No Pending Applications',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'All applications have been reviewed',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontFamily: 'Nunito',
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  color: const Color.fromRGBO(249, 115, 22, 1),
+                  onRefresh: _loadPendingApplications,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _pendingApplications.length,
+                    itemBuilder: (context, index) {
+                      final app = _pendingApplications[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.06),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.all(16),
+                          leading: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: const Color.fromRGBO(254, 243, 199, 1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.person_outline,
+                              color: Color.fromRGBO(249, 115, 22, 1),
+                              size: 32,
+                            ),
+                          ),
+                          title: Text(
+                            '${app['first_name']} ${app['last_name']}',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Color.fromRGBO(66, 32, 6, 1),
+                            ),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                app['email'] ?? 'No email',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontFamily: 'Nunito',
+                                  color: Color.fromRGBO(107, 114, 128, 1),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color.fromRGBO(254, 243, 199, 1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'Pending Review',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontFamily: 'Nunito',
+                                    fontWeight: FontWeight.w600,
+                                    color: Color.fromRGBO(146, 64, 14, 1),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: Color.fromRGBO(107, 114, 128, 1),
+                          ),
+                          onTap: () => _showApplicationDetails(app),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+    );
+  }
+}
