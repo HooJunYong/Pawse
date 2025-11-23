@@ -184,76 +184,79 @@ class _JournalingScreenState extends State<JournalingScreen> {
             right: 24,
             top: 24,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Prompt:',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.bold,
-                  color: Color.fromRGBO(66, 32, 6, 1),
+          child: Container(
+            width: 375,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Prompt:',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromRGBO(66, 32, 6, 1),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                entry.title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Nunito',
-                  color: Color.fromRGBO(92, 64, 51, 1),
+                const SizedBox(height: 8),
+                Text(
+                  entry.title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Nunito',
+                    color: Color.fromRGBO(92, 64, 51, 1),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Your Entry:',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.bold,
-                  color: Color.fromRGBO(66, 32, 6, 1),
+                const SizedBox(height: 16),
+                Text(
+                  'Your Entry:',
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.bold,
+                    color: Color.fromRGBO(66, 32, 6, 1),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                entry.content,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontFamily: 'Nunito',
-                  color: Color.fromRGBO(92, 64, 51, 1),
+                const SizedBox(height: 8),
+                Text(
+                  entry.content,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontFamily: 'Nunito',
+                    color: Color.fromRGBO(92, 64, 51, 1),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              if (canEdit)
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromRGBO(249, 115, 22, 1),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                const SizedBox(height: 24),
+                if (canEdit)
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(249, 115, 22, 1),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
                       ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context);
-                      _showEditEntryDialog(entry);
-                    },
-                    child: const Text(
-                      'Edit Entry',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontFamily: 'Nunito',
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _showEditEntryDialog(entry);
+                      },
+                      child: const Text(
+                        'Edit Entry',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                ),
-              const SizedBox(height: 16),
-            ],
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         );
       },
