@@ -5,7 +5,7 @@ import logging
 from pymongo.collection import Collection
 from pymongo import DESCENDING
 
-from app.config import get_settings
+from app.config.settings import get_settings
 from app.models.chat_message import Message, ChatMessage
 from app.models.chat_session import ChatSession
 

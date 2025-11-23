@@ -4,7 +4,7 @@ import logging
 
 from app.models.companion import AICompanionResponse
 from app.models.personality import PersonalityResponse
-from app.mongodb_connection import get_database
+from app.models.database import get_database
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import '../screens/homepage_screen.dart';
-import '../screens/chat_session_screen.dart';
+import '../screens/chat/chat_session_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
+  final String userId;
   final Function(int) onTap;
 
   const BottomNavBar({
     Key? key,
     required this.selectedIndex,
+    required this.userId,
     required this.onTap,
   }) : super(key: key);
 
@@ -50,7 +52,7 @@ class BottomNavBar extends StatelessWidget {
           if (index == 0) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const HomeScreen(),
+                builder: (context) => HomeScreen(userId: userId),
               ),
             );
           } else {
@@ -60,7 +62,7 @@ class BottomNavBar extends StatelessWidget {
           if (index == 1) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => const ChatSessionScreen(),
+                builder: (context) => ChatSessionScreen(userId: userId),
               ),
             );
           } else {

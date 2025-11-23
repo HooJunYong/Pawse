@@ -10,7 +10,7 @@ from app.models.chat_message import (
     MessageResponse,
     Message
 )
-from app.mongodb_connection import get_database
+from app.models.database import get_database
 from app.services.ai_chat_service import AIChatService
 
 # Configure logging

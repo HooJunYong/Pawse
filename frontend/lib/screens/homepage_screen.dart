@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import '../widgets/bottom_nav.dart'; // Import the reusable component
+import '../widgets/bottom_nav.dart';
 
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  final String userId;
+  const HomeScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -70,6 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
             left: 0,
             right: 0,
             child: BottomNavBar(
+              userId: widget.userId,
               selectedIndex: _currentIndex,
               onTap: (index) {
                 setState(() {

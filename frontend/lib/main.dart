@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/homepage_screen.dart';
+import 'screens/auth/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Add this
@@ -26,12 +27,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AI Mental Health Companion',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        scaffoldBackgroundColor: const Color(0xFFF7F4F2),
-        primarySwatch: Colors.orange,
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
+      // theme: ThemeData(
+      //   scaffoldBackgroundColor: const Color(0xFFF7F4F2),
+      //   primarySwatch: Colors.orange,
+      //   useMaterial3: true,
+      // ),
+      home: const LoginWidget(),
     );
   }
 }

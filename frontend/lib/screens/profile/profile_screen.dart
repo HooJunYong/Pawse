@@ -9,6 +9,7 @@ import '../wellness/wellness_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'join_therapist_screen.dart';
+import '../homepage_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -328,7 +329,12 @@ class _ProfileState extends State<Profile> {
                     IconButton(
                       icon: const Icon(Icons.home_outlined),
                       color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {},
+                      onPressed: () {Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => HomeScreen(userId: widget.userId)
+                            ),
+                        );},
                     ),
                     IconButton(
                       icon: const Icon(Icons.chat_bubble_outline),

@@ -9,7 +9,7 @@ from app.models.chat_session import (
     ChatSession
 )
 from app.models.chat_message import ChatMessage, Message
-from app.mongodb_connection import get_database
+from app.models.database import get_database
 from app.services.ai_chat_service import AIChatService
 
 # Configure logging
@@ -280,3 +280,57 @@ async def resume_session(session_id: str):
     except Exception as e:
         logger.error(f"Error resuming session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to resume session: {str(e)}")
+
+
+@router.get("/user/{user_id}/history")
+async def get_user_chat_history(user_id: str):
+    """
+    Get chat history for a user with last message from each session
+    
+    - **user_id**: User identifier
+    
+    Returns list of chat sessions with their last message and end_time (or start_time if session is active)
+    """
+    try:
+        db = get_database()
+        
+        # Get all sessions for the user, sorted by most recent first
+        sessions = list(
+            db.chat_sessions
+            .find({"user_id": user_id})
+            .sort("start_time", -1)
+        )
+        
+        if not sessions:
+            return []
+        
+        chat_history = []
+        
+        for session in sessions:
+            session_id = session["session_id"]
+            
+            # Get the last message from chat_messages collection
+            message_doc = db.chat_messages.find_one({"session_id": session_id})
+            
+            last_message_text = ""
+            if message_doc and message_doc.get("messages"):
+                # Get the last message from the messages array
+                last_message = message_doc["messages"][-1]
+                last_message_text = last_message.get("message_text", "")
+            
+            # Use end_time if session is ended, otherwise use start_time
+            display_date = session.get("end_time") or session.get("start_time")
+            
+            chat_history.append({
+                "session_id": session_id,
+                "date": display_date,
+                "last_message": last_message_text,
+                "is_active": session.get("end_time") is None
+            })
+        
+        logger.info(f"Retrieved {len(chat_history)} chat history entries for user: {user_id}")
+        return chat_history
+        
+    except Exception as e:
+        logger.error(f"Error retrieving chat history: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve chat history: {str(e)}")

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
-import '../widgets/bottom_nav.dart'; // Make sure this file exists in your project
+import '../../widgets/bottom_nav.dart';
+import '../../services/chat_session_service.dart';
+import '../../models/chat_history_model.dart';
 
 class ChatSessionScreen extends StatefulWidget {
-  const ChatSessionScreen({Key? key}) : super(key: key);
+  final String userId;
+  
+  const ChatSessionScreen({Key? key, required this.userId}) : super(key: key);
 
   @override
   State<ChatSessionScreen> createState() => _ChatSessionScreenState();
@@ -10,31 +14,41 @@ class ChatSessionScreen extends StatefulWidget {
 
 class _ChatSessionScreenState extends State<ChatSessionScreen> {
   int _currentIndex = 1; // Set to 1 to highlight the Chat icon
-
-  // Sample data mimicking the design
-  final List<Map<String, String>> _chatHistory = [
-    {
-      "date": "13/08/2025",
-      "message": "my mom scold me today",
-    },
-    {
-      "date": "12/08/2025",
-      "message": "I feel a bit stress today",
-    },
-    {
-      "date": "11/08/2025",
-      "message": "my friend make me angry",
-    },
-    {
-      "date": "10/08/2025",
-      "message": "I feel so lucky today",
-    },
-  ];
+  List<ChatHistoryItem> _chatHistory = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   // Colors extracted from design
   final Color _bgWhite = const Color(0xFFF7F7F7);
   final Color _btnBrown = const Color(0xFF5D3A1A);
   final Color _textBlack = const Color(0xFF1A1A1A);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChatHistory();
+  }
+
+  /// Load chat history from the backend
+  Future<void> _loadChatHistory() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final chatHistory = await ChatSessionService.getChatHistory(widget.userId);
+      setState(() {
+        _chatHistory = chatHistory;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load chat history: $e';
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,11 +91,58 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
 
                   const SizedBox(height: 40),
 
-                  // 3. History List
-                  // We map the data list to widgets
-                  ..._chatHistory.map((chat) {
-                    return _buildHistoryCard(chat['message']!, chat['date']!);
-                  }).toList(),
+                  // 3. History List or Loading/Error/Empty State
+                  if (_isLoading)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  else if (_errorMessage != null)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Colors.red),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            ElevatedButton(
+                              onPressed: _loadChatHistory,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  else if (_chatHistory.isEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text(
+                          'No chat history found, start chatting with your companion by clicking the "New Chat" button!!!',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: _textBlack,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  else
+                    // Map the chat history to widgets
+                    ..._chatHistory.map((chat) {
+                      return _buildHistoryCard(
+                        chat.lastMessage,
+                        chat.getFormattedDate(),
+                        chat.sessionId,
+                      );
+                    }).toList(),
                 ],
               ),
             ),
@@ -93,6 +154,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
             left: 0,
             right: 0,
             child: BottomNavBar(
+              userId: widget.userId,
               selectedIndex: _currentIndex,
               onTap: (index) {
                 setState(() {
@@ -130,7 +192,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
     );
   }
 
-  Widget _buildHistoryCard(String message, String date) {
+  Widget _buildHistoryCard(String message, String date, String sessionId) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
@@ -164,7 +226,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
           const SizedBox(height: 8),
           // Message content
           Text(
-            message,
+            message.isEmpty ? 'No messages yet' : message,
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
