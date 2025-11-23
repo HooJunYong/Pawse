@@ -5,52 +5,32 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'screens/homepage_screen.dart';
 
 Future<void> main() async {
-  await dotenv.load(fileName: ".env");
-  runApp(MyApp());
+  WidgetsFlutterBinding.ensureInitialized(); // Add this
+  try {
+    // Attempt to load the .env file
+    await dotenv.load(fileName: ".env");
+  } catch (e) {
+    // If it fails, print the error but continue running the app
+    debugPrint("Error loading .env file: $e");
+    // You typically don't want to stop the app here, 
+    // unless the .env file is absolutely critical for the UI to render.
+  }
+  runApp(const MyApp());
 }
 
-class MyApp extends StatefulWidget {
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  String message = "Loading...";
-
-  @override
-  void initState() {
-    super.initState();
-    fetchMessage();
-  }
-
-  Future<void> fetchMessage() async {
-    final baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-    final url = Uri.parse("$baseUrl/");
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        setState(() {
-          message = json.decode(response.body)['message'];
-        });
-      } else {
-        setState(() {
-          message = "Error: ${response.statusCode}";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        message = "Connection failed: $e";
-      });
-    }
-  }
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // home: Scaffold(
-      //   appBar: AppBar(title: const Text('AI Mental Health Companion')),
-      //   body: Center(child: Text(message)),
-      // ),
+      title: 'AI Mental Health Companion',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        scaffoldBackgroundColor: const Color(0xFFF7F4F2),
+        primarySwatch: Colors.orange,
+        useMaterial3: true,
+      ),
       home: const HomeScreen(),
     );
   }

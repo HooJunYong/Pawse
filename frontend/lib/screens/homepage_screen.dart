@@ -1,22 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_nav.dart'; // Import the reusable component
 
-class MentalHealthApp extends StatelessWidget {
-  const MentalHealthApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        fontFamily: 'Poppins', // Ensure you add a rounded font in pubspec.yaml for best results
-        scaffoldBackgroundColor: const Color(0xFFF7F4F2), // Light grey background
-        primarySwatch: Colors.orange,
-      ),
-      home: const HomeScreen(),
-    );
-  }
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
