@@ -289,7 +289,7 @@ async def get_user_chat_history(user_id: str):
     
     - **user_id**: User identifier
     
-    Returns list of chat sessions with their last message and end_time (or start_time if session is active)
+    Returns list of chat sessions with their last message, companion_id, and end_time (or start_time if session is active)
     """
     try:
         db = get_database()
@@ -308,6 +308,7 @@ async def get_user_chat_history(user_id: str):
         
         for session in sessions:
             session_id = session["session_id"]
+            companion_id = session.get("companion_id", "")
             
             # Get the last message from chat_messages collection
             message_doc = db.chat_messages.find_one({"session_id": session_id})
@@ -323,6 +324,7 @@ async def get_user_chat_history(user_id: str):
             
             chat_history.append({
                 "session_id": session_id,
+                "companion_id": companion_id,
                 "date": display_date,
                 "last_message": last_message_text,
                 "is_active": session.get("end_time") is None

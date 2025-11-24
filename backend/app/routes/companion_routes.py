@@ -94,6 +94,46 @@ async def get_companion_by_id(companion_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve companion: {str(e)}")
 
 
+@router.get("/companions/default/get", response_model=AICompanionResponse)
+async def get_default_companion():
+    """
+    Get the default companion
+    
+    Returns the companion marked as default (is_default=True)
+    """
+    try:
+        db = get_database()
+        
+        companion = db.ai_companions.find_one(
+            {"is_default": True, "is_active": True}, 
+            {"_id": 0}
+        )
+        
+        if not companion:
+            raise HTTPException(
+                status_code=404,
+                detail="No default companion found"
+            )
+        
+        return AICompanionResponse(
+            companion_id=companion["companion_id"],
+            personality_id=companion["personality_id"],
+            companion_name=companion["companion_name"],
+            description=companion["description"],
+            image=companion["image"],
+            created_at=companion["created_at"],
+            is_default=companion.get("is_default", False),
+            is_active=companion.get("is_active", True),
+            voice_tone=companion.get("voice_tone")
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving default companion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve default companion: {str(e)}")
+
+
 @router.get("/personalities", response_model=List[PersonalityResponse])
 async def get_all_personalities(active_only: bool = True):
     """

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../services/chat_session_service.dart';
+import '../../services/companion_service.dart';
 import '../../models/chat_history_model.dart';
+import '../../models/companion_model.dart';
+import 'change_companion_screen.dart';
 
 class ChatSessionScreen extends StatefulWidget {
   final String userId;
@@ -17,6 +21,8 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
   List<ChatHistoryItem> _chatHistory = [];
   bool _isLoading = true;
   String? _errorMessage;
+  String? _currentCompanion; // Store current companion ID
+  Companion? _companionData; // Store companion data for display
 
   // Colors extracted from design
   final Color _bgWhite = const Color(0xFFF7F7F7);
@@ -26,27 +32,80 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadChatHistory();
+    _loadChatHistoryAndCompanion();
   }
 
-  /// Load chat history from the backend
-  Future<void> _loadChatHistory() async {
+  /// Load chat history and determine current companion
+  Future<void> _loadChatHistoryAndCompanion() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
+      // Load chat history
       final chatHistory = await ChatSessionService.getChatHistory(widget.userId);
+      
+      // Determine current companion
+      String companionId;
+      if (chatHistory.isNotEmpty) {
+        // Get companion from most recent session
+        companionId = chatHistory.first.companionId;
+      } else {
+        // Get default companion if no chat history
+        final defaultCompanion = await CompanionService.getDefaultCompanion();
+        companionId = defaultCompanion.companionId;
+      }
+      
+      // Load companion data
+      final companion = await CompanionService.getCompanionById(companionId);
+      
       setState(() {
         _chatHistory = chatHistory;
+        _currentCompanion = companionId;
+        _companionData = companion;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Failed to load chat history: $e';
+        _errorMessage = 'Failed to load data: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  /// Navigate to change companion screen and handle result
+  Future<void> _navigateToChangeCompanion() async {
+    if (_currentCompanion == null) return;
+    
+    final result = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChangeCompanionScreen(
+          currentCompanionId: _currentCompanion!,
+        ),
+      ),
+    );
+    
+    // If a new companion was selected, update the current companion
+    if (result != null && result != _currentCompanion) {
+      try {
+        final newCompanion = await CompanionService.getCompanionById(result);
+        setState(() {
+          _currentCompanion = result;
+          _companionData = newCompanion;
+        });
+      } catch (e) {
+        // Show error message if failed to load new companion
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update companion: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -64,16 +123,18 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
               child: Column(
                 children: [
                   
-                  // 1. Cat Image
+                  // 1. Cat Image - Load from companion data
                   Transform.translate(
                     offset: const Offset(0, -50), // Move up by 20 pixels
                     child: Center(
-                      child: Image.asset(
-                        'assets/images/tile000.png', 
-                        width: 200,
-                        height: 200,
-                        fit: BoxFit.contain,
-                      ),
+                      child: _companionData?.image != null
+                          ? Image.asset(
+                              'assets/images/${_companionData!.image}',
+                              height: 200,
+                              width: 200,
+                              fit: BoxFit.contain,
+                            )
+                          : Image.asset('assets/images/tile000.png'),
                     ),
                   ),
                   
@@ -85,7 +146,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                     children: [
                       _buildBrownButton("New Chat", () {}),
                       const SizedBox(width: 16),
-                      _buildBrownButton("Change A Cat", () {}),
+                      _buildBrownButton("Change A Cat", _navigateToChangeCompanion),
                     ],
                   ),
 
@@ -112,7 +173,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                             ),
                             const SizedBox(height: 10),
                             ElevatedButton(
-                              onPressed: _loadChatHistory,
+                              onPressed: _loadChatHistoryAndCompanion,
                               child: const Text('Retry'),
                             ),
                           ],
