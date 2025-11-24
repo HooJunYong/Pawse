@@ -84,17 +84,6 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           }
 
           _isLoading = false;
-          // Helper to parse time string like '01:00 PM' to TimeOfDay
-          TimeOfDay _parseTimeString(String timeStr) {
-            final time = timeStr.trim().toUpperCase();
-            final isPM = time.contains('PM');
-            final parts = time.replaceAll('AM', '').replaceAll('PM', '').split(':');
-            int hour = int.parse(parts[0]);
-            final minute = int.parse(parts[1].split(' ')[0]);
-            if (isPM && hour < 12) hour += 12;
-            if (!isPM && hour == 12) hour = 0;
-            return TimeOfDay(hour: hour, minute: minute);
-          }
         });
       }
     } catch (e) {
