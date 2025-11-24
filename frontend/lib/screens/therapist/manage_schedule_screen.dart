@@ -26,6 +26,19 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   bool _isLoading = true;
   int _selectedIndex = 2; // Calendar is selected by default
 
+
+  // Helper to parse time string like '01:00 PM' to TimeOfDay
+  TimeOfDay _parseTimeString(String timeStr) {
+    final time = timeStr.trim().toUpperCase();
+    final isPM = time.contains('PM');
+    final parts = time.replaceAll('AM', '').replaceAll('PM', '').split(':');
+    int hour = int.parse(parts[0]);
+    final minute = int.parse(parts[1].split(' ')[0]);
+    if (isPM && hour < 12) hour += 12;
+    if (!isPM && hour == 12) hour = 0;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -57,12 +70,31 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
             _availabilitySlots = List<Map<String, dynamic>>.from(
               scheduleData['availability_slots'] ?? [],
             );
+            // Sort slots by start time (chronological order)
+            _availabilitySlots.sort((a, b) {
+              final aTime = _parseTimeString(a['start_time']);
+              final bTime = _parseTimeString(b['start_time']);
+              final aMinutes = aTime.hour * 60 + aTime.minute;
+              final bMinutes = bTime.hour * 60 + bTime.minute;
+              return aMinutes.compareTo(bMinutes);
+            });
           } else {
             _sessions = [];
             _availabilitySlots = [];
           }
 
           _isLoading = false;
+          // Helper to parse time string like '01:00 PM' to TimeOfDay
+          TimeOfDay _parseTimeString(String timeStr) {
+            final time = timeStr.trim().toUpperCase();
+            final isPM = time.contains('PM');
+            final parts = time.replaceAll('AM', '').replaceAll('PM', '').split(':');
+            int hour = int.parse(parts[0]);
+            final minute = int.parse(parts[1].split(' ')[0]);
+            if (isPM && hour < 12) hour += 12;
+            if (!isPM && hour == 12) hour = 0;
+            return TimeOfDay(hour: hour, minute: minute);
+          }
         });
       }
     } catch (e) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../profile/profile_screen.dart';
 import 'journaling_screen.dart';
+import 'meditation_screen.dart';
 
 class WellnessScreen extends StatefulWidget {
   final String userId;
@@ -177,7 +178,12 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           Icons.self_improvement,
                           const Color.fromRGBO(251, 191, 36, 1),
                           () {
-                            // Navigate to meditation
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MeditationScreen(),
+                              ),
+                            );
                           },
                         ),
                       ),

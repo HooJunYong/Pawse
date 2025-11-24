@@ -17,10 +17,253 @@ class TherapistDashboardScreen extends StatefulWidget {
 }
 
 class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
+  static const Color _background = Color.fromRGBO(247, 244, 242, 1);
+  static const Color _accent = Color.fromRGBO(249, 115, 22, 1);
+  static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
+  static const Color _popupBg = Color.fromRGBO(247, 244, 242, 1); // match profile
+  static const Color _popupBorder = Color.fromRGBO(249, 115, 22, 0.15); // subtle accent border
+  static const double _popupRadius = 40.0; // match profile
+
+  Future<void> _showEditScheduleDialog(Map<String, dynamic> schedule) async {
+    TimeOfDay selectedStartTime = _parseTimeOfDay(schedule['start_time']);
+    TimeOfDay selectedEndTime = _parseTimeOfDay(schedule['end_time']);
+
+    int startHour = selectedStartTime.hour;
+    int startMinute = selectedStartTime.minute;
+    int endHour = selectedEndTime.hour;
+    int endMinute = selectedEndTime.minute;
+
+    bool isSaving = false;
+    await showDialog(
+      context: context,
+      barrierDismissible: !isSaving,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Widget buildTimePicker(String label, int hour, int minute, void Function(int, int) onChanged) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: const TextStyle(color: _textPrimary, fontFamily: 'Nunito', fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 110,
+                    height: 128,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: _popupBorder, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _accent.withOpacity(0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Hour
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_up, size: 28),
+                              onPressed: () {
+                                int newHour = (hour - 1) < 0 ? 23 : hour - 1;
+                                onChanged(newHour, minute);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                            Text(hour.toString().padLeft(2, '0'), style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.bold, fontSize: 28, color: _textPrimary)),
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 28),
+                              onPressed: () {
+                                int newHour = (hour + 1) > 23 ? 0 : hour + 1;
+                                onChanged(newHour, minute);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 18),
+                        // Minute
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_up, size: 28),
+                              onPressed: () {
+                                int newMinute = (minute - 1) < 0 ? 59 : minute - 1;
+                                onChanged(hour, newMinute);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                            Text(minute.toString().padLeft(2, '0'), style: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.bold, fontSize: 28, color: _textPrimary)),
+                            IconButton(
+                              icon: const Icon(Icons.keyboard_arrow_down, size: 28),
+                              onPressed: () {
+                                int newMinute = (minute + 1) > 59 ? 0 : minute + 1;
+                                onChanged(hour, newMinute);
+                              },
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Container(
+                width: 350,
+                decoration: BoxDecoration(
+                  color: _popupBg,
+                  borderRadius: BorderRadius.circular(_popupRadius),
+                  border: Border.all(color: _popupBorder, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Text(
+                        'Edit Schedule',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          color: _textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        buildTimePicker('Start Time', startHour, startMinute, (h, m) {
+                          setState(() {
+                            startHour = h;
+                            startMinute = m;
+                          });
+                        }),
+                        buildTimePicker('End Time', endHour, endMinute, (h, m) {
+                          setState(() {
+                            endHour = h;
+                            endMinute = m;
+                          });
+                        }),
+                      ],
+                    ),
+                    const SizedBox(height: 32),
+                    if (isSaving)
+                      const Center(child: CircularProgressIndicator()),
+                    if (!isSaving)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              foregroundColor: _accent,
+                              textStyle: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.bold),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                            },
+                            child: const Text('Cancel'),
+                          ),
+                          const SizedBox(width: 12),
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              backgroundColor: _accent,
+                              foregroundColor: Colors.white,
+                              textStyle: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.bold),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                            ),
+                            onPressed: () async {
+                              setState(() { isSaving = true; });
+                              final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+                              final availabilityId = schedule['availability_id'];
+                              final userId = widget.userId;
+                              final startTimeStr = TimeOfDay(hour: startHour, minute: startMinute).format(context);
+                              final endTimeStr = TimeOfDay(hour: endHour, minute: endMinute).format(context);
+                              try {
+                                final response = await http.put(
+                                  Uri.parse('$apiUrl/therapist/availability/$availabilityId?user_id=$userId'),
+                                  headers: {'Content-Type': 'application/json'},
+                                  body: jsonEncode({
+                                    'start_time': startTimeStr,
+                                    'end_time': endTimeStr,
+                                  }),
+                                );
+                                if (response.statusCode == 200) {
+                                  await _loadUpcomingSchedule();
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Update successful')),
+                                  );
+                                  Navigator.of(context).pop();
+                                } else {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Update failed: \\${response.body}')),
+                                  );
+                                  setState(() { isSaving = false; });
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Error: \\${e.toString()}')),
+                                );
+                                setState(() { isSaving = false; });
+                              }
+                            },
+                            child: const Text('Save'),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+    TimeOfDay _parseTimeOfDay(String timeStr) {
+      // Expects format like '02:00 PM' or '14:00'
+      final time = timeStr.trim().toUpperCase();
+      final isPM = time.contains('PM');
+      final parts = time.replaceAll('AM', '').replaceAll('PM', '').split(':');
+      int hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1].split(' ')[0]);
+      if (isPM && hour < 12) hour += 12;
+      if (!isPM && hour == 12) hour = 0;
+      return TimeOfDay(hour: hour, minute: minute);
+    }
   List<Map<String, dynamic>> _todaysAppointments = [];
   List<Map<String, dynamic>> _upcomingSchedule = [];
   String _therapistName = '';
-  int _selectedIndex = 0;
   bool _isLoading = true;
 
   @override
@@ -78,21 +321,30 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     for (int i = 0; i < 5; i++) {
       final date = now.add(Duration(days: i));
       final dateStr = "${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-      
+
       try {
         final response = await http.get(
           Uri.parse('$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'),
         );
-        
+
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body);
           final sessions = List<Map<String, dynamic>>.from(data['sessions'] ?? []);
           final availabilitySlots = List<Map<String, dynamic>>.from(data['availability_slots'] ?? []);
-          
+
+          // Sort slots by start time
+          availabilitySlots.sort((a, b) {
+            TimeOfDay aStart = _parseTimeOfDay(a['start_time']);
+            TimeOfDay bStart = _parseTimeOfDay(b['start_time']);
+            int aMinutes = aStart.hour * 60 + aStart.minute;
+            int bMinutes = bStart.hour * 60 + bStart.minute;
+            return aMinutes.compareTo(bMinutes);
+          });
+
           for (var slot in availabilitySlots) {
             bool isBooked = false;
             String? clientName;
-            
+
             for (var session in sessions) {
               final sessionTime = DateTime.parse(session['scheduled_at']);
               final slotStart = _parseTimeWithDate(dateStr, slot['start_time']);
@@ -102,7 +354,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                 break;
               }
             }
-            
+
             scheduleData.add({
               'date': dateStr,
               'start_time': slot['start_time'],
@@ -117,8 +369,16 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         continue;
       }
     }
-    
+
     if (mounted) {
+      // Sort the final scheduleData by start_time for each day (in case)
+      scheduleData.sort((a, b) {
+        TimeOfDay aStart = _parseTimeOfDay(a['start_time']);
+        TimeOfDay bStart = _parseTimeOfDay(b['start_time']);
+        int aMinutes = aStart.hour * 60 + aStart.minute;
+        int bMinutes = bStart.hour * 60 + bStart.minute;
+        return aMinutes.compareTo(bMinutes);
+      });
       setState(() {
         _upcomingSchedule = scheduleData;
       });
@@ -428,7 +688,14 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                       : Column(
                           children: _upcomingSchedule.map((schedule) {
                             final date = DateTime.parse(schedule['date']);
-                            final dateStr = "${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][date.weekday%7]}, ${date.month}/${date.day}";
+                            const monthNames = [
+                              'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                              'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                            ];
+                            const dayNames = [
+                              'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+                            ];
+                            final dateStr = "${dayNames[date.weekday - 1]}, ${monthNames[date.month - 1]} ${date.day}";
                             final isBooked = schedule['is_booked'] ?? false;
                             
                             return Container(
@@ -471,26 +738,23 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                         const SizedBox(height: 4),
                                         Row(
                                           children: [
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: isBooked
-                                                    ? const Color.fromRGBO(34, 197, 94, 0.1)
-                                                    : const Color.fromRGBO(249, 115, 22, 0.1),
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              child: Text(
-                                                isBooked ? 'Booked' : 'Available',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontFamily: 'Nunito',
-                                                  fontWeight: FontWeight.w600,
-                                                  color: isBooked
-                                                      ? const Color.fromRGBO(34, 197, 94, 1)
-                                                      : const Color.fromRGBO(249, 115, 22, 1),
+                                            if (isBooked)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromRGBO(34, 197, 94, 0.1),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                ),
+                                                child: const Text(
+                                                  'Booked',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    fontFamily: 'Nunito',
+                                                    fontWeight: FontWeight.w600,
+                                                    color: Color.fromRGBO(34, 197, 94, 1),
+                                                  ),
                                                 ),
                                               ),
-                                            ),
                                             if (isBooked && schedule['client_name'] != null) ...[
                                               const SizedBox(width: 8),
                                               Flexible(
@@ -514,14 +778,8 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                   IconButton(
                                     icon: const Icon(Icons.edit_outlined, size: 20),
                                     color: const Color.fromRGBO(249, 115, 22, 1),
-                                    onPressed: () async {
-                                      await Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => ManageScheduleScreen(userId: widget.userId),
-                                        ),
-                                      );
-                                      await _loadUpcomingSchedule();
+                                    onPressed: () {
+                                      _showEditScheduleDialog(schedule);
                                     },
                                     padding: EdgeInsets.zero,
                                     constraints: const BoxConstraints(),

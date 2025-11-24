@@ -25,7 +25,6 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
   static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
 
   late Future<Map<String, dynamic>> _profileFuture;
-  int _selectedIndex = 2; // Profile is selected
 
   @override
   void initState() {
