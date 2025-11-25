@@ -6,10 +6,8 @@ import '../../services/companion_service.dart';
 class ChangeCompanionScreen extends StatefulWidget {
   final String currentCompanionId;
 
-  const ChangeCompanionScreen({
-    Key? key,
-    required this.currentCompanionId,
-  }) : super(key: key);
+  const ChangeCompanionScreen({Key? key, required this.currentCompanionId})
+    : super(key: key);
 
   @override
   State<ChangeCompanionScreen> createState() => _ChangeCompanionScreenState();
@@ -23,7 +21,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
   String? _errorMessage;
 
   // Colors from design
-  final Color _bgColor = const Color(0xFFF3EDE5);
+  final Color _bgColor = const Color(0xFFF7F4F2);
   final Color _btnBrown = const Color(0xFF5D3A1A);
   final Color _cardBg = Colors.white;
   final Color _textDark = const Color(0xFF1A1A1A);
@@ -42,11 +40,15 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
 
     try {
       // Load all companions
-      final companions = await CompanionService.getAllCompanions(activeOnly: true);
-      
+      final companions = await CompanionService.getAllCompanions(
+        activeOnly: true,
+      );
+
       // Load current companion data
-      final currentCompanion = await CompanionService.getCompanionById(widget.currentCompanionId);
-      
+      final currentCompanion = await CompanionService.getCompanionById(
+        widget.currentCompanionId,
+      );
+
       setState(() {
         _companions = companions;
         _currentCompanion = currentCompanion;
@@ -99,32 +101,35 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _errorMessage!,
-                                style: const TextStyle(color: Colors.red),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadCompanions,
-                                child: const Text('Retry'),
-                              ),
-                            ],
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _errorMessage!,
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
                           ),
-                        )
-                      : SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 20),
-                              
-                              // Current companion image at top
-                              if (_currentCompanion != null)
-                                Image.asset(
+                          const SizedBox(height: 16),
+                          ElevatedButton(
+                            onPressed: _loadCompanions,
+                            child: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    )
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
+
+                          // Current companion image at top
+                          if (_currentCompanion != null)
+                            Transform.translate(
+                              offset: const Offset(0, -50),
+                              child: Center(
+                                child: Image.asset(
                                   'assets/images/${_currentCompanion!.image}',
                                   width: 180,
                                   height: 180,
@@ -138,51 +143,56 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                                     );
                                   },
                                 ),
-                              
-                              const SizedBox(height: 30),
-                              
-                              // "Choose one!" title
-                              Text(
-                                'Choose one!',
-                                style: TextStyle(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                  color: _textDark,
-                                ),
                               ),
-                              
-                              const SizedBox(height: 12),
-                              
-                              // Subtitle
-                              Text(
-                                'Choose how you want\nmy personality to be!',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
-                                  color: _textDark,
-                                  height: 1.4,
-                                ),
-                              ),
-                              
-                              const SizedBox(height: 30),
-                              
-                              // List of companion cards
-                              ..._companions.map((companion) {
-                                final isSelected = _selectedCompanion?.companionId == companion.companionId;
-                                return _buildCompanionCard(companion, isSelected);
-                              }).toList(),
-                              
-                              const SizedBox(height: 100), // Extra space for button
-                            ],
+                            ),
+
+                          // "Choose one!" title
+                          Text(
+                            'Choose one!',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: _textDark,
+                            ),
                           ),
-                        ),
+
+                          const SizedBox(height: 12),
+
+                          // Subtitle
+                          Text(
+                            'Choose how you want\nmy personality to be!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w500,
+                              color: _textDark,
+                              height: 1.4,
+                            ),
+                          ),
+
+                          const SizedBox(height: 30),
+
+                          // List of companion cards
+                          ..._companions.map((companion) {
+                            final isSelected =
+                                _selectedCompanion?.companionId ==
+                                companion.companionId;
+                            return _buildCompanionCard(companion, isSelected);
+                          }).toList(),
+
+                          const SizedBox(height: 100), // Extra space for button
+                        ],
+                      ),
+                    ),
             ),
 
             // Fixed Select button at bottom
             if (!_isLoading && _errorMessage == null)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 20,
+                ),
                 decoration: BoxDecoration(
                   color: _bgColor,
                   boxShadow: [
@@ -197,7 +207,9 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _selectedCompanion != null ? _confirmSelection : null,
+                    onPressed: _selectedCompanion != null
+                        ? _confirmSelection
+                        : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _btnBrown,
                       foregroundColor: Colors.white,
@@ -276,9 +288,9 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                 ),
               ),
             ),
-            
+
             const SizedBox(width: 16),
-            
+
             // Companion info
             Expanded(
               child: Column(

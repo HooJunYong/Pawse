@@ -26,7 +26,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
   Companion? _companionData; // Store companion data for display
 
   // Colors extracted from design
-  final Color _bgWhite = const Color(0xFFF7F7F7);
+  final Color _bgColor = const Color(0xFFF7F4F2);
   final Color _btnBrown = const Color(0xFF5D3A1A);
   final Color _textBlack = const Color(0xFF1A1A1A);
 
@@ -128,6 +128,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
         builder: (context) => ChatInterfaceScreen(
           userId: widget.userId,
           companion: _companionData!,
+          sessionId: null, // null = new session
         ),
       ),
     );
@@ -136,10 +137,41 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
     _loadChatHistoryAndCompanion();
   }
 
+  /// Resume existing chat session
+  Future<void> _resumeChatSession(String sessionId, String companionId) async {
+    try {
+      // Load companion data for the session
+      final companion = await CompanionService.getCompanionById(companionId);
+
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatInterfaceScreen(
+            userId: widget.userId,
+            companion: companion,
+            sessionId: sessionId, // Resume existing session
+          ),
+        ),
+      );
+
+      // Reload chat history after returning from chat
+      _loadChatHistoryAndCompanion();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to resume chat: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgWhite,
+      backgroundColor: _bgColor,
       body: Stack(
         children: [
           // Main Content Area
@@ -152,7 +184,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                   
                   // 1. Cat Image - Load from companion data
                   Transform.translate(
-                    offset: const Offset(0, -50), // Move up by 20 pixels
+                    offset: const Offset(0, -50),
                     child: Center(
                       child: _companionData?.image != null
                           ? Image.asset(
@@ -229,6 +261,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                         chat.lastMessage,
                         chat.getFormattedDate(),
                         chat.sessionId,
+                        chat.companionId,
                       );
                     }).toList(),
                 ],
@@ -280,51 +313,73 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
     );
   }
 
-  Widget _buildHistoryCard(String message, String date, String sessionId) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Date aligns to the right
-          Align(
-            alignment: Alignment.topRight,
-            child: Text(
-              date,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: Colors.black87,
+  Widget _buildHistoryCard(String message, String date, String sessionId, String companionId) {
+    // Truncate message to first 10 words
+    String displayMessage = message.isEmpty ? 'No messages yet' : _truncateMessage(message, 10);
+    
+    return GestureDetector(
+      onTap: () => _resumeChatSession(sessionId, companionId),
+      child: Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Date aligns to the right
+            Align(
+              alignment: Alignment.topRight,
+              child: Text(
+                date,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 8),
-          // Message content
-          Text(
-            message.isEmpty ? 'No messages yet' : message,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _textBlack,
-              height: 1.3,
+            const SizedBox(height: 8),
+            // Message content (truncated)
+            Text(
+              displayMessage,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _textBlack,
+                height: 1.3,
+              ),
             ),
-          ),
-          const SizedBox(height: 8), 
-        ],
+            const SizedBox(height: 8), 
+          ],
+        ),
       ),
     );
+  }
+
+  /// Truncate message to specified number of words
+  String _truncateMessage(String message, int wordLimit) {
+    if (message.isEmpty) return message;
+    
+    // Split the message into words
+    List<String> words = message.split(' ');
+    
+    // If message has fewer words than the limit, return as is
+    if (words.length <= wordLimit) {
+      return message;
+    }
+    
+    // Take first 'wordLimit' words and add "..."
+    return '${words.take(wordLimit).join(' ')}...';
   }
 }

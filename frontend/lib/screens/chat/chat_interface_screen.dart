@@ -3,15 +3,18 @@ import 'dart:convert';
 import '../../services/chat_session_service.dart';
 import '../../services/api_service.dart';
 import '../../models/companion_model.dart';
+import '../../widgets/typing_indicator.dart';
 
 class ChatInterfaceScreen extends StatefulWidget {
   final String userId;
   final Companion companion;
+  final String? sessionId; // Optional: for resuming existing sessions
 
   const ChatInterfaceScreen({
     Key? key,
     required this.userId,
     required this.companion,
+    this.sessionId, // null = new session, non-null = resume session
   }) : super(key: key);
 
   @override
@@ -38,7 +41,11 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   @override
   void initState() {
     super.initState();
-    _startNewSession();
+    if (widget.sessionId != null) {
+      _resumeExistingSession(widget.sessionId!);
+    } else {
+      _startNewSession();
+    }
   }
 
   @override
@@ -74,6 +81,33 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
     } catch (e) {
       setState(() {
         _errorMessage = 'Failed to start chat session: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// Resume an existing chat session
+  Future<void> _resumeExistingSession(String sessionId) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Resume session
+      final response = await ChatSessionService.resumeSession(sessionId);
+
+      if (response.statusCode == 200) {
+        _sessionId = sessionId;
+
+        // Load existing messages
+        await _loadMessages();
+      } else {
+        throw Exception('Failed to resume session: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to resume chat session: $e';
         _isLoading = false;
       });
     }
@@ -120,36 +154,54 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
     final messageText = _messageController.text.trim();
     _messageController.clear();
 
+    // 1. Immediately add user message to the list
+    final userMessage = ChatMessage(
+      role: 'user',
+      messageText: messageText,
+      timestamp: DateTime.now(),
+      isLoading: false,
+    );
     setState(() {
-      _isSending = true;
+      _messages.add(userMessage);
     });
+    _scrollToBottom();
+
+    // 2. Add a temporary loading message for the AI
+    final loadingMessage = ChatMessage(
+      role: 'ai',
+      messageText: '...', // Placeholder text
+      timestamp: DateTime.now(),
+      isLoading: true, // Mark as loading
+    );
+    setState(() {
+      _messages.add(loadingMessage);
+    });
+    _scrollToBottom();
 
     try {
       final response = await ApiService.post('/api/chat/message/send', {
         'session_id': _sessionId,
         'message_text': messageText,
       });
-
+ 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-
-        // Add user message and AI response
+        final aiResponse = ChatMessage.fromJson(data['ai_response']);
+ 
+        // 3. Replace the loading message with the actual AI response
         setState(() {
-          _messages.add(ChatMessage.fromJson(data['user_message']));
-          _messages.add(ChatMessage.fromJson(data['ai_response']));
-          _isSending = false;
+          // Find the loading message and replace it
+          final loadingIndex = _messages.indexWhere((msg) => msg.isLoading);
+          if (loadingIndex != -1) {
+            _messages[loadingIndex] = aiResponse;
+          }
         });
-
-        // Scroll to bottom
-        _scrollToBottom();
+        // Scroll to the bottom to show the new AI message
+        _scrollToBottom(); 
       } else {
         throw Exception('Failed to send message: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() {
-        _isSending = false;
-      });
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -157,6 +209,10 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             backgroundColor: Colors.red,
           ),
         );
+        // Remove the loading indicator on error
+        setState(() {
+          _messages.removeWhere((msg) => msg.isLoading);
+        });
       }
     }
   }
@@ -291,14 +347,25 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                                 color: isAI ? _aiMessageBg : _userMessageBg,
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                              child: Text(
-                                message.messageText,
-                                style: TextStyle(
-                                  color: _textBlack,
-                                  fontSize: 16,
-                                  height: 1.4,
-                                ),
-                              ),
+                              child: message.isLoading
+                                  ? const SizedBox(
+                                      width: 40,
+                                      height: 24,
+                                      child: Center(
+                                        child: TypingIndicator(
+                                          size: 6.0,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                                    )
+                                  : Text(
+                                      message.messageText,
+                                      style: TextStyle(
+                                        color: _textBlack,
+                                        fontSize: 16,
+                                        height: 1.4,
+                                      ),
+                                    ),
                             ),
                           );
                         },
@@ -388,12 +455,14 @@ class ChatMessage {
   final String messageText;
   final DateTime timestamp;
   final String? emotion;
+  final bool isLoading;
 
   ChatMessage({
     required this.role,
     required this.messageText,
     required this.timestamp,
     this.emotion,
+    this.isLoading = false,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -402,6 +471,7 @@ class ChatMessage {
       messageText: json['message_text'] ?? '',
       timestamp: DateTime.parse(json['timestamp']),
       emotion: json['emotion'],
+      isLoading: false, // Messages from JSON are never loading
     );
   }
 

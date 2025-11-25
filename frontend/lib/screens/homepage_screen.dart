@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_nav.dart';
-
+import '../screens/chat/chat_session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -169,7 +169,14 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  // Navigate to ChatSessionScreen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => ChatSessionScreen(userId: widget.userId),
+                    ),
+                  );
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _btnBrown,
                   foregroundColor: Colors.white,

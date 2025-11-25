@@ -247,13 +247,6 @@ async def resume_session(session_id: str):
         if not session:
             raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
         
-        # Check if session has ended
-        if session.get("end_time"):
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot resume ended session. Please start a new session."
-            )
-        
         # Verify companion is still active
         companion = db.ai_companions.find_one(
             {"companion_id": session["companion_id"], "is_active": True}
