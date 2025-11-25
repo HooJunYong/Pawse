@@ -101,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: const CircleAvatar(
             radius: 28,
             backgroundColor: Colors.white,
-            backgroundImage: AssetImage('assets/images/tile000.png'),
+            backgroundImage: AssetImage('assets/images/defaultcat.png'),
           ),
         ),
         const SizedBox(width: 16),
@@ -191,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Positioned(
           top: -120, // Pull up to overlap
           child: Image.asset(
-            'assets/images/tile000.png', 
+            'assets/images/defaultcat.png', 
             width: 200,
             height: 200,
             fit: BoxFit.cover, // or BoxFit.fill

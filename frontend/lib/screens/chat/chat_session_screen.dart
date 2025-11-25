@@ -6,6 +6,7 @@ import '../../services/companion_service.dart';
 import '../../models/chat_history_model.dart';
 import '../../models/companion_model.dart';
 import 'change_companion_screen.dart';
+import 'chat_interface_screen.dart';
 
 class ChatSessionScreen extends StatefulWidget {
   final String userId;
@@ -109,6 +110,32 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
     }
   }
 
+  /// Navigate to new chat interface
+  Future<void> _navigateToNewChat() async {
+    if (_companionData == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a companion first'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatInterfaceScreen(
+          userId: widget.userId,
+          companion: _companionData!,
+        ),
+      ),
+    );
+
+    // Reload chat history after returning from chat
+    _loadChatHistoryAndCompanion();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,7 +161,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                               width: 200,
                               fit: BoxFit.contain,
                             )
-                          : Image.asset('assets/images/tile000.png'),
+                          : Image.asset('assets/images/defaultcat.png'),
                     ),
                   ),
                   
@@ -144,7 +171,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildBrownButton("New Chat", () {}),
+                      _buildBrownButton("New Chat", _navigateToNewChat),
                       const SizedBox(width: 16),
                       _buildBrownButton("Change A Cat", _navigateToChangeCompanion),
                     ],

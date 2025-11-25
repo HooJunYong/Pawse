@@ -131,7 +131,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                                   fit: BoxFit.contain,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Image.asset(
-                                      'assets/images/tile000.png',
+                                      'assets/images/defaultcat.png',
                                       width: 180,
                                       height: 180,
                                       fit: BoxFit.contain,
@@ -267,7 +267,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return Image.asset(
-                      'assets/images/tile000.png',
+                      'assets/images/defaultcat.png',
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
