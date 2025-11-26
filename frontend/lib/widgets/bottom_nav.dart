@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../screens/homepage_screen.dart';
+import '../screens/profile/profile_screen.dart';
+import '../screens/wellness/wellness_screen.dart';
 // import '../screens/chat/chat_session_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
@@ -53,25 +55,26 @@ class BottomNavBar extends StatelessWidget {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
+          onTap(index); // Always update parent state
           if (index == 0) {
-            Navigator.of(context).push(
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => HomeScreen(userId: userId),
               ),
             );
-          } else {
-            onTap(index);
+          } else if (index == 4) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => WellnessScreen(userId: userId),
+              ),
+            );
+          } else if (index == 5) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => Profile(userId: userId),
+              ),
+            );
           }
-          // ChatSessionScreen is in a friend's module. Uncomment and import when available.
-          // if (index == 1) {
-          //   Navigator.of(context).push(
-          //     MaterialPageRoute(
-          //       builder: (context) => ChatSessionScreen(userId: userId),
-          //     ),
-          //   );
-          // } else {
-          //   onTap(index);
-          // }
         },
         child: Container(
           padding: const EdgeInsets.all(12),

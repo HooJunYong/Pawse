@@ -38,6 +38,9 @@ class TherapistService {
         languages: 'EN, M',
         rating: 4.8,
         imageUrl: 'Mr.L',
+        title: 'Clinical Psychologist',
+        quote: 'Understanding your trauma is the first step to healing.',
+        price: 180.0,
       ),
       Therapist(
         id: '2',
@@ -47,6 +50,9 @@ class TherapistService {
         languages: 'EN, C',
         rating: 4.9,
         imageUrl: 'Ms.C',
+        title: 'Family Therapist',
+        quote: 'Building stronger families through open communication.',
+        price: 160.0,
       ),
       Therapist(
         id: '3',
@@ -56,6 +62,9 @@ class TherapistService {
         languages: 'EN, T',
         rating: 4.7,
         imageUrl: 'Dr.R',
+        title: 'Career Counselor',
+        quote: "Navigating life's transitions with confidence.",
+        price: 200.0,
       ),
     ];
   }

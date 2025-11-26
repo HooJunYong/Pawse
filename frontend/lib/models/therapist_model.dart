@@ -7,6 +7,9 @@ class Therapist {
   final String languages;
   final double rating;
   final String imageUrl; // Or initials if no image
+  final String title;
+  final String quote;
+  final double price;
 
   Therapist({
     required this.id,
@@ -16,6 +19,9 @@ class Therapist {
     required this.languages,
     required this.rating,
     required this.imageUrl,
+    required this.title,
+    required this.quote,
+    required this.price,
   });
 
   factory Therapist.fromJson(Map<String, dynamic> json) {
@@ -27,6 +33,9 @@ class Therapist {
       languages: json['languages'] as String,
       rating: (json['rating'] as num).toDouble(),
       imageUrl: json['imageUrl'] as String,
+      title: json['title'] ?? 'Licensed Counselor',
+      quote: json['quote'] ?? 'Here to help you heal.',
+      price: (json['price'] as num?)?.toDouble() ?? 150.0,
     );
   }
 }
