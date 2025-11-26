@@ -81,7 +81,6 @@ flutter:
     - family: Urbanist
       fonts:
         - asset: assets/fonts/Urbanist-VariableFont_wght.ttf
-          style: italic
     # - family: Poppins
     #   fonts:
     #     - asset: fonts/TrajanPro.ttf

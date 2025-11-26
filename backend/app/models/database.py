@@ -45,6 +45,11 @@ def initialize_indexes():
         db.personalities.create_index("personality_id", unique=True)
         db.personalities.create_index("is_active")
         
+        # Mood tracking
+        db.mood_tracking.create_index("mood_id", unique=True)
+        db.mood_tracking.create_index("user_id")
+        db.mood_tracking.create_index([("user_id", 1), ("date", -1)])
+        
         logger.info("All database indexes created successfully")
         
     except Exception as e:

@@ -15,6 +15,7 @@ from .routes.profile_routes import router as profile_router
 from .routes.password_routes import router as password_router
 from .routes.therapist_routes import router as therapist_router
 from .routes.schedule_routes import router as schedule_router
+from .routes.mood_routes import router as mood_router
 from app.config.settings import get_settings
 
 # Load environment variables
@@ -74,6 +75,7 @@ app.include_router(profile_router, tags=["Profile"])
 app.include_router(password_router, tags=["Password"])
 app.include_router(therapist_router, tags=["Therapist"])
 app.include_router(schedule_router, tags=["Schedule"])
+app.include_router(mood_router, tags=["Mood Tracking"])
 
 
 # Get MongoDB database connection

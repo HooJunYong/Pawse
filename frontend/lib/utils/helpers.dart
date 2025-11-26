@@ -118,3 +118,37 @@ class Helpers {
     }
   }
 }
+
+class MoodConstants {
+  // Define the asset paths
+  static const String assetVeryHappy = 'assets/images/mood_very_happy.png';
+  static const String assetHappy = 'assets/images/mood_happy.png';
+  static const String assetNeutral = 'assets/images/mood_neutral.png';
+  static const String assetSad = 'assets/images/mood_sad.png';
+  static const String assetAwful = 'assets/images/mood_awful.png';
+
+  // Define the Database values (The strings your DB expects)
+  static const String dbVeryHappy = 'very happy';
+  static const String dbHappy = 'happy';
+  static const String dbNeutral = 'neutral';
+  static const String dbSad = 'sad';
+  static const String dbAwful = 'awful';
+
+  // The Converter Map
+  static const Map<String, String> assetToDbValue = {
+    assetVeryHappy: dbVeryHappy,
+    assetHappy: dbHappy,
+    assetNeutral: dbNeutral,
+    assetSad: dbSad,
+    assetAwful: dbAwful,
+  };
+  
+  // Reverse map to load history and show the emoji again
+  static const Map<String, String> dbValueToAsset = {
+    dbVeryHappy: assetVeryHappy,
+    dbHappy: assetHappy,
+    dbNeutral: assetNeutral,
+    dbSad: assetSad,
+    dbAwful: assetAwful,
+  };
+}

@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/mood_service.dart';
 import '../admin/admin_therapist_management.dart';
-import '../profile/profile_screen.dart';
+import '../homepage_screen.dart';
+import '../mood/mood_check_in_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -35,8 +37,8 @@ class _LoginWidgetState extends State<LoginWidget> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Show loading indicator and get its controller to hide it later
+      final snackBarController = ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Logging in...')),
       );
 
@@ -52,6 +54,9 @@ class _LoginWidgetState extends State<LoginWidget> {
         );
 
         if (!mounted) return;
+
+        // Hide the SnackBar before navigating
+        snackBarController.close();
 
         if (response.statusCode == 200) {
           // Success - parse user_id and user_type, navigate accordingly
@@ -79,14 +84,11 @@ class _LoginWidgetState extends State<LoginWidget> {
               ),
             );
           } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Profile(userId: userId),
-              ),
-            );
+            // Check mood log status before navigating regular users
+            await _checkMoodAndNavigate(userId);
           }
         } else if (response.statusCode == 401) {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // Invalid credentials - show popup dialog
           showDialog(
             context: context,
@@ -104,6 +106,7 @@ class _LoginWidgetState extends State<LoginWidget> {
             },
           );
         } else if (response.statusCode == 403) {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // User inactive - show popup dialog
           showDialog(
             context: context,
@@ -121,6 +124,7 @@ class _LoginWidgetState extends State<LoginWidget> {
             },
           );
         } else {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // Other error - show popup dialog
           final error = jsonDecode(response.body);
           showDialog(
@@ -141,6 +145,7 @@ class _LoginWidgetState extends State<LoginWidget> {
         }
       } catch (e) {
         if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Hide on exception
         showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -157,6 +162,57 @@ class _LoginWidgetState extends State<LoginWidget> {
           },
         );
       }
+    }
+  }
+
+  /// Check mood log status and navigate accordingly
+  Future<void> _checkMoodAndNavigate(String userId) async {
+    try {
+      // Call the mood service to check today's status
+      final response = await MoodService.checkMoodStatus(userId);
+      
+      if (!mounted) return;
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final hasLoggedToday = data['has_logged_today'] as bool? ?? false;
+
+        // Navigate based on mood check-in status
+        if (hasLoggedToday) {
+          // User already logged mood, go to homepage
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(userId: userId),
+            ),
+          );
+        } else {
+          // User hasn't logged mood, go to mood check-in screen
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MoodCheckInScreen(userId: userId),
+            ),
+          );
+        }
+      } else {
+        // If mood check fails, default to homepage
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => HomeScreen(userId: userId),
+          ),
+        );
+      }
+    } catch (e) {
+      // If error occurs, default to homepage
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => HomeScreen(userId: userId),
+        ),
+      );
     }
   }
 
