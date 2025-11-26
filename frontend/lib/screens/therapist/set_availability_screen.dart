@@ -277,6 +277,17 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       if (picked != null && picked is TimeOfDay) {
         setState(() {
           _timeSlots[index][type] = picked;
+          // If selecting 'from', auto-set 'to' to 2 hours after 'from'
+          if (type == 'from') {
+            final from = picked;
+            int endHour = from.hour + 2;
+            int endMinute = from.minute;
+            if (endHour >= 24) {
+              endHour = 23;
+              endMinute = 59;
+            }
+            _timeSlots[index]['to'] = TimeOfDay(hour: endHour, minute: endMinute);
+          }
           _sortTimeSlots();
         });
       }
@@ -378,6 +389,12 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           final slotA = _timeSlots[i];
           final fromA = toMinutes(slotA['from']!);
           final toA = toMinutes(slotA['to']!);
+          // Enforce max 2 hour duration
+          if (toA - fromA > 120) {
+            hasOverlap = true;
+            overlapMsg = 'Each slot can be a maximum of 2 hours.';
+            break;
+          }
           if (fromA >= toA) {
             hasOverlap = true;
             overlapMsg = 'The start time must be before the end time in all slots.';
@@ -411,7 +428,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Duplicate/Overlapping Slot',
+                        'Invalid Slot',
                         style: TextStyle(
                           fontFamily: 'Nunito',
                           fontWeight: FontWeight.bold,

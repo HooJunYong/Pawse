@@ -24,7 +24,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   List<Map<String, dynamic>> _availabilitySlots = [];
   Set<String> _datesWithSchedule = {};
   bool _isLoading = true;
-  int _selectedIndex = 2; // Calendar is selected by default
+  // int _selectedIndex = 2; // Calendar is selected by default
 
 
   // Helper to parse time string like '01:00 PM' to TimeOfDay

@@ -17,7 +17,6 @@ class TherapistDashboardScreen extends StatefulWidget {
 }
 
 class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
-  static const Color _background = Color.fromRGBO(247, 244, 242, 1);
   static const Color _accent = Color.fromRGBO(249, 115, 22, 1);
   static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
   static const Color _popupBg = Color.fromRGBO(247, 244, 242, 1); // match profile

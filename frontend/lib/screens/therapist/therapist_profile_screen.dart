@@ -170,6 +170,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                               builder: (context) => TherapistEditProfileScreen(userId: widget.userId),
                             ),
                           );
+                          // If the edit screen returns true, refresh the profile
                           if (result == true) {
                             setState(() => _profileFuture = _fetchProfile());
                           }
