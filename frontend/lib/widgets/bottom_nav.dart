@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../screens/homepage_screen.dart';
 import '../screens/chat/chat_session_screen.dart';
+import '../screens/mood/mood_tracking_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -68,7 +69,15 @@ class BottomNavBar extends StatelessWidget {
           } else {
             onTap(index);
           }
-          
+          if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => MoodTrackingScreen(userId: userId),
+              ),
+            );
+          } else {
+            onTap(index);
+          }
         },
         child: Container(
           padding: const EdgeInsets.all(12),

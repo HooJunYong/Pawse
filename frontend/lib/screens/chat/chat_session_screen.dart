@@ -280,7 +280,6 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
               onTap: (index) {
                 setState(() {
                   _currentIndex = index;
-                  // Add navigation logic here (e.g., Navigator.push...)
                 });
               },
             ),
