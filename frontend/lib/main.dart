@@ -30,7 +30,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'AI Mental Health Companion',
       debugShowCheckedModeBanner: false,
-      home: const LoginWidget(),
+      home: SplashScreen(),
     );
   }
 }

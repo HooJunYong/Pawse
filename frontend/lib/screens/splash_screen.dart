@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'auth/login_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   @override
@@ -66,7 +67,10 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     await Future.delayed(Duration(seconds: 3));
     
     if (mounted) {
-       Navigator.pushReplacementNamed(context, '/login'); 
+       Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoginWidget()),
+       );
     }
   }
 
@@ -79,7 +83,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final backgroundColor = Color(0xFFF7F4F2);
-    final contentColor = Color(0x4F3422);
+    final contentColor = Color(0xFF4F3422);
 
     return Scaffold(
       backgroundColor: backgroundColor,
