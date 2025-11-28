@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../screens/homepage_screen.dart';
 import '../screens/chat/chat_session_screen.dart';
 import '../screens/mood/mood_tracking_screen.dart';
+import '../screens/profile/profile_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -59,7 +60,6 @@ class BottomNavBar extends StatelessWidget {
           } else {
             onTap(index);
           }
-          // Navigate to ChatSessionScreen if chat bubble (index 1) is tapped
           if (index == 1) {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -73,6 +73,33 @@ class BottomNavBar extends StatelessWidget {
             Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (context) => MoodTrackingScreen(userId: userId),
+              ),
+            );
+          } else {
+            onTap(index);
+          }
+          if (index == 3) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => MoodTrackingScreen(userId: userId),
+              ),
+            );
+          } else {
+            onTap(index);
+          }
+          if (index == 4) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => MoodTrackingScreen(userId: userId),
+              ),
+            );
+          } else {
+            onTap(index);
+          }
+          if (index == 5) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => Profile(userId: userId),
               ),
             );
           } else {

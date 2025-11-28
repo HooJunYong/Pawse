@@ -69,12 +69,6 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         MoodResponse: The created mood entry
     """
     try:
-        # Check if user already logged mood today
-        if check_today_log(mood_data.user_id):
-            raise HTTPException(
-                status_code=400, 
-                detail="You have already logged your mood for today. Please update instead."
-            )
         
         # Generate unique mood ID
         mood_id = generate_mood_id()
