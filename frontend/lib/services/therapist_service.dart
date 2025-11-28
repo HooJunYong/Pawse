@@ -1,71 +1,97 @@
-import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 import '../models/therapist_model.dart';
-// import 'dart:convert';
-// import 'package:http/http.dart' as http;
 
 class TherapistService {
-  // TODO: Replace with your actual Python server URL (e.g., 'http://127.0.0.1:5000')
-  static const String baseUrl = 'http://your-python-api.com';
+  final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
 
-  Future<List<Therapist>> getTherapists() async {
-    // Uncomment for real backend
-    /*
+  Future<List<Therapist>> getTherapists({String? searchQuery}) async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/therapists'));
+      String endpoint = '/therapist/verified';
+      if (searchQuery != null && searchQuery.isNotEmpty) {
+        endpoint += '?search=$searchQuery';
+      }
+
+      final response = await http.get(
+        Uri.parse('$baseUrl$endpoint'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
       if (response.statusCode == 200) {
-        List<dynamic> body = jsonDecode(response.body);
-        List<Therapist> therapists = body
-            .map((dynamic item) => Therapist.fromJson(item))
-            .toList();
-        return therapists;
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => _mapTherapistFromBackend(json)).toList();
       } else {
         throw Exception('Failed to load therapists');
       }
     } catch (e) {
-      throw Exception('Error connecting to backend: $e');
+      throw Exception('Error getting therapists: $e');
     }
-    */
+  }
 
-    // Mock data for UI demo
-    await Future.delayed(const Duration(seconds: 1));
-    return [
-      Therapist(
-        id: '1',
-        name: 'Mr. Lim Wei',
-        specialties: 'Depression, Trauma',
-        location: 'Penang',
-        languages: 'EN, M',
-        rating: 4.8,
-        imageUrl: 'Mr.L',
-        title: 'Clinical Psychologist',
-        quote: 'Understanding your trauma is the first step to healing.',
-        price: 180.0,
-      ),
-      Therapist(
-        id: '2',
-        name: 'Ms. Chloe Tan',
-        specialties: 'Family, Self-Esteem',
-        location: 'Johor Bahru',
-        languages: 'EN, C',
-        rating: 4.9,
-        imageUrl: 'Ms.C',
-        title: 'Family Therapist',
-        quote: 'Building stronger families through open communication.',
-        price: 160.0,
-      ),
-      Therapist(
-        id: '3',
-        name: 'Dr. Rajesh',
-        specialties: 'Career, Life Transitions',
-        location: 'Selangor',
-        languages: 'EN, T',
-        rating: 4.7,
-        imageUrl: 'Dr.R',
-        title: 'Career Counselor',
-        quote: "Navigating life's transitions with confidence.",
-        price: 200.0,
-      ),
-    ];
+  Therapist _mapTherapistFromBackend(Map<String, dynamic> json) {
+    // Map backend therapist profile to frontend Therapist model
+    // Build full address from backend fields with null safety
+    final officeAddress = json['office_address']?.toString() ?? '';
+    final city = json['city']?.toString() ?? '';
+    final postalCode = json['postal_code']?.toString() ?? '';
+    final state = json['state']?.toString() ?? '';
+    
+    // Construct address, removing empty parts and extra commas
+    final addressParts = [officeAddress, city, postalCode, state]
+        .where((part) => part.isNotEmpty)
+        .join(', ');
+    
+    final address = addressParts.isNotEmpty ? addressParts : state;
+    
+    return Therapist(
+      id: json['user_id']?.toString() ?? '',
+      name: '${json['first_name']?.toString() ?? ''} ${json['last_name']?.toString() ?? ''}'.trim(),
+      specialties:
+          (json['specializations'] as List<dynamic>?)?.join(', ') ?? 'General Counseling',
+      location: state,
+      address: address.isEmpty ? 'Location not specified' : address,
+      languages:
+          (json['languages_spoken'] as List<dynamic>?)?.join(', ') ?? 'English',
+      rating: 4.5, // Default rating as backend doesn't have this yet
+      imageUrl: _getInitials(json['first_name']?.toString(), json['last_name']?.toString()),
+      title: json['license_number'] != null
+          ? 'Licensed Therapist'
+          : 'Counselor',
+      centerName: json['office_name']?.toString() ?? 'Holistic Mind Center',
+      quote: json['bio']?.toString() ?? 'Here to help you on your journey.',
+      price: (json['hourly_rate'] as num?)?.toDouble() ?? 150.0,
+    );
+  }
+
+  String _getInitials(String? firstName, String? lastName) {
+    String initials = '';
+    if (firstName != null && firstName.isNotEmpty) {
+      initials += firstName[0].toUpperCase();
+    }
+    if (lastName != null && lastName.isNotEmpty) {
+      initials += lastName[0].toUpperCase();
+    }
+    return initials.isNotEmpty ? initials : '?';
+  }
+
+  Future<Therapist> getTherapistById(String therapistId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/therapist/profile/$therapistId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return _mapTherapistFromBackend(data);
+      } else {
+        throw Exception('Failed to load therapist');
+      }
+    } catch (e) {
+      throw Exception('Error getting therapist: $e');
+    }
   }
 }

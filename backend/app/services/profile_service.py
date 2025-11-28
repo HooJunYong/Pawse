@@ -85,6 +85,7 @@ def get_profile_details(user_id: str) -> dict:
     return {
         "user_id": user_id,
         "email": user.get("email"),
+        "phone_number": (profile or {}).get("phone_number", ""),
         "first_name": (profile or {}).get("first_name", ""),
         "last_name": (profile or {}).get("last_name", ""),
         "date_of_birth": (profile or {}).get("date_of_birth", ""),
@@ -117,6 +118,8 @@ def update_user_profile(user_id: str, payload: UpdateProfileRequest) -> UpdatePr
         updates_profile["first_name"] = payload.first_name.strip()
     if payload.last_name is not None:
         updates_profile["last_name"] = payload.last_name.strip()
+    if payload.phone_number is not None:
+        updates_profile["phone_number"] = payload.phone_number.strip()
     if payload.date_of_birth is not None:
         updates_profile["date_of_birth"] = payload.date_of_birth
     if payload.gender is not None:

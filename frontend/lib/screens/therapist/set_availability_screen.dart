@@ -20,15 +20,18 @@ class SetAvailabilityScreen extends StatefulWidget {
 }
 
 class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
-    // Sorts the _timeSlots list by the 'from' time (earliest first)
+    // Sort slots chronologically so locked entries remain in place.
     void _sortTimeSlots() {
       _timeSlots.sort((a, b) {
-        final aMinutes = a['from']!.hour * 60 + a['from']!.minute;
-        final bMinutes = b['from']!.hour * 60 + b['from']!.minute;
+        final TimeOfDay aFrom = a['from'] as TimeOfDay;
+        final TimeOfDay bFrom = b['from'] as TimeOfDay;
+        final int aMinutes = aFrom.hour * 60 + aFrom.minute;
+        final int bMinutes = bFrom.hour * 60 + bFrom.minute;
         return aMinutes.compareTo(bMinutes);
       });
     }
-  final List<Map<String, TimeOfDay>> _timeSlots = [];
+
+  final List<Map<String, dynamic>> _timeSlots = [];
   bool _applyToAllThursdays = false;
 
   @override
@@ -57,12 +60,20 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
             for (var slot in availabilitySlots) {
               final startTime = _parseTimeString(slot['start_time']);
               final endTime = _parseTimeString(slot['end_time']);
-              _timeSlots.add({'from': startTime, 'to': endTime});
+              final bool isBooked = slot['is_booked'] == true ||
+                  (slot['status']?.toString().toLowerCase() == 'booked');
+
+              _timeSlots.add({
+                'from': startTime,
+                'to': endTime,
+                'locked': isBooked,
+              });
               // Check if it's a recurring availability (availability_date is null)
               if (slot['availability_date'] == null) {
                 isRecurring = true;
               }
             }
+            _sortTimeSlots();
             _applyToAllThursdays = isRecurring;
           });
         }
@@ -95,19 +106,30 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       _timeSlots.add({
         'from': const TimeOfDay(hour: 14, minute: 0),
         'to': const TimeOfDay(hour: 17, minute: 0),
+        'locked': false,
       });
       _sortTimeSlots();
     });
   }
 
   void _removeTimeSlot(int index) {
+    if (_timeSlots[index]['locked'] == true) {
+      _showLockedSlotMessage();
+      return;
+    }
     setState(() {
       _timeSlots.removeAt(index);
     });
   }
 
   Future<void> _selectTime(int index, String type) async {
-    TimeOfDay initialTime = _timeSlots[index][type] ?? const TimeOfDay(hour: 9, minute: 0);
+    if (_timeSlots[index]['locked'] == true) {
+      _showLockedSlotMessage();
+      return;
+    }
+
+    final TimeOfDay initialTime = _timeSlots[index][type] as TimeOfDay? ??
+        const TimeOfDay(hour: 9, minute: 0);
     int hour = initialTime.hourOfPeriod == 0 ? 12 : initialTime.hourOfPeriod;
     int minute = initialTime.minute;
     bool isPM = initialTime.period == DayPeriod.pm;
@@ -294,6 +316,14 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
     });
   }
 
+  void _showLockedSlotMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Booked slots cannot be edited or removed.'),
+      ),
+    );
+  }
+
   String _formatTimeOfDay(TimeOfDay time) {
     final hour = time.hourOfPeriod == 0 ? 12 : time.hourOfPeriod;
     final minute = time.minute.toString().padLeft(2, '0');
@@ -319,7 +349,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
             if (DateUtils.isSameDay(widget.selectedDate, DateTime.now())) {
               final now = TimeOfDay.now();
               for (int i = 0; i < _timeSlots.length; i++) {
-                final from = _timeSlots[i]['from']!;
+                final TimeOfDay from = _timeSlots[i]['from'] as TimeOfDay;
                 // If the slot starts before now, show error
                 if (from.hour < now.hour || (from.hour == now.hour && from.minute < now.minute)) {
                   await showDialog(
@@ -387,8 +417,10 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         int toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
         for (int i = 0; i < _timeSlots.length; i++) {
           final slotA = _timeSlots[i];
-          final fromA = toMinutes(slotA['from']!);
-          final toA = toMinutes(slotA['to']!);
+          final TimeOfDay fromTimeA = slotA['from'] as TimeOfDay;
+          final TimeOfDay toTimeA = slotA['to'] as TimeOfDay;
+          final fromA = toMinutes(fromTimeA);
+          final toA = toMinutes(toTimeA);
           // Enforce max 2 hour duration
           if (toA - fromA > 120) {
             hasOverlap = true;
@@ -403,11 +435,13 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           for (int j = 0; j < _timeSlots.length; j++) {
             if (i == j) continue;
             final slotB = _timeSlots[j];
-            final fromB = toMinutes(slotB['from']!);
-            final toB = toMinutes(slotB['to']!);
+            final TimeOfDay fromTimeB = slotB['from'] as TimeOfDay;
+            final TimeOfDay toTimeB = slotB['to'] as TimeOfDay;
+            final fromB = toMinutes(fromTimeB);
+            final toB = toMinutes(toTimeB);
             if (!(toA <= fromB || fromA >= toB)) {
               hasOverlap = true;
-              overlapMsg = 'Duplicate/Overlapping Slot: ${_formatTimeOfDay(slotA['from']!)} - ${_formatTimeOfDay(slotA['to']!)} overlaps with ${_formatTimeOfDay(slotB['from']!)} - ${_formatTimeOfDay(slotB['to']!)}.';
+              overlapMsg = 'Duplicate/Overlapping Slot: ${_formatTimeOfDay(fromTimeA)} - ${_formatTimeOfDay(toTimeA)} overlaps with ${_formatTimeOfDay(fromTimeB)} - ${_formatTimeOfDay(toTimeB)}.';
               break;
             }
           }
@@ -484,8 +518,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       final slots = _timeSlots
           .map(
             (slot) => {
-              'start_time': _formatTimeOfDay(slot['from']!),
-              'end_time': _formatTimeOfDay(slot['to']!),
+              'start_time': _formatTimeOfDay(slot['from'] as TimeOfDay),
+              'end_time': _formatTimeOfDay(slot['to'] as TimeOfDay),
             },
           )
           .toList();
@@ -790,157 +824,183 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
 
                   // Time Slots
                   ..._timeSlots.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final slot = entry.value;
+                    final int index = entry.key;
+                    final Map<String, dynamic> slot = entry.value;
+                    final bool isLocked = slot['locked'] == true;
+                    final TimeOfDay fromTime = slot['from'] as TimeOfDay;
+                    final TimeOfDay toTime = slot['to'] as TimeOfDay;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isLocked ? const Color(0xFFF3F4F6) : Colors.white,
                         borderRadius: BorderRadius.circular(12),
+                        border: isLocked
+                            ? Border.all(color: const Color(0xFFCBD5F5))
+                            : null,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withOpacity(isLocked ? 0.02 : 0.06),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
                         ],
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // From Time
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'From',
+                          if (isLocked)
+                            Row(
+                              children: const [
+                                Icon(Icons.lock, size: 16, color: Color(0xFF1E3A8A)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Booked slot – edits disabled',
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontFamily: 'Nunito',
-                                    color: Color.fromRGBO(107, 114, 128, 1),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                GestureDetector(
-                                  onTap: () => _selectTime(index, 'from'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: const Color.fromRGBO(
-                                          229,
-                                          231,
-                                          235,
-                                          1,
-                                        ),
-                                      ),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          _formatTimeOfDay(slot['from']!),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontFamily: 'Nunito',
-                                            fontWeight: FontWeight.w600,
-                                            color: Color.fromRGBO(66, 32, 6, 1),
-                                          ),
-                                        ),
-                                        const Icon(
-                                          Icons.access_time,
-                                          size: 18,
-                                          color: Color.fromRGBO(
-                                            107,
-                                            114,
-                                            128,
-                                            1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    color: Color(0xFF1E3A8A),
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
-                          ),
-                          const SizedBox(width: 12),
-                          // To Time
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'To',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontFamily: 'Nunito',
-                                    color: Color.fromRGBO(107, 114, 128, 1),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                GestureDetector(
-                                  onTap: () => _selectTime(index, 'to'),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 12,
+                          if (isLocked) const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              // From Time
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'From',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontFamily: 'Nunito',
+                                        color: Color.fromRGBO(107, 114, 128, 1),
+                                      ),
                                     ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: const Color.fromRGBO(
-                                          229,
-                                          231,
-                                          235,
-                                          1,
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap: isLocked
+                                          ? null
+                                          : () => _selectTime(index, 'from'),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isLocked ? const Color(0xFFE5E7EB) : null,
+                                          border: Border.all(
+                                            color: const Color.fromRGBO(229, 231, 235, 1),
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatTimeOfDay(fromTime),
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontFamily: 'Nunito',
+                                                fontWeight: FontWeight.w600,
+                                                color: isLocked
+                                                    ? const Color(0xFF4B5563)
+                                                    : const Color.fromRGBO(66, 32, 6, 1),
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.access_time,
+                                              size: 18,
+                                              color: isLocked
+                                                  ? const Color(0xFF9CA3AF)
+                                                  : const Color.fromRGBO(107, 114, 128, 1),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      borderRadius: BorderRadius.circular(8),
                                     ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          _formatTimeOfDay(slot['to']!),
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontFamily: 'Nunito',
-                                            fontWeight: FontWeight.w600,
-                                            color: Color.fromRGBO(66, 32, 6, 1),
-                                          ),
-                                        ),
-                                        const Icon(
-                                          Icons.access_time,
-                                          size: 18,
-                                          color: Color.fromRGBO(
-                                            107,
-                                            114,
-                                            128,
-                                            1,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          // Delete Button
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: Colors.red,
-                            ),
-                            onPressed: () => _removeTimeSlot(index),
+                              ),
+                              const SizedBox(width: 12),
+                              // To Time
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'To',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontFamily: 'Nunito',
+                                        color: Color.fromRGBO(107, 114, 128, 1),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    GestureDetector(
+                                      onTap:
+                                          isLocked ? null : () => _selectTime(index, 'to'),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 12,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isLocked ? const Color(0xFFE5E7EB) : null,
+                                          border: Border.all(
+                                            color: const Color.fromRGBO(229, 231, 235, 1),
+                                          ),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatTimeOfDay(toTime),
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontFamily: 'Nunito',
+                                                fontWeight: FontWeight.w600,
+                                                color: isLocked
+                                                    ? const Color(0xFF4B5563)
+                                                    : const Color.fromRGBO(66, 32, 6, 1),
+                                              ),
+                                            ),
+                                            Icon(
+                                              Icons.access_time,
+                                              size: 18,
+                                              color: isLocked
+                                                  ? const Color(0xFF9CA3AF)
+                                                  : const Color.fromRGBO(107, 114, 128, 1),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline,
+                                  color: isLocked ? const Color(0xFF9CA3AF) : Colors.red,
+                                ),
+                                onPressed: () {
+                                  if (isLocked) {
+                                    _showLockedSlotMessage();
+                                  } else {
+                                    _removeTimeSlot(index);
+                                  }
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),

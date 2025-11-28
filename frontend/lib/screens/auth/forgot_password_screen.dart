@@ -1,4 +1,8 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 
 import 'otp_screen.dart';
 
@@ -12,6 +16,7 @@ class ForgotPasswordWidget extends StatefulWidget {
 class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _emailController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -19,16 +24,73 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
       final email = _emailController.text.trim();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Reset code sent to $email')),
-      );
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const OtpWidget()),
-      );
+      
+      setState(() => _isLoading = true);
+
+      try {
+        final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+        final response = await http.post(
+          Uri.parse('$apiUrl/otp/create'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'email': email}),
+        );
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Reset code sent to $email'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OtpWidget(email: email),
+            ),
+          );
+        } else {
+          final error = jsonDecode(response.body);
+          String errorMessage = error['detail'] ?? 'An error occurred';
+          
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Text(response.statusCode == 404 ? 'Account Not Found' : 'Error'),
+              content: Text(errorMessage),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Connection Error'),
+            content: Text('Failed to connect to server: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
+      }
     }
   }
 
@@ -49,7 +111,7 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  // Logo
+                  // Mail Icon
                   Container(
                     width: 130,
                     height: 130,
@@ -64,16 +126,10 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                         )
                       ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Center(
-                        child: Image.asset(
-                          'assets/images/tile001.png',
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
+                    child: const Icon(
+                      Icons.mail_outline,
+                      size: 70,
+                      color: Color.fromRGBO(249, 115, 22, 1),
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -172,15 +228,24 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(9999)),
                       ),
-                      onPressed: _submit,
-                      child: const Text(
-                        'Send Code',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontFamily: 'Nunito',
-                          color: Colors.white,
-                        ),
-                      ),
+                      onPressed: _isLoading ? null : _submit,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text(
+                              'Send Code',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontFamily: 'Nunito',
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 32),

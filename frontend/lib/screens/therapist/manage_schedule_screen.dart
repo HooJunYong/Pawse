@@ -617,20 +617,45 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   Widget _buildAvailabilityCard(Map<String, dynamic> slot) {
+    final isBooked = slot['is_booked'] == true ||
+        (slot['status']?.toString().toLowerCase() == 'booked');
+
+    final Color backgroundColor = isBooked
+        ? const Color.fromRGBO(59, 130, 246, 0.08)
+        : const Color.fromRGBO(249, 115, 22, 0.1);
+    final Color borderColor = isBooked
+        ? const Color.fromRGBO(59, 130, 246, 0.3)
+        : const Color.fromRGBO(249, 115, 22, 0.3);
+    final Color labelBackground = isBooked
+        ? const Color.fromRGBO(59, 130, 246, 0.12)
+        : Colors.green[50]!;
+    final Color labelBorder = isBooked
+        ? const Color.fromRGBO(59, 130, 246, 0.3)
+        : Colors.green[200]!;
+    final Color labelTextColor = isBooked
+        ? const Color.fromRGBO(30, 64, 175, 1)
+        : Colors.green[700]!;
+    final IconData statusIcon = isBooked ? Icons.event_busy : Icons.schedule;
+    final String statusLabel = isBooked ? 'Booked' : 'Available';
+    final String subtitleText = isBooked ? 'Slot no longer available' : 'Available for booking';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color.fromRGBO(249, 115, 22, 0.1),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color.fromRGBO(249, 115, 22, 0.3),
+          color: borderColor,
           width: 1,
         ),
       ),
       child: Row(
         children: [
-          const Icon(Icons.schedule, color: Color.fromRGBO(249, 115, 22, 1)),
+          Icon(statusIcon,
+              color: isBooked
+                  ? const Color.fromRGBO(30, 64, 175, 1)
+                  : const Color.fromRGBO(249, 115, 22, 1)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -647,7 +672,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Available for booking',
+                  subtitleText,
                   style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'Nunito',
@@ -661,16 +686,16 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.green[50],
+              color: labelBackground,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.green[200]!, width: 1),
+              border: Border.all(color: labelBorder, width: 1),
             ),
             child: Text(
-              'Available',
+              statusLabel,
               style: TextStyle(
                 fontSize: 12,
                 fontFamily: 'Nunito',
-                color: Colors.green[700],
+                color: labelTextColor,
                 fontWeight: FontWeight.w600,
               ),
             ),

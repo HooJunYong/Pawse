@@ -1,6 +1,6 @@
 import uuid
 import logging
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Optional
 from fastapi import HTTPException
 from ..models.database import db
@@ -27,6 +27,23 @@ def _parse_time_string(time_str: str) -> time:
 def _time_to_string(time_obj: time) -> str:
     """Convert time object to string format 'HH:MM AM/PM'"""
     return time_obj.strftime("%I:%M %p")
+
+
+def _time_to_minutes(time_obj: time) -> int:
+    """Convert a time object to minutes since midnight."""
+
+    return time_obj.hour * 60 + time_obj.minute
+
+
+def _time_string_to_minutes(time_str: str | None) -> Optional[int]:
+    """Convert a time label like '2:00 PM' to minutes since midnight."""
+
+    if not time_str:
+        return None
+    try:
+        return _time_to_minutes(_parse_time_string(time_str))
+    except HTTPException:
+        return None
 
 def set_therapist_availability(payload: SetAvailabilityRequest) -> dict:
     """Set or update therapist availability for a specific day or date"""
@@ -174,7 +191,7 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
     start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
     
-    sessions = list(db.therapy_session.find({
+    sessions = list(db.therapy_sessions.find({
         "therapist_user_id": user_id,
         "scheduled_at": {
             "$gte": start_of_day,
@@ -182,8 +199,42 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
         }
     }, {"_id": 0}).sort("scheduled_at", 1))
     
-    # Enrich sessions with client info
+    session_windows: list[dict[str, int | str | None]] = []
+
+    # Enrich sessions with client info and normalize time labels
     for session in sessions:
+        scheduled_value = session.get("scheduled_at")
+        scheduled_dt: Optional[datetime] = None
+        if isinstance(scheduled_value, datetime):
+            scheduled_dt = scheduled_value
+        elif isinstance(scheduled_value, str):
+            try:
+                scheduled_dt = datetime.fromisoformat(scheduled_value.replace("Z", "+00:00"))
+            except ValueError:
+                scheduled_dt = None
+
+        duration = int(session.get("duration_minutes", 50))
+        start_minutes = None
+
+        if scheduled_dt is not None:
+            start_minutes = scheduled_dt.hour * 60 + scheduled_dt.minute
+        else:
+            start_minutes = _time_string_to_minutes(session.get("start_time"))
+            if start_minutes is not None:
+                scheduled_dt = start_of_day + timedelta(minutes=start_minutes)
+
+        if scheduled_dt is not None and start_minutes is not None:
+            normalized_start = scheduled_dt.strftime("%I:%M %p")
+            normalized_end = (scheduled_dt + timedelta(minutes=duration)).strftime("%I:%M %p")
+            session["start_time"] = normalized_start
+            if not session.get("end_time"):
+                session["end_time"] = normalized_end
+            session_windows.append({
+                "start": start_minutes,
+                "end": start_minutes + duration,
+                "session_id": session.get("session_id"),
+            })
+
         client = db.user_profile.find_one({"user_id": session["user_id"]}, {"_id": 0})
         if client:
             session["client_name"] = f"{client.get('first_name', '')} {client.get('last_name', '')}".strip()
@@ -199,6 +250,26 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
             {"user_id": user_id, "day_of_week": day_name, "availability_date": None}  # Recurring
         ]
     }, {"_id": 0}).sort("start_time", 1))
+
+    for slot in availability_slots:
+        slot_start = _time_string_to_minutes(slot.get("start_time"))
+        slot_end = _time_string_to_minutes(slot.get("end_time"))
+
+        is_booked = False
+        if slot_start is not None and slot_end is not None and slot_end > slot_start:
+            for window in session_windows:
+                window_start = window.get("start")
+                window_end = window.get("end")
+                if not isinstance(window_start, int) or not isinstance(window_end, int):
+                    continue
+                if not (slot_end <= window_start or slot_start >= window_end):
+                    is_booked = True
+                    slot["booked_session_id"] = window.get("session_id")
+                    break
+
+        slot["is_booked"] = is_booked
+        if is_booked:
+            slot["is_available"] = False
     
     return TherapistScheduleResponse(
         date=date,
@@ -233,7 +304,7 @@ def get_therapist_dashboard(user_id: str) -> TherapistDashboardResponse:
     start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = now.replace(hour=23, minute=59, second=59, microsecond=999999)
     
-    sessions = list(db.therapy_session.find({
+    sessions = list(db.therapy_sessions.find({
         "therapist_user_id": user_id,
         "scheduled_at": {
             "$gte": start_of_day,
@@ -369,7 +440,7 @@ def get_therapist_schedule_for_month(user_id: str, year: int, month: int) -> dic
         end_of_month = datetime(year, month + 1, 1)
 
     # --- Get dates with sessions ---
-    sessions = db.therapy_session.find({
+    sessions = db.therapy_sessions.find({
         "therapist_user_id": user_id,
         "scheduled_at": {
             "$gte": start_of_month,

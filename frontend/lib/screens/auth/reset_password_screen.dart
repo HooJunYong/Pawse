@@ -6,7 +6,8 @@ import 'package:http/http.dart' as http;
 
 class ResetPassword extends StatefulWidget {
   final String email;
-  const ResetPassword({super.key, required this.email});
+  final String? otpCode;
+  const ResetPassword({super.key, required this.email, this.otpCode});
 
   @override
   State<ResetPassword> createState() => _ResetPasswordState();
@@ -103,10 +104,11 @@ class _ResetPasswordState extends State<ResetPassword> {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
       final response = await http.post(
-        Uri.parse('$apiUrl/reset-password'),
+        Uri.parse('$apiUrl/otp/reset-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'email': widget.email,
+          'otp': widget.otpCode ?? '',
           'new_password': _newPasswordController.text,
         }),
       );
@@ -198,43 +200,25 @@ class _ResetPasswordState extends State<ResetPassword> {
     return Scaffold(
       backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(32.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 40),
-                  // Lock icon
-                  Container(
-                    width: 64,
-                    height: 64,
-                    decoration: BoxDecoration(
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color.fromRGBO(0, 0, 0, 0.25),
-                          offset: Offset(0, 4),
-                          blurRadius: 4,
-                        ),
-                      ],
-                      borderRadius: BorderRadius.circular(32),
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(32),
-                      child: Image.asset(
-                        'assets/images/Rotationlock1.png',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => const Icon(
-                          Icons.lock_reset,
-                          size: 64,
-                          color: Color.fromRGBO(66, 32, 6, 1),
-                        ),
+        child: Center(
+          child: SizedBox(
+            width: 375,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const SizedBox(height: 40),
+                      // Lock icon
+                      const Icon(
+                        Icons.lock_reset,
+                        size: 64,
+                        color: Color.fromRGBO(249, 115, 22, 1),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                      const SizedBox(height: 24),
                   const Text(
                     'Create New Password',
                     textAlign: TextAlign.center,
@@ -296,8 +280,10 @@ class _ResetPasswordState extends State<ResetPassword> {
                         ),
                       ),
                     ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),

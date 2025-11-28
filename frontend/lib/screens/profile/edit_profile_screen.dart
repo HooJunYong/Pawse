@@ -19,6 +19,7 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _homeAddressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
@@ -44,6 +45,7 @@ class _EditProfileState extends State<EditProfile> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _dobController.dispose();
     _homeAddressController.dispose();
     _cityController.dispose();
@@ -63,6 +65,7 @@ class _EditProfileState extends State<EditProfile> {
           _firstNameController.text = (data['first_name'] as String?) ?? '';
           _lastNameController.text = (data['last_name'] as String?) ?? '';
           _emailController.text = (data['email'] as String?) ?? '';
+          _phoneController.text = (data['phone_number'] as String?) ?? '';
           _dobController.text = (data['date_of_birth'] as String?) ?? '';
           _selectedGender = (data['gender'] as String?) ?? 'Select';
           if (_selectedGender.isEmpty) _selectedGender = 'Select';
@@ -209,6 +212,7 @@ class _EditProfileState extends State<EditProfile> {
           'first_name': _firstNameController.text.trim(),
           'last_name': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
+          'phone_number': _phoneController.text.trim(),
           'date_of_birth': _dobController.text.trim(),
           'gender': _selectedGender,
           'home_address': _homeAddressController.text.trim(),
@@ -720,6 +724,21 @@ class _EditProfileState extends State<EditProfile> {
                               }
                               if (!RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(value.trim())) {
                                 return 'Enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _phoneController,
+                            label: 'Phone Number',
+                            hintText: 'e.g., +60123456789',
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (value != null && value.trim().isNotEmpty) {
+                                if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value.trim())) {
+                                  return 'Enter valid phone number';
+                                }
                               }
                               return null;
                             },

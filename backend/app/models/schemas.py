@@ -26,6 +26,7 @@ class UpdateProfileRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
     home_address: Optional[str] = None
@@ -39,6 +40,29 @@ class UpdateProfileRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+class CreateOtpRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+
+class OtpResponse(BaseModel):
+    message: str
+    otp_code: Optional[str] = None  # Only for development
+    expires_in_minutes: Optional[int] = None
+
+class VerifyOtpResponse(BaseModel):
+    success: bool
+    message: str
+    user_id: Optional[str] = None
+    email: Optional[str] = None
 
 class TherapistApplicationRequest(BaseModel):
     user_id: str
