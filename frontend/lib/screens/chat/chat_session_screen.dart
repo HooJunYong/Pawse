@@ -55,6 +55,9 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
       } else {
         // Get default companion if no chat history
         final defaultCompanion = await CompanionService.getDefaultCompanion();
+        if (defaultCompanion == null) {
+          throw Exception('No default companion available');
+        }
         companionId = defaultCompanion.companionId;
       }
       
@@ -193,7 +196,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                               width: 200,
                               fit: BoxFit.contain,
                             )
-                          : Image.asset('assets/images/defaultcat.png'),
+                          : Image.asset('assets/images/americonsh1.png'),
                     ),
                   ),
                   

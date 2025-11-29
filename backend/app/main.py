@@ -16,6 +16,7 @@ from .routes.password_routes import router as password_router
 from .routes.therapist_routes import router as therapist_router
 from .routes.schedule_routes import router as schedule_router
 from .routes.mood_routes import router as mood_router
+from .routes.personality_routes import router as personality_router
 from app.config.settings import get_settings
 
 # Load environment variables
@@ -70,6 +71,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(session_router)
 app.include_router(message_router)
 app.include_router(companion_router)
+app.include_router(personality_router, tags=["Personalities"])
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(profile_router, tags=["Profile"])
 app.include_router(password_router, tags=["Password"])

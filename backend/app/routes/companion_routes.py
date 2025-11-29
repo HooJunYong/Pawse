@@ -2,57 +2,129 @@ from fastapi import APIRouter, HTTPException
 from typing import List
 import logging
 
-from app.models.companion import AICompanionResponse
+from app.models.companion import AICompanionCreate, AICompanionUpdate, AICompanionResponse
 from app.models.personality import PersonalityResponse
-from app.models.database import get_database
+from app.services.companion_service import CompanionService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Companions & Personalities"])
+router = APIRouter(prefix="/api", tags=["Companions"])
+
+
+# ==================== Companion Routes ====================
+
+@router.post("/companions", response_model=AICompanionResponse)
+async def create_companion(companion_data: AICompanionCreate):
+    """
+    Create a new AI companion
+    
+    - **user_id**: Optional - None for system bot, user_id for user's companion
+    - **personality_id**: Required - Reference to personality
+    - **companion_name**: Required - Name of the companion
+    - **description**: Required - Companion description
+    - **image**: Required - Image URL or path
+    
+    Returns the created companion
+    """
+    try:
+        companion = CompanionService.create_companion(companion_data)
+        return companion
+    except Exception as e:
+        logger.error(f"Error creating companion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create companion: {str(e)}")
 
 
 @router.get("/companions", response_model=List[AICompanionResponse])
 async def get_all_companions(active_only: bool = True):
     """
-    Get all AI companions
+    Get all AI companions (both system and user companions)
     
     - **active_only**: If True, return only active companions (default: True)
     
-    Returns list of companions
+    Returns list of all companions
     """
     try:
-        db = get_database()
-        
-        # Build query filter
-        query = {"is_active": True} if active_only else {}
-        
-        # Fetch companions
-        companions = list(db.ai_companions.find(query, {"_id": 0}))
-        
-        # Convert to response models
-        companion_responses = [
-            AICompanionResponse(
-                companion_id=comp["companion_id"],
-                personality_id=comp["personality_id"],
-                companion_name=comp["companion_name"],
-                description=comp["description"],
-                image=comp["image"],
-                created_at=comp["created_at"],
-                is_default=comp.get("is_default", False),
-                is_active=comp.get("is_active", True),
-                voice_tone=comp.get("voice_tone")
-            )
-            for comp in companions
-        ]
-        
-        logger.info(f"Retrieved {len(companion_responses)} companions")
-        return companion_responses
-        
+        companions = CompanionService.get_all_companions(active_only)
+        return companions
     except Exception as e:
         logger.error(f"Error retrieving companions: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve companions: {str(e)}")
+
+
+@router.get("/companions/system", response_model=List[AICompanionResponse])
+async def get_system_companions(active_only: bool = True):
+    """
+    Get all system bot companions (user_id is null)
+    
+    - **active_only**: If True, return only active companions (default: True)
+    
+    Returns list of system companions
+    """
+    try:
+        companions = CompanionService.get_system_companions(active_only)
+        return companions
+    except Exception as e:
+        logger.error(f"Error retrieving system companions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve system companions: {str(e)}")
+
+
+@router.get("/companions/user/{user_id}", response_model=List[AICompanionResponse])
+async def get_user_companions(user_id: str, active_only: bool = True):
+    """
+    Get companions that belong to a specific user only (excludes system bots)
+    
+    - **user_id**: The user ID to filter by
+    - **active_only**: If True, return only active companions (default: True)
+    
+    Returns list of user's companions
+    """
+    try:
+        companions = CompanionService.get_user_companions(user_id, active_only)
+        return companions
+    except Exception as e:
+        logger.error(f"Error retrieving user companions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve user companions: {str(e)}")
+
+
+@router.get("/companions/available/{user_id}", response_model=List[AICompanionResponse])
+async def get_available_companions(user_id: str, active_only: bool = True):
+    """
+    Get all system companions plus companions belonging to a specific user
+    
+    - **user_id**: The user ID to include companions for
+    - **active_only**: If True, return only active companions (default: True)
+    
+    Returns list of system companions and user's companions
+    """
+    try:
+        companions = CompanionService.get_user_and_system_companions(user_id, active_only)
+        return companions
+    except Exception as e:
+        logger.error(f"Error retrieving available companions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve available companions: {str(e)}")
+
+
+@router.get("/companions/default/get", response_model=AICompanionResponse)
+async def get_default_companion():
+    """
+    Get the default companion
+    
+    Returns the companion marked as default (is_default=True)
+    """
+    try:
+        companion = CompanionService.get_default_companion()
+        
+        if not companion:
+            raise HTTPException(status_code=404, detail="No default companion found")
+        
+        return companion
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving default companion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve default companion: {str(e)}")
 
 
 @router.get("/companions/{companion_id}", response_model=AICompanionResponse)
@@ -65,28 +137,12 @@ async def get_companion_by_id(companion_id: str):
     Returns companion details
     """
     try:
-        db = get_database()
-        
-        companion = db.ai_companions.find_one({"companion_id": companion_id}, {"_id": 0})
+        companion = CompanionService.get_companion_by_id(companion_id)
         
         if not companion:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Companion not found: {companion_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"Companion not found: {companion_id}")
         
-        return AICompanionResponse(
-            companion_id=companion["companion_id"],
-            personality_id=companion["personality_id"],
-            companion_name=companion["companion_name"],
-            description=companion["description"],
-            image=companion["image"],
-            created_at=companion["created_at"],
-            is_default=companion.get("is_default", False),
-            is_active=companion.get("is_active", True),
-            voice_tone=companion.get("voice_tone")
-        )
-        
+        return companion
     except HTTPException:
         raise
     except Exception as e:
@@ -94,122 +150,50 @@ async def get_companion_by_id(companion_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to retrieve companion: {str(e)}")
 
 
-@router.get("/companions/default/get", response_model=AICompanionResponse)
-async def get_default_companion():
+@router.put("/companions/{companion_id}", response_model=AICompanionResponse)
+async def update_companion(companion_id: str, update_data: AICompanionUpdate):
     """
-    Get the default companion
+    Update an existing companion
     
-    Returns the companion marked as default (is_default=True)
+    - **companion_id**: The companion to update
+    
+    Returns the updated companion
     """
     try:
-        db = get_database()
-        
-        companion = db.ai_companions.find_one(
-            {"is_default": True, "is_active": True}, 
-            {"_id": 0}
-        )
+        companion = CompanionService.update_companion(companion_id, update_data)
         
         if not companion:
-            raise HTTPException(
-                status_code=404,
-                detail="No default companion found"
-            )
+            raise HTTPException(status_code=404, detail=f"Companion not found: {companion_id}")
         
-        return AICompanionResponse(
-            companion_id=companion["companion_id"],
-            personality_id=companion["personality_id"],
-            companion_name=companion["companion_name"],
-            description=companion["description"],
-            image=companion["image"],
-            created_at=companion["created_at"],
-            is_default=companion.get("is_default", False),
-            is_active=companion.get("is_active", True),
-            voice_tone=companion.get("voice_tone")
-        )
-        
+        return companion
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving default companion: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve default companion: {str(e)}")
+        logger.error(f"Error updating companion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to update companion: {str(e)}")
 
 
-@router.get("/personalities", response_model=List[PersonalityResponse])
-async def get_all_personalities(active_only: bool = True):
+@router.delete("/companions/{companion_id}")
+async def delete_companion(companion_id: str):
     """
-    Get all personalities
+    Delete a companion
     
-    - **active_only**: If True, return only active personalities (default: True)
+    - **companion_id**: The companion to delete
     
-    Returns list of personalities
-    """
-    try:
-        db = get_database()
-        
-        # Build query filter
-        query = {"is_active": True} if active_only else {}
-        
-        # Fetch personalities
-        personalities = list(db.personalities.find(query, {"_id": 0}))
-        
-        # Convert to response models
-        personality_responses = [
-            PersonalityResponse(
-                personality_id=pers["personality_id"],
-                personality_name=pers["personality_name"],
-                description=pers["description"],
-                prompt_modifier=pers["prompt_modifier"],
-                created_at=pers["created_at"],
-                is_active=pers.get("is_active", True)
-            )
-            for pers in personalities
-        ]
-        
-        logger.info(f"Retrieved {len(personality_responses)} personalities")
-        return personality_responses
-        
-    except Exception as e:
-        logger.error(f"Error retrieving personalities: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve personalities: {str(e)}")
-
-
-@router.get("/personalities/{personality_id}", response_model=PersonalityResponse)
-async def get_personality_by_id(personality_id: str):
-    """
-    Get personality details by ID
-    
-    - **personality_id**: The personality to retrieve
-    
-    Returns personality details
+    Returns success message
     """
     try:
-        db = get_database()
+        deleted = CompanionService.delete_companion(companion_id)
         
-        personality = db.personalities.find_one(
-            {"personality_id": personality_id},
-            {"_id": 0}
-        )
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Companion not found: {companion_id}")
         
-        if not personality:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Personality not found: {personality_id}"
-            )
-        
-        return PersonalityResponse(
-            personality_id=personality["personality_id"],
-            personality_name=personality["personality_name"],
-            description=personality["description"],
-            prompt_modifier=personality["prompt_modifier"],
-            created_at=personality["created_at"],
-            is_active=personality.get("is_active", True)
-        )
-        
+        return {"message": f"Companion {companion_id} deleted successfully"}
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving personality: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve personality: {str(e)}")
+        logger.error(f"Error deleting companion: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete companion: {str(e)}")
 
 
 @router.get("/companions/{companion_id}/personality", response_model=PersonalityResponse)
@@ -222,43 +206,14 @@ async def get_companion_personality(companion_id: str):
     Returns the companion's personality details
     """
     try:
-        db = get_database()
-        
-        # Get companion
-        companion = db.ai_companions.find_one({"companion_id": companion_id})
-        
-        if not companion:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Companion not found: {companion_id}"
-            )
-        
-        # Get personality
-        personality = db.personalities.find_one(
-            {"personality_id": companion["personality_id"]},
-            {"_id": 0}
-        )
+        personality = CompanionService.get_companion_personality(companion_id)
         
         if not personality:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Personality not found for companion: {companion_id}"
-            )
+            raise HTTPException(status_code=404, detail=f"Companion or personality not found: {companion_id}")
         
-        return PersonalityResponse(
-            personality_id=personality["personality_id"],
-            personality_name=personality["personality_name"],
-            description=personality["description"],
-            prompt_modifier=personality["prompt_modifier"],
-            created_at=personality["created_at"],
-            is_active=personality.get("is_active", True)
-        )
-        
+        return personality
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error retrieving companion personality: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to retrieve companion personality: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve companion personality: {str(e)}")

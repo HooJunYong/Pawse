@@ -7,6 +7,7 @@ import 'screens/auth/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/mood/mood_check_in_screen.dart';
 import 'screens/mood/mood_entry_confirmation_screen.dart';
+import 'screens/companion/customize_comp_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized(); // Add this
