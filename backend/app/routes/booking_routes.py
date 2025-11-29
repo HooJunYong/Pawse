@@ -8,6 +8,11 @@ from ..models.booking_schemas import (
     UpcomingSessionResponse,
     CancelBookingRequest,
     CancelBookingResponse,
+    UpdateSessionStatusRequest,
+    UpdateSessionStatusResponse,
+    PendingRatingResponse,
+    SubmitSessionRatingRequest,
+    SubmitSessionRatingResponse,
 )
 from ..services import booking_service
 
@@ -96,3 +101,37 @@ def cancel_booking(request: CancelBookingRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to cancel booking: {str(e)}")
+
+
+@router.post("/session/status", response_model=UpdateSessionStatusResponse)
+def update_session_status(request: UpdateSessionStatusRequest):
+    """Update the status of a therapy session (e.g., completed, no_show)"""
+
+    try:
+        return booking_service.update_session_status(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update session status: {str(e)}")
+
+
+@router.get("/client/{client_user_id}/pending-rating", response_model=PendingRatingResponse)
+def get_pending_rating(client_user_id: str):
+    """Return the next completed session awaiting a client rating."""
+
+    try:
+        return booking_service.get_pending_rating(client_user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load pending rating: {str(e)}")
+
+
+@router.post("/session/rate", response_model=SubmitSessionRatingResponse)
+def submit_session_rating(request: SubmitSessionRatingRequest):
+    """Persist a client rating for a completed session."""
+
+    try:
+        return booking_service.submit_session_rating(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit rating: {str(e)}")

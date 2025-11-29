@@ -25,6 +25,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
   static const Color _textPrimary = Color.fromRGBO(66, 32, 6, 1);
 
   late Future<Map<String, dynamic>> _profileFuture;
+  int _profileImageVersion = 0;
 
   @override
   void initState() {
@@ -121,9 +122,17 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                   final initials = (firstName.isNotEmpty ? firstName[0] : '') + 
                                    (lastName.isNotEmpty ? lastName[0] : '');
                   final profilePictureUrl = data['profile_picture_url'] as String?;
+                  final double ratingValue = (data['average_rating'] as num?)?.toDouble() ?? 0.0;
+                  final int ratingCount = (data['rating_count'] as num?)?.toInt() ?? 0;
+                  final bool hasRating = ratingCount > 0;
+                  String? displayUrl = profilePictureUrl;
+                  if (displayUrl != null && displayUrl.isNotEmpty && _profileImageVersion != 0) {
+                    final separator = displayUrl.contains('?') ? '&' : '?';
+                    displayUrl = '$displayUrl${separator}v=$_profileImageVersion';
+                  }
                   
                   Widget avatarWidget;
-                  if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
+                  if (displayUrl != null && displayUrl.isNotEmpty) {
                     avatarWidget = Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -135,7 +144,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                       child: CircleAvatar(
                         radius: 48,
                         backgroundColor: const Color(0xFFFED7AA),
-                        backgroundImage: NetworkImage(profilePictureUrl),
+                        backgroundImage: NetworkImage(displayUrl),
                       ),
                     );
                   } else {
@@ -157,6 +166,48 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                           color: Color.fromRGBO(66, 32, 6, 1),
                         ),
                       ),
+                      const SizedBox(height: 12), // Spacing between Name and Rating
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min, // Shrink to fit content
+                          children: [
+                            const Icon(Icons.star_rounded, color: Colors.amber, size: 22),
+                            const SizedBox(width: 6),
+                            Text(
+                              hasRating ? ratingValue.toStringAsFixed(1) : 'New',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                fontFamily: 'Nunito',
+                                color: Color.fromRGBO(66, 32, 6, 1),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              hasRating
+                                  ? '${ratingCount} review${ratingCount == 1 ? '' : 's'}'
+                                  : 'No ratings yet',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontFamily: 'Nunito',
+                                color: Color.fromRGBO(156, 163, 175, 1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       const SizedBox(height: 32),
                       
                       // Menu Items
@@ -171,8 +222,18 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                             ),
                           );
                           // If the edit screen returns true, refresh the profile
+                          bool shouldRefresh = false;
                           if (result == true) {
-                            setState(() => _profileFuture = _fetchProfile());
+                            shouldRefresh = true;
+                          } else if (result is Map) {
+                            shouldRefresh = result['updated'] == true;
+                          }
+
+                          if (shouldRefresh) {
+                            setState(() {
+                              _profileFuture = _fetchProfile();
+                              _profileImageVersion = DateTime.now().millisecondsSinceEpoch;
+                            });
                           }
                         },
                       ),

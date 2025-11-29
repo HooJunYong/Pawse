@@ -45,6 +45,8 @@ class TherapistService {
         .join(', ');
     
     final address = addressParts.isNotEmpty ? addressParts : state;
+      final ratingValue = (json['average_rating'] as num?)?.toDouble();
+      final ratingCount = (json['rating_count'] as num?)?.toInt() ?? 0;
     
     return Therapist(
       id: json['user_id']?.toString() ?? '',
@@ -55,7 +57,8 @@ class TherapistService {
       address: address.isEmpty ? 'Location not specified' : address,
       languages:
           (json['languages_spoken'] as List<dynamic>?)?.join(', ') ?? 'English',
-      rating: 4.5, // Default rating as backend doesn't have this yet
+        rating: ratingValue ?? 0.0,
+        ratingCount: ratingCount,
       imageUrl: _getInitials(json['first_name']?.toString(), json['last_name']?.toString()),
       title: json['license_number'] != null
           ? 'Licensed Therapist'

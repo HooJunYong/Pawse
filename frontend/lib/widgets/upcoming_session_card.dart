@@ -83,20 +83,35 @@ class UpcomingSessionCard extends StatelessWidget {
     final DateTime scheduledLocal = upcoming.scheduledAt.toLocal();
     final String scheduleLabel = _formatScheduleLabel(scheduledLocal);
     final String initials = _initialsFromName(upcoming.therapistName);
+    final String? photoUrl = upcoming.therapistProfilePictureUrl;
 
     return _buildCard(
       Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: const Color(0xFFFFF8E1),
-            child: Text(
-              initials,
-              style: const TextStyle(
-                color: Color(0xFF5D4037),
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFF97316).withOpacity(0.6),
+                width: 2,
               ),
+            ),
+            child: CircleAvatar(
+              radius: 30,
+              backgroundColor: const Color(0xFFFFF8E1),
+              backgroundImage: (photoUrl != null && photoUrl.isNotEmpty)
+                  ? NetworkImage(photoUrl)
+                  : null,
+              child: (photoUrl == null || photoUrl.isEmpty)
+                  ? Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Color(0xFF5D4037),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: 16),
@@ -153,7 +168,7 @@ class UpcomingSessionCard extends StatelessWidget {
       child: child,
     );
 
-    if (session == null || onTap == null) {
+    if (onTap == null) {
       return card;
     }
 

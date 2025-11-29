@@ -17,6 +17,12 @@ class TherapistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasRating = therapist.ratingCount > 0;
+    final String ratingLabel = hasRating
+        ? therapist.rating.toStringAsFixed(1)
+        : 'New';
+    final String ratingCountLabel = hasRating ? ' (${therapist.ratingCount})' : '';
+
     return GestureDetector(
       onTap: () async {
         final booked = await Navigator.push<bool>(
@@ -77,7 +83,7 @@ class TherapistCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        therapist.name,
+                        therapist.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -94,7 +100,7 @@ class TherapistCard extends StatelessWidget {
                         const Icon(Icons.star, color: Colors.amber, size: 18),
                         const SizedBox(width: 4),
                         Text(
-                          therapist.rating.toString(),
+                          '$ratingLabel$ratingCountLabel',
                           style: const TextStyle(
                             color: Colors.amber,
                             fontWeight: FontWeight.bold,

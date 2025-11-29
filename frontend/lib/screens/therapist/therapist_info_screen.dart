@@ -33,6 +33,14 @@ class TherapistInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool hasRating = therapist.ratingCount > 0;
+    final String ratingLabel = hasRating
+      ? therapist.rating.toStringAsFixed(1)
+      : 'New';
+    final String ratingCountLabel = hasRating
+      ? '${therapist.ratingCount} review${therapist.ratingCount == 1 ? '' : 's'}'
+      : 'No ratings yet';
+
     return Scaffold(
       // ----------------------------------------
       // CHANGED: Added background color here
@@ -98,7 +106,7 @@ class TherapistInfoScreen extends StatelessWidget {
                           child: Column(
                             children: [
                               Text(
-                                therapist.name,
+                                therapist.displayName,
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 22,
@@ -145,10 +153,25 @@ class TherapistInfoScreen extends StatelessWidget {
                                     const Icon(Icons.star, color: Colors.amber, size: 20),
                                     const SizedBox(width: 6),
                                     Text(
-                                      '${therapist.rating} Rating',
+                                      hasRating
+                                          ? '$ratingLabel Rating'
+                                          : ratingLabel,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: Color(0xFF4E342E),
+                                      ),
+                                    ),
+                                    Container(
+                                      margin: const EdgeInsets.symmetric(horizontal: 12),
+                                      height: 12,
+                                      width: 1,
+                                      color: Colors.grey.shade300,
+                                    ),
+                                    Text(
+                                      ratingCountLabel,
+                                      style: const TextStyle(
+                                        color: Color(0xFF6B7280),
+                                        fontSize: 12,
                                       ),
                                     ),
                                     Container(

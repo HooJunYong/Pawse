@@ -11,7 +11,13 @@ from ..models.booking_schemas import (
     CancelBookingRequest,
     CancelBookingResponse,
     SessionStatus,
-    SessionType
+    SessionType,
+    UpdateSessionStatusRequest,
+    UpdateSessionStatusResponse,
+    PendingRatingResponse,
+    PendingRatingSession,
+    SubmitSessionRatingRequest,
+    SubmitSessionRatingResponse,
 )
 from ..config.timezone import now_my
 
@@ -503,6 +509,170 @@ def get_upcoming_client_session(client_user_id: str) -> Optional[UpcomingSession
         session_type=type_enum,
         center_name=center_name_value,
         center_address=center_address_value,
+    )
+
+
+def update_session_status(request: UpdateSessionStatusRequest) -> UpdateSessionStatusResponse:
+    """Mark a therapy session as completed or no-show."""
+
+    allowed_statuses = {SessionStatus.completed, SessionStatus.no_show}
+    if request.status not in allowed_statuses:
+        raise ValueError("Only completed or no_show statuses can be applied via this endpoint.")
+
+    session = db.therapy_sessions.find_one({
+        "session_id": request.session_id,
+        "therapist_user_id": request.therapist_user_id,
+    })
+
+    if not session:
+        raise ValueError("Session not found or does not belong to this therapist.")
+
+    current_status = _coerce_session_status(session.get("session_status") or session.get("status"))
+
+    if current_status == SessionStatus.cancelled:
+        raise ValueError("Cancelled sessions cannot be updated.")
+
+    if current_status == request.status:
+        return UpdateSessionStatusResponse(
+            success=True,
+            message=f"Session already marked as {request.status.value.replace('_', ' ')}.",
+            session_status=current_status,
+        )
+
+    now_ts = now_my()
+
+    update_fields = {
+        "session_status": request.status.value,
+        "status": request.status.value,
+        "updated_at": now_ts,
+    }
+    unset_fields: dict[str, str] = {}
+
+    if request.status == SessionStatus.completed:
+        awaiting_rating = session.get("user_rating") in (None, "", 0, 0.0)
+        update_fields["completed_at"] = now_ts
+        update_fields["awaiting_rating"] = awaiting_rating
+        if awaiting_rating:
+            update_fields["rating_prompted_at"] = now_ts
+        else:
+            unset_fields["rating_prompted_at"] = ""
+    else:  # no_show
+        update_fields["awaiting_rating"] = False
+        update_fields["completed_at"] = now_ts
+        unset_fields["rating_prompted_at"] = ""
+
+    update_spec: dict[str, dict] = {"$set": update_fields}
+    if unset_fields:
+        update_spec["$unset"] = unset_fields
+
+    db.therapy_sessions.update_one(
+        {"session_id": request.session_id, "therapist_user_id": request.therapist_user_id},
+        update_spec,
+    )
+
+    return UpdateSessionStatusResponse(
+        success=True,
+        message=f"Session marked as {request.status.value.replace('_', ' ')}.",
+        session_status=request.status,
+    )
+
+
+def get_pending_rating(client_user_id: str) -> PendingRatingResponse:
+    """Return the next completed session that still requires a client rating."""
+
+    query = {
+        "user_id": client_user_id,
+        "session_status": SessionStatus.completed.value,
+        "$and": [
+            {
+                "$or": [
+                    {"user_rating": {"$exists": False}},
+                    {"user_rating": None},
+                    {"user_rating": ""},
+                ]
+            },
+            {
+                "$or": [
+                    {"awaiting_rating": True},
+                    {"awaiting_rating": {"$exists": False}},
+                ]
+            },
+        ],
+    }
+
+    session = db.therapy_sessions.find_one(query, sort=[("scheduled_at", 1)])
+
+    if not session:
+        return PendingRatingResponse(has_pending=False, session=None)
+
+    scheduled_value = session.get("scheduled_at")
+    if isinstance(scheduled_value, datetime):
+        scheduled_dt = scheduled_value
+    else:
+        try:
+            scheduled_dt = datetime.fromisoformat(str(scheduled_value))
+        except Exception:
+            scheduled_dt = now_my()
+
+    therapist_profile = db.therapist_profile.find_one(
+        {"user_id": session.get("therapist_user_id")},
+        {"profile_picture_url": 1},
+    )
+
+    pending = PendingRatingSession(
+        session_id=session.get("session_id", ""),
+        therapist_user_id=session.get("therapist_user_id", ""),
+        therapist_name=session.get("therapist_name", "Therapist"),
+        scheduled_at=scheduled_dt,
+        end_time=session.get("end_time", ""),
+        duration_minutes=int(session.get("duration_minutes", 50)),
+        session_type=_coerce_session_type(session.get("session_type")),
+        therapist_profile_picture_url=(therapist_profile or {}).get("profile_picture_url"),
+    )
+
+    return PendingRatingResponse(has_pending=True, session=pending)
+
+
+def submit_session_rating(request: SubmitSessionRatingRequest) -> SubmitSessionRatingResponse:
+    """Store the client rating for a completed therapy session."""
+
+    rating_value = float(request.rating)
+    if rating_value < 1 or rating_value > 5:
+        raise ValueError("Rating must be between 1 and 5 stars.")
+
+    session = db.therapy_sessions.find_one({
+        "session_id": request.session_id,
+        "user_id": request.client_user_id,
+    })
+
+    if not session:
+        raise ValueError("Session not found for this user.")
+
+    if _coerce_session_status(session.get("session_status") or session.get("status")) != SessionStatus.completed:
+        raise ValueError("Only completed sessions can be rated.")
+
+    now_ts = now_my()
+
+    update_spec = {
+        "$set": {
+            "user_rating": round(rating_value, 1),
+            "user_feedback": request.feedback or "",
+            "awaiting_rating": False,
+            "rated_at": now_ts,
+            "updated_at": now_ts,
+        },
+        "$unset": {"rating_prompted_at": ""},
+    }
+
+    db.therapy_sessions.update_one(
+        {"session_id": request.session_id, "user_id": request.client_user_id},
+        update_spec,
+    )
+
+    return SubmitSessionRatingResponse(
+        success=True,
+        message="Thank you for rating your session.",
+        rating=round(rating_value, 1),
     )
 
 

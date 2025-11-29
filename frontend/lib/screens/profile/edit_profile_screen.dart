@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../theme/shadows.dart';
+
 class EditProfile extends StatefulWidget {
   final String userId;
   const EditProfile({super.key, required this.userId});
@@ -403,20 +405,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedGender,
@@ -469,20 +465,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedState,
@@ -561,19 +551,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: TextFormField(
             controller: controller,
             readOnly: readOnly,
@@ -587,7 +572,7 @@ class _EditProfileState extends State<EditProfile> {
                 fontSize: 14,
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
             style: const TextStyle(
               fontFamily: 'Nunito',

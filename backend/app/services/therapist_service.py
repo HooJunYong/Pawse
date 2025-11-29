@@ -1,6 +1,6 @@
 import uuid
 import logging
-from typing import Optional
+from typing import Optional, List
 from fastapi import HTTPException
 from ..models.database import db
 from ..models.schemas import TherapistApplicationRequest, TherapistApplicationResponse, TherapistProfileResponse, UpdateTherapistProfileRequest
@@ -8,6 +8,40 @@ from ..config.timezone import now_my
 import base64
 
 logger = logging.getLogger(__name__)
+
+
+def _compute_rating_summary(therapist_ids: List[str]) -> dict[str, dict[str, float | int]]:
+    """Return average rating and count for each therapist id provided."""
+
+    if not therapist_ids:
+        return {}
+
+    summary: dict[str, list[float]] = {}
+    cursor = db.therapy_sessions.find(
+        {
+            "therapist_user_id": {"$in": therapist_ids},
+            "user_rating": {"$exists": True, "$ne": None},
+        },
+        {"therapist_user_id": 1, "user_rating": 1},
+    )
+
+    for doc in cursor:
+        rating_value = doc.get("user_rating")
+        therapist_id = doc.get("therapist_user_id")
+        if therapist_id and isinstance(rating_value, (int, float)):
+            summary.setdefault(therapist_id, []).append(float(rating_value))
+
+    aggregates: dict[str, dict[str, float | int]] = {}
+    for therapist_id, ratings in summary.items():
+        if not ratings:
+            continue
+        average = round(sum(ratings) / len(ratings), 1)
+        aggregates[therapist_id] = {
+            "average_rating": average,
+            "rating_count": len(ratings),
+        }
+
+    return aggregates
 
 def submit_therapist_application(payload: TherapistApplicationRequest) -> TherapistApplicationResponse:
     """Submit a therapist application"""
@@ -119,6 +153,15 @@ def get_therapist_profile(user_id: str) -> TherapistProfileResponse:
     
     if not therapist:
         raise HTTPException(status_code=404, detail="Therapist profile not found")
+
+    rating_map = _compute_rating_summary([user_id])
+    rating_info = rating_map.get(user_id)
+    if rating_info:
+        therapist["average_rating"] = rating_info["average_rating"]
+        therapist["rating_count"] = rating_info["rating_count"]
+    else:
+        therapist["average_rating"] = None
+        therapist["rating_count"] = 0
     
     return TherapistProfileResponse(**therapist)
 
@@ -139,7 +182,16 @@ def get_all_verified_therapists() -> list[TherapistProfileResponse]:
         {"verification_status": "approved"},
         {"_id": 0}
     ))
-    
+
+    therapist_ids = [t.get("user_id", "") for t in therapists if t.get("user_id")]
+    rating_map = _compute_rating_summary(therapist_ids)
+
+    for therapist in therapists:
+        therapist_id = therapist.get("user_id")
+        rating_info = rating_map.get(therapist_id, {}) if therapist_id else {}
+        therapist["average_rating"] = rating_info.get("average_rating")
+        therapist["rating_count"] = rating_info.get("rating_count", 0)
+
     return [TherapistProfileResponse(**t) for t in therapists]
 
 

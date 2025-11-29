@@ -230,12 +230,26 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           Navigator.pop(context); // Close loading dialog
         }
 
+        Map<String, dynamic>? updatedProfile;
+        if (response.body.isNotEmpty) {
+          try {
+            updatedProfile = jsonDecode(response.body) as Map<String, dynamic>;
+          } catch (_) {
+            updatedProfile = null;
+          }
+        }
+
         if (response.statusCode == 200) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Profile updated successfully!')),
             );
-            Navigator.of(context).pop(true); // Return true to indicate success
+            Navigator.of(context).pop({
+              'updated': true,
+              'profilePictureUrl': updatedProfile != null
+                  ? updatedProfile['profile_picture_url'] as String?
+                  : null,
+            });
           }
         } else {
           final error = jsonDecode(response.body);
@@ -624,6 +638,12 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
                           const SizedBox(height: 16),
                           _buildTextField(
                             controller: _officeNameController,
+                            label: 'Therapy Center Name',
+                            hintText: 'e.g., Mindful Haven Therapy',
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _officeAddressController,
                             label: 'Therapy Center Address',
                             hintText: 'e.g., 123 Jalan Ampang',
                           ),

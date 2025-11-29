@@ -76,6 +76,7 @@ class TherapySession {
   final String sessionType;
   final String? centerName;
   final String? centerAddress;
+  final String? therapistProfilePictureUrl;
 
   TherapySession({
     required this.sessionId,
@@ -90,6 +91,7 @@ class TherapySession {
     required this.sessionType,
     this.centerName,
     this.centerAddress,
+    this.therapistProfilePictureUrl,
   });
 
   factory TherapySession.fromJson(Map<String, dynamic> json) {
@@ -128,12 +130,77 @@ class TherapySession {
       sessionType: json['session_type']?.toString() ?? 'in_person',
       centerName: json['center_name']?.toString(),
       centerAddress: json['center_address']?.toString(),
+      therapistProfilePictureUrl: json['therapist_profile_picture_url']?.toString(),
+    );
+  }
+
+  TherapySession copyWith({String? therapistProfilePictureUrl}) {
+    return TherapySession(
+      sessionId: sessionId,
+      therapistUserId: therapistUserId,
+      therapistName: therapistName,
+      scheduledAt: scheduledAt,
+      startTime: startTime,
+      endTime: endTime,
+      durationMinutes: durationMinutes,
+      sessionFee: sessionFee,
+      sessionStatus: sessionStatus,
+      sessionType: sessionType,
+      centerName: centerName,
+      centerAddress: centerAddress,
+      therapistProfilePictureUrl: therapistProfilePictureUrl ?? this.therapistProfilePictureUrl,
+    );
+  }
+}
+
+class PendingRatingSession {
+  final String sessionId;
+  final String therapistUserId;
+  final String therapistName;
+  final DateTime scheduledAt;
+  final String endTime;
+  final int durationMinutes;
+  final String sessionType;
+  final String? therapistProfilePictureUrl;
+
+  PendingRatingSession({
+    required this.sessionId,
+    required this.therapistUserId,
+    required this.therapistName,
+    required this.scheduledAt,
+    required this.endTime,
+    required this.durationMinutes,
+    required this.sessionType,
+    this.therapistProfilePictureUrl,
+  });
+
+  factory PendingRatingSession.fromJson(Map<String, dynamic> json) {
+    final scheduledRaw = json['scheduled_at'];
+    DateTime scheduledAt;
+    if (scheduledRaw is DateTime) {
+      scheduledAt = scheduledRaw;
+    } else if (scheduledRaw is String) {
+      scheduledAt = DateTime.tryParse(scheduledRaw) ?? DateTime.now();
+    } else {
+      scheduledAt = DateTime.now();
+    }
+
+    return PendingRatingSession(
+      sessionId: json['session_id']?.toString() ?? '',
+      therapistUserId: json['therapist_user_id']?.toString() ?? '',
+      therapistName: json['therapist_name']?.toString() ?? 'Therapist',
+      scheduledAt: scheduledAt,
+      endTime: json['end_time']?.toString() ?? '',
+      durationMinutes: int.tryParse(json['duration_minutes']?.toString() ?? '') ?? 50,
+      sessionType: json['session_type']?.toString() ?? 'in_person',
+      therapistProfilePictureUrl: json['therapist_profile_picture_url']?.toString(),
     );
   }
 }
 
 class BookingService {
   final String baseUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+  final Map<String, String?> _therapistPhotoCache = {};
 
   Future<TherapistAvailability> getTherapistAvailability(
     String therapistUserId,
@@ -191,33 +258,64 @@ class BookingService {
   }
 
   Future<TherapySession?> getUpcomingSession(String clientUserId) async {
+    final sessions = await getUpcomingSessions(clientUserId, limit: 1);
+    return sessions.isNotEmpty ? sessions.first : null;
+  }
+
+  Future<List<TherapySession>> getUpcomingSessions(String clientUserId, {int? limit}) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/booking/client/$clientUserId/upcoming'),
+        Uri.parse('$baseUrl/booking/client/$clientUserId'),
       );
 
-      if (response.statusCode == 200) {
-        if (response.body.isEmpty || response.body == 'null') {
-          return null;
-        }
-
-        final dynamic decoded = json.decode(response.body);
-        if (decoded == null) {
-          return null;
-        }
-
-        if (decoded is Map<String, dynamic>) {
-          return TherapySession.fromJson(decoded);
-        }
-
-        throw Exception('Unexpected response format for upcoming session');
-      } else if (response.statusCode == 404) {
-        return null;
-      } else {
-        throw Exception('Failed to load upcoming session: ${response.statusCode}');
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load upcoming sessions: ${response.statusCode}');
       }
+
+      final dynamic decoded = json.decode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw Exception('Unexpected response format for upcoming sessions');
+      }
+
+      final bookingsRaw = decoded['bookings'];
+      if (bookingsRaw is! List) {
+        return [];
+      }
+
+      final now = DateTime.now();
+      final sessions = bookingsRaw
+          .map((item) => item is Map<String, dynamic> ? TherapySession.fromJson(item) : null)
+          .whereType<TherapySession>()
+          .where((session) {
+            final sessionStart = session.scheduledAt.toLocal();
+            final status = session.sessionStatus.toLowerCase();
+            return status.contains('scheduled') && sessionStart.isAfter(now);
+          })
+          .toList()
+        ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
+
+      final effectiveLimit = limit != null && limit > 0 ? limit : null;
+      final limitedSessions = effectiveLimit != null
+          ? sessions.take(effectiveLimit).toList()
+          : sessions;
+
+      if (limitedSessions.isEmpty) {
+        return limitedSessions;
+      }
+
+      final therapistIds = limitedSessions.map((s) => s.therapistUserId).toSet();
+      final Map<String, String?> photoMap = {};
+      await Future.wait(therapistIds.map((id) async {
+        photoMap[id] = await _getTherapistProfilePicture(id);
+      }));
+
+      return limitedSessions
+          .map((session) => session.copyWith(
+                therapistProfilePictureUrl: photoMap[session.therapistUserId],
+              ))
+          .toList();
     } catch (e) {
-      throw Exception('Error fetching upcoming session: $e');
+      throw Exception('Error fetching upcoming sessions: $e');
     }
   }
 
@@ -249,5 +347,92 @@ class BookingService {
     } catch (e) {
       throw Exception('Error cancelling booking: $e');
     }
+  }
+
+  Future<PendingRatingSession?> getPendingRating(String clientUserId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/booking/client/$clientUserId/pending-rating'),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load pending rating: ${response.statusCode}');
+      }
+
+      final dynamic decoded = json.decode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final hasPending = decoded['has_pending'] == true;
+        final session = decoded['session'];
+        if (hasPending && session is Map<String, dynamic>) {
+          return PendingRatingSession.fromJson(session);
+        }
+      }
+
+      return null;
+    } catch (e) {
+      throw Exception('Error fetching pending rating: $e');
+    }
+  }
+
+  Future<void> submitSessionRating({
+    required String sessionId,
+    required String clientUserId,
+    required int rating,
+    String? feedback,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/booking/session/rate'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': sessionId,
+          'client_user_id': clientUserId,
+          'rating': rating,
+          if (feedback != null && feedback.isNotEmpty) 'feedback': feedback,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return;
+      }
+
+      final dynamic decoded = json.decode(response.body);
+      final message = decoded is Map<String, dynamic>
+          ? decoded['detail']?.toString() ?? decoded['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Failed to submit rating: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error submitting rating: $e');
+    }
+  }
+
+  Future<String?> _getTherapistProfilePicture(String therapistUserId) async {
+    if (therapistUserId.isEmpty) {
+      return null;
+    }
+
+    if (_therapistPhotoCache.containsKey(therapistUserId)) {
+      return _therapistPhotoCache[therapistUserId];
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/therapist/profile/$therapistUserId'),
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final url = decoded['profile_picture_url']?.toString();
+          _therapistPhotoCache[therapistUserId] = url;
+          return url;
+        }
+      }
+    } catch (_) {
+      // Ignore errors; default to null
+    }
+
+    _therapistPhotoCache[therapistUserId] = null;
+    return null;
   }
 }

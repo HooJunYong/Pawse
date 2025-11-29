@@ -105,6 +105,59 @@ class CancelBookingResponse(BaseModel):
     message: str
 
 
+class UpdateSessionStatusRequest(BaseModel):
+    """Request to update the status of an existing therapy session"""
+
+    session_id: str
+    therapist_user_id: str
+    status: SessionStatus
+
+
+class UpdateSessionStatusResponse(BaseModel):
+    """Response returned after updating a session's status"""
+
+    success: bool
+    message: str
+    session_status: SessionStatus
+
+
+class PendingRatingSession(BaseModel):
+    """Details of a session waiting for client feedback"""
+
+    session_id: str
+    therapist_user_id: str
+    therapist_name: str
+    scheduled_at: datetime
+    end_time: str
+    duration_minutes: int
+    session_type: SessionType
+    therapist_profile_picture_url: Optional[str] = None
+
+
+class PendingRatingResponse(BaseModel):
+    """Wrapper describing whether a client has a rating to complete"""
+
+    has_pending: bool
+    session: Optional[PendingRatingSession] = None
+
+
+class SubmitSessionRatingRequest(BaseModel):
+    """Payload submitted when a client rates a completed session"""
+
+    session_id: str
+    client_user_id: str
+    rating: float
+    feedback: Optional[str] = None
+
+
+class SubmitSessionRatingResponse(BaseModel):
+    """Response returned after a rating is stored"""
+
+    success: bool
+    message: str
+    rating: float
+
+
 class BookingListResponse(BaseModel):
     """List of bookings"""
     bookings: list[BookingResponse]

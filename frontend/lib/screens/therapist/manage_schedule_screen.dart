@@ -26,6 +26,215 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   bool _isLoading = true;
   // int _selectedIndex = 2; // Calendar is selected by default
 
+  Map<String, dynamic>? _findSessionById(String? sessionId) {
+    if (sessionId == null) return null;
+    try {
+      return _sessions.firstWhere(
+        (session) => (session['session_id'] ?? '') == sessionId,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _promptCancelBookedSlot(Map<String, dynamic> slot) async {
+    final String? sessionId = slot['booked_session_id'] as String?;
+    final Map<String, dynamic>? session = _findSessionById(sessionId);
+    if (sessionId == null || session == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to locate the booked session for this slot.'),
+        ),
+      );
+      return;
+    }
+
+    final TextEditingController reasonController = TextEditingController();
+    String? errorMessage;
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFFF7F4F2),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: const Text(
+                'Cancel Booking',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                  color: Color.fromRGBO(66, 32, 6, 1),
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Are you sure you want to cancel this session with ${session['client_name'] ?? 'the client'}?",
+                      style: const TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 14,
+                        color: Color.fromRGBO(66, 32, 6, 1),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Cancellation Reason',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        color: Color.fromRGBO(107, 114, 128, 1),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonController,
+                      maxLines: 3,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: InputDecoration(
+                        hintText: 'Let the client know why you are cancelling...',
+                        hintStyle: const TextStyle(
+                          fontFamily: 'Nunito',
+                          color: Color.fromRGBO(156, 163, 175, 1),
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color.fromRGBO(229, 231, 235, 1),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color.fromRGBO(229, 231, 235, 1),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: const BorderSide(
+                            color: Color.fromRGBO(249, 115, 22, 1),
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      ),
+                    ),
+                    if (errorMessage != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        errorMessage!,
+                        style: const TextStyle(
+                          color: Colors.redAccent,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                    textStyle: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600),
+                  ),
+                  child: const Text('Keep Booking'),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () async {
+                          if (reasonController.text.trim().isEmpty) {
+                            setStateDialog(() {
+                              errorMessage = 'Please provide a reason for cancelling.';
+                            });
+                            return;
+                          }
+                          setStateDialog(() {
+                            isSubmitting = true;
+                            errorMessage = null;
+                          });
+
+                          try {
+                            final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+                            final response = await http.post(
+                              Uri.parse('$apiUrl/booking/cancel'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({
+                                'session_id': sessionId,
+                                'client_user_id': session['user_id'],
+                                'reason': reasonController.text.trim(),
+                              }),
+                            );
+
+                            if (response.statusCode == 200) {
+                              Navigator.of(dialogContext).pop();
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Booking cancelled successfully.'),
+                                  ),
+                                );
+                                await _loadSchedule();
+                                await _loadMonthSchedule();
+                              }
+                            } else {
+                              final Map<String, dynamic>? payload = response.body.isNotEmpty
+                                  ? jsonDecode(response.body) as Map<String, dynamic>?
+                                  : null;
+                              setStateDialog(() {
+                                isSubmitting = false;
+                                errorMessage = payload != null && payload['detail'] != null
+                                    ? payload['detail'].toString()
+                                    : 'Failed to cancel booking. Please try again.';
+                              });
+                            }
+                          } catch (e) {
+                            setStateDialog(() {
+                              isSubmitting = false;
+                              errorMessage = 'Failed to cancel booking: $e';
+                            });
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFB91C1C),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Text(
+                          'Cancel Session',
+                          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   // Helper to parse time string like '01:00 PM' to TimeOfDay
   TimeOfDay _parseTimeString(String timeStr) {
@@ -91,9 +300,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
         setState(() {
           _isLoading = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading schedule: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading schedule: $e')));
       }
     }
   }
@@ -105,7 +314,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
       final month = _selectedDate.month;
 
       final response = await http.get(
-        Uri.parse('$apiUrl/therapist/schedule/${widget.userId}/month?year=$year&month=$month'),
+        Uri.parse(
+          '$apiUrl/therapist/schedule/${widget.userId}/month?year=$year&month=$month',
+        ),
       );
 
       if (response.statusCode == 200 && mounted) {
@@ -237,7 +448,12 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                                           fontSize: 12,
                                           fontFamily: 'Nunito',
                                           fontWeight: FontWeight.w600,
-                                          color: Color.fromRGBO(107, 114, 128, 1),
+                                          color: Color.fromRGBO(
+                                            107,
+                                            114,
+                                            128,
+                                            1,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -264,10 +480,20 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: const Color.fromRGBO(249, 115, 22, 0.2),
+                                    color: const Color.fromRGBO(
+                                      249,
+                                      115,
+                                      22,
+                                      0.2,
+                                    ),
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: const Color.fromRGBO(249, 115, 22, 0.5),
+                                      color: const Color.fromRGBO(
+                                        249,
+                                        115,
+                                        22,
+                                        0.5,
+                                      ),
                                       width: 2,
                                     ),
                                   ),
@@ -349,10 +575,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                       ),
                     )
                   else ...[
-                    // Show booked sessions
-                    ..._sessions.map((session) => _buildSessionCard(session)),
-                    // Show available time slots
-                    ..._availabilitySlots.map((slot) => _buildAvailabilityCard(slot)),
+                    // Show available time slots (booked/available states rendered inside)
+                    ..._availabilitySlots.map(
+                      (slot) => _buildAvailabilityCard(slot),
+                    ),
                   ],
                   const SizedBox(height: 24),
 
@@ -376,17 +602,6 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: Text(
-                      "Block out times you're unavailable.",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontFamily: 'Nunito',
-                        color: Colors.grey[600],
                       ),
                     ),
                   ),
@@ -434,7 +649,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => TherapistDashboardScreen(userId: widget.userId),
+                          builder: (context) =>
+                              TherapistDashboardScreen(userId: widget.userId),
                         ),
                       );
                     },
@@ -469,7 +685,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => TherapistProfileScreen(userId: widget.userId),
+                          builder: (context) =>
+                              TherapistProfileScreen(userId: widget.userId),
                         ),
                       );
                     },
@@ -484,8 +701,16 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   Widget _buildCalendarGrid() {
-    final firstDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month, 1);
-    final lastDayOfMonth = DateTime(_selectedDate.year, _selectedDate.month + 1, 0);
+    final firstDayOfMonth = DateTime(
+      _selectedDate.year,
+      _selectedDate.month,
+      1,
+    );
+    final lastDayOfMonth = DateTime(
+      _selectedDate.year,
+      _selectedDate.month + 1,
+      0,
+    );
     final daysInMonth = lastDayOfMonth.day;
     final firstWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
 
@@ -500,10 +725,12 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_selectedDate.year, _selectedDate.month, day);
       final dateStr = DateFormat('yyyy-MM-dd').format(date);
-      final isSelected = date.year == _selectedDate.year &&
+      final isSelected =
+          date.year == _selectedDate.year &&
           date.month == _selectedDate.month &&
           date.day == _selectedDate.day;
-      final isToday = date.year == DateTime.now().year &&
+      final isToday =
+          date.year == DateTime.now().year &&
           date.month == DateTime.now().month &&
           date.day == DateTime.now().day;
       final hasSchedule = _datesWithSchedule.contains(dateStr);
@@ -518,8 +745,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
               color: isSelected
                   ? const Color.fromRGBO(249, 115, 22, 1)
                   : hasSchedule
-                      ? const Color.fromRGBO(249, 115, 22, 0.2)
-                      : Colors.transparent,
+                  ? const Color.fromRGBO(249, 115, 22, 0.2)
+                  : Colors.transparent,
               shape: BoxShape.circle,
               border: hasSchedule && !isSelected
                   ? Border.all(
@@ -538,8 +765,8 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                   color: isSelected
                       ? Colors.white
                       : hasSchedule
-                          ? const Color.fromRGBO(249, 115, 22, 1)
-                          : const Color.fromRGBO(66, 32, 6, 1),
+                      ? const Color.fromRGBO(249, 115, 22, 1)
+                      : const Color.fromRGBO(66, 32, 6, 1),
                 ),
               ),
             ),
@@ -554,70 +781,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     );
   }
 
-  Widget _buildSessionCard(Map<String, dynamic> session) {
-    final scheduledAt = DateTime.parse(session['scheduled_at']);
-    final startTime = DateFormat('h:mm').format(scheduledAt);
-    final endTime = DateFormat('h:mm a').format(
-      scheduledAt.add(Duration(minutes: session['duration_minutes'] ?? 50)),
-    );
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$startTime - $endTime',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontFamily: 'Nunito',
-                    fontWeight: FontWeight.bold,
-                    color: Color.fromRGBO(249, 115, 22, 1),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  session['client_name'] ?? 'Unknown Client',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontFamily: 'Nunito',
-                    fontWeight: FontWeight.w600,
-                    color: Color.fromRGBO(66, 32, 6, 1),
-                  ),
-                ),
-                Text(
-                  'Session with ${session['client_name']?.split(' ').first ?? 'Client'}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontFamily: 'Nunito',
-                    color: Color.fromRGBO(107, 114, 128, 1),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildAvailabilityCard(Map<String, dynamic> slot) {
-    final isBooked = slot['is_booked'] == true ||
+    final isBooked =
+        slot['is_booked'] == true ||
         (slot['status']?.toString().toLowerCase() == 'booked');
 
     final Color backgroundColor = isBooked
@@ -637,25 +803,26 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
         : Colors.green[700]!;
     final IconData statusIcon = isBooked ? Icons.event_busy : Icons.schedule;
     final String statusLabel = isBooked ? 'Booked' : 'Available';
-    final String subtitleText = isBooked ? 'Slot no longer available' : 'Available for booking';
+    final String subtitleText = isBooked
+        ? 'Slot no longer available'
+        : 'Available for booking';
 
-    return Container(
+    final Widget cardContent = Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: borderColor,
-          width: 1,
-        ),
+        border: Border.all(color: borderColor, width: 1),
       ),
       child: Row(
         children: [
-          Icon(statusIcon,
-              color: isBooked
-                  ? const Color.fromRGBO(30, 64, 175, 1)
-                  : const Color.fromRGBO(249, 115, 22, 1)),
+          Icon(
+            statusIcon,
+            color: isBooked
+                ? const Color.fromRGBO(30, 64, 175, 1)
+                : const Color.fromRGBO(249, 115, 22, 1),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -702,6 +869,15 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           ),
         ],
       ),
+    );
+
+    if (!isBooked) {
+      return cardContent;
+    }
+
+    return GestureDetector(
+      onTap: () => _promptCancelBookedSlot(slot),
+      child: cardContent,
     );
   }
 

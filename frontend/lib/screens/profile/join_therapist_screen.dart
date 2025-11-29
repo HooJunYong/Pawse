@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../theme/shadows.dart';
 import 'therapist_verification_status_screen.dart';
 
 class JoinTherapist extends StatefulWidget {
@@ -451,45 +452,35 @@ class _JoinTherapistState extends State<JoinTherapist> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          keyboardType: keyboardType,
-          decoration: InputDecoration(
-            hintText: placeholder,
-            hintStyle: const TextStyle(
-              color: Color.fromRGBO(156, 163, 175, 1),
-              fontFamily: 'Nunito',
-            ),
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color.fromRGBO(229, 231, 235, 1),
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color.fromRGBO(229, 231, 235, 1),
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(
-                color: Color.fromRGBO(249, 115, 22, 1),
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: kPillShadow,
+            color: Colors.white,
+            border: Border.all(
+              color: const Color.fromRGBO(229, 231, 235, 1),
+              width: 1,
             ),
           ),
-          style: const TextStyle(
-            fontSize: 14,
-            fontFamily: 'Nunito',
-            color: Color.fromRGBO(66, 32, 6, 1),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: TextField(
+            controller: controller,
+            maxLines: maxLines,
+            keyboardType: keyboardType,
+            decoration: InputDecoration(
+              hintText: placeholder,
+              hintStyle: const TextStyle(
+                color: Color.fromRGBO(156, 163, 175, 1),
+                fontFamily: 'Nunito',
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Nunito',
+              color: Color.fromRGBO(66, 32, 6, 1),
+            ),
           ),
         ),
       ],
@@ -513,20 +504,14 @@ class _JoinTherapistState extends State<JoinTherapist> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedState,
@@ -928,25 +913,31 @@ class _JoinTherapistState extends State<JoinTherapist> {
                       keyboardType: TextInputType.number,
                     ),
                     const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9999),
+                        boxShadow: kButtonShadow,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
                           ),
-                          elevation: 4,
-                        ),
-                        onPressed: _submitApplication,
-                        child: const Text(
-                          'Submit for Verification',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'Nunito',
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                          onPressed: _submitApplication,
+                          child: const Text(
+                            'Submit for Verification',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),

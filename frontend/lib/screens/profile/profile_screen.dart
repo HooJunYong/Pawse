@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
 import '../../widgets/bottom_nav.dart';
 import '../auth/login_screen.dart';
 import 'change_password_screen.dart';
@@ -79,13 +80,7 @@ class _ProfileState extends State<Profile> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: kPillShadow,
       ),
       child: ListTile(
         leading: Icon(icon, color: const Color.fromRGBO(66, 32, 6, 1), size: 20),
@@ -260,31 +255,38 @@ class _ProfileState extends State<Profile> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9999),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginWidget(),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9999),
+                          boxShadow: kButtonShadow,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              elevation: 0,
+                              backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9999),
                               ),
-                            );
-                          },
-                          child: const Text(
-                            'Log Out',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontFamily: 'Nunito',
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginWidget(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Log Out',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'Nunito',
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),

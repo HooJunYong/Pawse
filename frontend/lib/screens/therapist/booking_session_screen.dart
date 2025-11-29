@@ -65,6 +65,20 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
       
       setState(() {
         _availability = availability;
+        if (_selectedTimeSlot != null) {
+          AvailableTimeSlot? refreshedSlot;
+          for (final slot in availability.availableSlots) {
+            if (slot.slotId == _selectedTimeSlot!.slotId) {
+              refreshedSlot = slot;
+              break;
+            }
+          }
+          if (refreshedSlot != null && _isSlotBookable(refreshedSlot)) {
+            _selectedTimeSlot = refreshedSlot;
+          } else {
+            _selectedTimeSlot = null;
+          }
+        }
         _isLoading = false;
       });
     } catch (e) {
@@ -123,8 +137,18 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
     return hourlyRate * hours;
   }
 
+  bool _isSlotBookable(AvailableTimeSlot slot) {
+    final slotStart = _parseSlotTime(slot.startTime);
+    return slot.isAvailable && slotStart.isAfter(DateTime.now());
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool hasValidSelectedSlot =
+        _selectedTimeSlot != null && _isSlotBookable(_selectedTimeSlot!);
+    final AvailableTimeSlot? effectiveSelectedSlot =
+        hasValidSelectedSlot ? _selectedTimeSlot : null;
+
     return Scaffold(
       backgroundColor: _backgroundColor,
       appBar: AppBar(
@@ -285,8 +309,10 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                                   spacing: spacing,
                                   runSpacing: spacing,
                                   children: slots.map((slot) {
-                                    final isSelected = _selectedTimeSlot?.slotId == slot.slotId;
-                                    final isDisabled = !slot.isAvailable;
+                                    final isSelected = effectiveSelectedSlot?.slotId == slot.slotId;
+                                    final DateTime slotStart = _parseSlotTime(slot.startTime);
+                                    final bool isPastSlot = !slotStart.isAfter(DateTime.now());
+                                    final bool isDisabled = !slot.isAvailable || isPastSlot;
 
                                     final Color backgroundColor;
                                     final Color borderColor;
@@ -314,6 +340,9 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                                             : () {
                                                 setState(() {
                                                   _selectedTimeSlot = slot;
+                                                  if (!_isSlotBookable(slot)) {
+                                                    _selectedTimeSlot = null;
+                                                  }
                                                 });
                                               },
                                         child: Container(
@@ -373,7 +402,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                     ),
                     child: Column(
                       children: [
-                        _buildSummaryRow('Therapist', widget.therapist.name),
+                        _buildSummaryRow('Therapist', widget.therapist.displayName),
                         const SizedBox(height: 12),
                         _buildSummaryRow(
                           'Date',
@@ -382,15 +411,15 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                         const SizedBox(height: 12),
                         _buildSummaryRow(
                           'Time',
-                          _selectedTimeSlot != null
-                              ? '${_selectedTimeSlot!.startTime} - ${_selectedTimeSlot!.endTime}'
+                            effectiveSelectedSlot != null
+                              ? '${effectiveSelectedSlot.startTime} - ${effectiveSelectedSlot.endTime}'
                               : '-',
                         ),
                         const SizedBox(height: 12),
                         _buildSummaryRow(
                           'Price',
-                          _selectedTimeSlot != null
-                              ? 'RM ${_calculateSlotPrice(_selectedTimeSlot!).toStringAsFixed(0)}'
+                            effectiveSelectedSlot != null
+                              ? 'RM ${_calculateSlotPrice(effectiveSelectedSlot).toStringAsFixed(0)}'
                               : 'RM ${(_availability?.price ?? widget.therapist.price).toStringAsFixed(0)}',
                         ),
                       ],
@@ -402,7 +431,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _selectedTimeSlot != null
+                      onPressed: effectiveSelectedSlot != null
                           ? () {
                               _showConfirmationDialog(context);
                             }
@@ -420,7 +449,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                         'Confirm Booking',
                         style: TextStyle(
                           fontFamily: 'Nunito',
-                          color: _selectedTimeSlot != null ? Colors.white : Colors.white.withOpacity(0.7),
+                          color: effectiveSelectedSlot != null ? Colors.white : Colors.white.withOpacity(0.7),
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -543,7 +572,13 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
   }
 
   void _showConfirmationDialog(BuildContext context) {
-    if (_selectedTimeSlot == null) return;
+    final slot = _selectedTimeSlot;
+    if (slot == null || !_isSlotBookable(slot)) {
+      setState(() {
+        _selectedTimeSlot = null;
+      });
+      return;
+    }
 
     showDialog(
       context: context,
@@ -561,7 +596,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
             ),
           ),
           content: Text(
-            'Are you sure you want to book a session with ${widget.therapist.name} on ${_getMonthName(_selectedDate.month)} ${_selectedDate.day}, ${_selectedDate.year} from ${_selectedTimeSlot!.startTime} to ${_selectedTimeSlot!.endTime}?',
+            'Are you sure you want to book a session with ${widget.therapist.displayName} on ${_getMonthName(_selectedDate.month)} ${_selectedDate.day}, ${_selectedDate.year} from ${slot.startTime} to ${slot.endTime}?',
             style: TextStyle(
               color: _textSecondary,
               fontFamily: 'Nunito',
@@ -594,25 +629,36 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
 
                 try {
                   final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+                  final currentSlot = _selectedTimeSlot;
+                  if (currentSlot == null || !_isSlotBookable(currentSlot)) {
+                    messenger.hideCurrentSnackBar();
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Selected slot is no longer available.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
 
                   await _bookingService.createBooking(
                     clientUserId: widget.clientUserId,
                     therapistUserId: widget.therapist.id,
                     date: dateStr,
-                    startTime: _selectedTimeSlot!.startTime,
-                    durationMinutes: _calculateDurationMinutes(_selectedTimeSlot!),
+                    startTime: currentSlot.startTime,
+                    durationMinutes: _calculateDurationMinutes(currentSlot),
                     sessionType: 'in_person',
                   );
 
                   messenger.hideCurrentSnackBar();
                   if (!mounted) return;
-                  final price = _calculateSlotPrice(_selectedTimeSlot!);
+                  final price = _calculateSlotPrice(currentSlot);
                   Navigator.of(this.context).pushReplacement(
                     MaterialPageRoute(
                       builder: (_) => BookingSuccessScreen(
-                        therapistName: widget.therapist.name,
+                        therapistName: widget.therapist.displayName,
                         date: _selectedDate,
-                        time: '${_selectedTimeSlot!.startTime}',
+                        time: currentSlot.startTime,
                         price: price,
                         clientUserId: widget.clientUserId,
                       ),

@@ -31,6 +31,132 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       });
     }
 
+  static const List<Map<String, int>> _recommendedSlotTemplates = [
+    {
+      'startHour': 10,
+      'startMinute': 0,
+      'endHour': 12,
+      'endMinute': 0,
+    },
+    {
+      'startHour': 14,
+      'startMinute': 0,
+      'endHour': 16,
+      'endMinute': 0,
+    },
+    {
+      'startHour': 16,
+      'startMinute': 0,
+      'endHour': 18,
+      'endMinute': 0,
+    },
+  ];
+
+  String _slotKey(TimeOfDay from, TimeOfDay to) {
+    return '${from.hour}:${from.minute}-${to.hour}:${to.minute}';
+  }
+
+  Map<String, dynamic>? _buildRecommendedSlot(
+    Set<String> usedKeys,
+    bool isToday,
+    int nowMinutes,
+  ) {
+    for (final template in _recommendedSlotTemplates) {
+      final from = TimeOfDay(
+        hour: template['startHour']!,
+        minute: template['startMinute']!,
+      );
+      final to = TimeOfDay(
+        hour: template['endHour']!,
+        minute: template['endMinute']!,
+      );
+      final key = _slotKey(from, to);
+      final startMinutes = from.hour * 60 + from.minute;
+      if (isToday && startMinutes < nowMinutes) {
+        continue;
+      }
+      if (!usedKeys.contains(key)) {
+        return {
+          'from': from,
+          'to': to,
+          'locked': false,
+        };
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _buildNextAvailableSlot(
+    Set<String> usedKeys,
+    bool isToday,
+    int nowMinutes,
+  ) {
+    final int minStartHour;
+    if (isToday) {
+      minStartHour = ((nowMinutes + 59) ~/ 60).clamp(8, 20);
+    } else {
+      minStartHour = 8;
+    }
+
+    for (int startHour = minStartHour; startHour <= 20; startHour++) {
+      if (isToday && (startHour * 60) < nowMinutes) {
+        continue;
+      }
+      final endHour = startHour + 2;
+      if (endHour > 22) {
+        break;
+      }
+      final from = TimeOfDay(hour: startHour, minute: 0);
+      final to = TimeOfDay(hour: endHour, minute: 0);
+      final key = _slotKey(from, to);
+      if (!usedKeys.contains(key)) {
+        return {
+          'from': from,
+          'to': to,
+          'locked': false,
+        };
+      }
+    }
+
+    // Fall back to the next two-hour window starting from now/today or default morning slot.
+    if (isToday) {
+      int startHour = (nowMinutes ~/ 60);
+      int startMinute = nowMinutes % 60;
+      if (startHour < 8) {
+        startHour = 8;
+      }
+      if (startHour > 23) {
+        startHour = 23;
+        if (startMinute < 0) {
+          startMinute = 0;
+        } else if (startMinute > 59) {
+          startMinute = 59;
+        }
+      }
+
+      int endHour = startHour + 2;
+      int endMinute = startMinute;
+      if (endHour > 23) {
+        endHour = 23;
+        endMinute = 59;
+        if (startHour == endHour && endMinute <= startMinute) {
+          startMinute = (startMinute > 0) ? startMinute - 1 : 0;
+        }
+      }
+      return {
+        'from': TimeOfDay(hour: startHour, minute: startMinute),
+        'to': TimeOfDay(hour: endHour, minute: endMinute),
+        'locked': false,
+      };
+    }
+
+    return {
+      'from': const TimeOfDay(hour: 10, minute: 0),
+      'to': const TimeOfDay(hour: 12, minute: 0),
+      'locked': false,
+    };
+  }
+
   final List<Map<String, dynamic>> _timeSlots = [];
   bool _applyToAllThursdays = false;
 
@@ -103,11 +229,14 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
 
   void _addTimeSlot() {
     setState(() {
-      _timeSlots.add({
-        'from': const TimeOfDay(hour: 14, minute: 0),
-        'to': const TimeOfDay(hour: 17, minute: 0),
-        'locked': false,
-      });
+      final usedKeys = _timeSlots
+          .map((slot) => _slotKey(slot['from'] as TimeOfDay, slot['to'] as TimeOfDay))
+          .toSet();
+      final bool isToday = DateUtils.isSameDay(widget.selectedDate, DateTime.now());
+      final int nowMinutes = TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
+      final nextSlot = _buildRecommendedSlot(usedKeys, isToday, nowMinutes) ??
+          _buildNextAvailableSlot(usedKeys, isToday, nowMinutes);
+      _timeSlots.add(nextSlot);
       _sortTimeSlots();
     });
   }

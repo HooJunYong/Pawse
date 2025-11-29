@@ -7,6 +7,7 @@ class Therapist {
   final String address; // Full address for detail view
   final String languages;
   final double rating;
+  final int ratingCount;
   final String imageUrl; // Or initials if no image
   final String title;
   final String centerName; // Center/Clinic name
@@ -21,12 +22,26 @@ class Therapist {
     required this.address,
     required this.languages,
     required this.rating,
+    required this.ratingCount,
     required this.imageUrl,
     required this.title,
     required this.centerName,
     required this.quote,
     required this.price,
   });
+
+  String get displayName {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      return 'Dr.';
+    }
+    final lower = trimmed.toLowerCase();
+    final hasDoctorPrefix = lower.startsWith('dr. ') ||
+        lower.startsWith('dr ') ||
+        lower == 'dr.' ||
+        lower == 'dr';
+    return hasDoctorPrefix ? trimmed : 'Dr. $trimmed';
+  }
 
   factory Therapist.fromJson(Map<String, dynamic> json) {
     return Therapist(
@@ -36,7 +51,8 @@ class Therapist {
       location: json['location'] as String,
       address: json['address'] ?? json['location'] ?? '',
       languages: json['languages'] as String,
-      rating: (json['rating'] as num).toDouble(),
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
       imageUrl: json['imageUrl'] as String,
       title: json['title'] ?? 'Licensed Counselor',
       centerName: json['centerName'] ?? 'Holistic Mind Center',
