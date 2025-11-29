@@ -222,6 +222,38 @@ class BookingService {
     }
   }
 
+  Future<Set<String>> getTherapistScheduledDates(
+    String therapistUserId,
+    int year,
+    int month,
+  ) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '$baseUrl/therapist/schedule/$therapistUserId/month?year=$year&month=$month',
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic decoded = json.decode(response.body);
+        if (decoded is Map<String, dynamic>) {
+          final scheduled = decoded['scheduled_dates'];
+          if (scheduled is List) {
+            return scheduled
+                .map((date) => date?.toString() ?? '')
+                .where((date) => date.isNotEmpty)
+                .toSet();
+          }
+        }
+        return <String>{};
+      } else {
+        throw Exception('Failed to load monthly schedule: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Error fetching monthly schedule: $e');
+    }
+  }
+
   Future<Map<String, dynamic>> createBooking({
     required String clientUserId,
     required String therapistUserId,

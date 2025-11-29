@@ -5,19 +5,20 @@ import '../../widgets/contact_row.dart';
 import '../../widgets/expertise_chip.dart';
 import 'booking_session_screen.dart';
 
-const List<BoxShadow> _cardShadow = [
-  BoxShadow(
-    color: Color(0x1A000000),
-    blurRadius: 18,
-    offset: Offset(0, 8),
-  ),
-];
+// --- Theme Colors ---
+const Color _bgWhite = Color(0xFFFDFCF8); // Soft cream background
+const Color _primaryBrown = Color(0xFF5D4037); // Dark brown for headings/buttons
+const Color _textDark = Color(0xFF3E2723); // Almost black brown for main text
+const Color _textGrey = Color(0xFF8D6E63); // Warm grey for subtitles
+const Color _accentOrange = Color(0xFFFFB74D); // Soft orange for icons/highlights
+const Color _chipBg = Color(0xFFFFF3E0); // Very light orange for chips
 
-const List<BoxShadow> _chipShadow = [
+// --- Shadows ---
+final List<BoxShadow> _softShadow = [
   BoxShadow(
-    color: Color(0x14000000),
-    blurRadius: 12,
-    offset: Offset(0, 4),
+    color: const Color(0xFF5D4037).withOpacity(0.08), // Brown-tinted shadow
+    blurRadius: 20,
+    offset: const Offset(0, 8),
   ),
 ];
 
@@ -34,26 +35,26 @@ class TherapistInfoScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bool hasRating = therapist.ratingCount > 0;
-    final String ratingLabel = hasRating
-      ? therapist.rating.toStringAsFixed(1)
-      : 'New';
+    final String ratingLabel =
+        hasRating ? therapist.rating.toStringAsFixed(1) : 'New';
     final String ratingCountLabel = hasRating
-      ? '${therapist.ratingCount} review${therapist.ratingCount == 1 ? '' : 's'}'
-      : 'No ratings yet';
+        ? '${therapist.ratingCount} review${therapist.ratingCount == 1 ? '' : 's'}'
+        : 'No ratings yet';
 
     return Scaffold(
-      // ----------------------------------------
-      // CHANGED: Added background color here
-      // ----------------------------------------
-      backgroundColor: const Color(0xFFF7F4F2), 
+      backgroundColor: const Color(0xFFF7F4F2), // Main background
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.5),
+        leading: Container(
+          margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.9),
+            shape: BoxShape.circle,
+          ),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF4E342E)),
+            icon: const Icon(Icons.arrow_back, color: _primaryBrown),
             onPressed: () => Navigator.pop(context),
           ),
         ),
@@ -69,6 +70,7 @@ class TherapistInfoScreen extends StatelessWidget {
                   height: 340,
                   child: Stack(
                     children: [
+                      // Gradient Background
                       Container(
                         height: 260,
                         decoration: const BoxDecoration(
@@ -76,8 +78,8 @@ class TherapistInfoScreen extends StatelessWidget {
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              Color(0xFFFFECB3),
-                              Color(0xFFFFCC80),
+                              Color(0xFFFFECB3), // Light Amber
+                              Color(0xFFFFCC80), // Orange Accent
                             ],
                           ),
                           borderRadius: BorderRadius.only(
@@ -86,22 +88,18 @@ class TherapistInfoScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                      // Info Card
                       Positioned(
                         top: 100,
-                        left: 20,
-                        right: 20,
+                        left: 24,
+                        right: 24,
                         child: Container(
-                          padding: const EdgeInsets.only(top: 60, bottom: 20, left: 20, right: 20),
+                          padding: const EdgeInsets.only(
+                              top: 60, bottom: 24, left: 20, right: 20),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 15,
-                                offset: const Offset(0, 5),
-                              ),
-                            ],
+                            boxShadow: _softShadow,
                           ),
                           child: Column(
                             children: [
@@ -111,21 +109,23 @@ class TherapistInfoScreen extends StatelessWidget {
                                 style: const TextStyle(
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF4E342E),
+                                  color: _textDark,
+                                  fontFamily: 'Nunito',
                                 ),
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 6),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.business, size: 14, color: Colors.blueGrey[400]),
-                                  const SizedBox(width: 4),
+                                  const Icon(Icons.business,
+                                      size: 16, color: _textGrey),
+                                  const SizedBox(width: 6),
                                   Text(
                                     therapist.centerName,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.blueGrey[600],
+                                      color: _textGrey,
                                     ),
                                   ),
                                 ],
@@ -135,22 +135,26 @@ class TherapistInfoScreen extends StatelessWidget {
                                 therapist.title,
                                 style: TextStyle(
                                   fontSize: 13,
-                                  color: Colors.grey[600],
+                                  color: _textGrey.withOpacity(0.8),
                                 ),
                               ),
-                              const SizedBox(height: 16),
+                              const SizedBox(height: 20),
+                              
+                              // Rating Pill
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFFDFCF8),
+                                  color: _bgWhite,
                                   borderRadius: BorderRadius.circular(50),
-                                  border: Border.all(color: Colors.grey.shade200),
-                                  boxShadow: _chipShadow,
+                                  border: Border.all(
+                                      color: _primaryBrown.withOpacity(0.1)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                                    const Icon(Icons.star_rounded,
+                                        color: Colors.amber, size: 22),
                                     const SizedBox(width: 6),
                                     Text(
                                       hasRating
@@ -158,38 +162,35 @@ class TherapistInfoScreen extends StatelessWidget {
                                           : ratingLabel,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF4E342E),
+                                        color: _textDark,
+                                        fontSize: 13,
                                       ),
                                     ),
                                     Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                                      height: 12,
+                                      margin: const EdgeInsets.symmetric(
+                                          horizontal: 12),
+                                      height: 14,
                                       width: 1,
                                       color: Colors.grey.shade300,
                                     ),
                                     Text(
                                       ratingCountLabel,
                                       style: const TextStyle(
-                                        color: Color(0xFF6B7280),
+                                        color: _textGrey,
                                         fontSize: 12,
                                       ),
                                     ),
-                                    Container(
-                                      margin: const EdgeInsets.symmetric(horizontal: 12),
-                                      height: 12,
-                                      width: 1,
-                                      color: Colors.grey.shade300,
-                                    ),
-                                    const Icon(Icons.verified, color: Colors.blue, size: 18),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'Verified',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: Color(0xFF4E342E),
-                                        fontSize: 12,
+                                    if (hasRating) ...[
+                                      Container(
+                                        margin: const EdgeInsets.symmetric(
+                                            horizontal: 12),
+                                        height: 14,
+                                        width: 1,
+                                        color: Colors.grey.shade300,
                                       ),
-                                    ),
+                                      const Icon(Icons.verified,
+                                          color: Colors.blueAccent, size: 18),
+                                    ]
                                   ],
                                 ),
                               ),
@@ -197,6 +198,7 @@ class TherapistInfoScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                      // Profile Image
                       Positioned(
                         top: 60,
                         left: 0,
@@ -209,21 +211,23 @@ class TherapistInfoScreen extends StatelessWidget {
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black.withOpacity(0.1),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 5),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
                             padding: const EdgeInsets.all(4),
                             child: CircleAvatar(
-                              radius: 45,
+                              radius: 48,
                               backgroundColor: const Color(0xFFFFF3E0),
+                              // You might want to switch to NetworkImage if available
+                              // backgroundImage: NetworkImage(therapist.imageUrl),
                               child: Text(
-                                therapist.imageUrl,
+                                therapist.imageUrl, // Fallback initials
                                 style: const TextStyle(
-                                  fontSize: 24,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF5D4037),
+                                  color: _primaryBrown,
                                 ),
                               ),
                             ),
@@ -233,6 +237,7 @@ class TherapistInfoScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                
                 // Main Content
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -240,45 +245,41 @@ class TherapistInfoScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Quote
-                      Text(
-                        therapist.quote,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          height: 1.5,
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: _chipBg.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '"${therapist.quote}"',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: _textGrey,
+                            fontStyle: FontStyle.italic,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 28),
+                      
                       // Areas of Expertise
-                      const Text(
-                        "Areas of Expertise",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF37474F),
-                        ),
-                      ),
+                      _buildSectionTitle("Areas of Expertise"),
                       const SizedBox(height: 12),
                       Wrap(
-                        spacing: 12,
+                        spacing: 10,
                         runSpacing: 10,
                         children: therapist.specialties
                             .split(',')
                             .map((s) => ExpertiseChip(label: s.trim()))
                             .toList(),
                       ),
-                      const SizedBox(height: 24),
+                      
+                      const SizedBox(height: 28),
+                      
                       // Languages Spoken
-                      const Text(
-                        "Languages Spoken",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF37474F),
-                        ),
-                      ),
+                      _buildSectionTitle("Languages Spoken"),
                       const SizedBox(height: 12),
                       Wrap(
                         spacing: 10,
@@ -288,89 +289,93 @@ class TherapistInfoScreen extends StatelessWidget {
                             .map((lang) => LanguageChip(label: lang.trim()))
                             .toList(),
                       ),
-                      const SizedBox(height: 24),
+                      
+                      const SizedBox(height: 28),
+                      
                       // Contact & Location
-                      const Text(
-                        "Contact & Location",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF37474F),
-                        ),
-                      ),
+                      _buildSectionTitle("Contact & Location"),
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: _cardShadow,
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: _softShadow,
                         ),
                         child: Column(
                           children: [
                             ContactRow(
-                              icon: Icons.phone,
+                              icon: Icons.phone_rounded,
                               text: "012-345 6789",
-                              iconColor: Colors.orange,
+                              iconColor: _accentOrange,
                             ),
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                              child: Divider(height: 1, color: Color(0xFFEEEEEE)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Divider(
+                                  height: 1,
+                                  color: _primaryBrown.withOpacity(0.1)),
                             ),
                             ContactRow(
-                              icon: Icons.location_on,
+                              icon: Icons.location_on_rounded,
                               text: therapist.address,
-                              iconColor: Colors.orange,
+                              iconColor: _accentOrange,
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      
+                      const SizedBox(height: 28),
+                      
                       // Availability
-                      const Text(
-                        "Availability",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF37474F),
-                        ),
-                      ),
+                      _buildSectionTitle("Availability"),
                       const SizedBox(height: 12),
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                            vertical: 16, horizontal: 20),
+                            vertical: 18, horizontal: 20),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: _cardShadow,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                              color: _primaryBrown.withOpacity(0.1)),
                         ),
-                        child: RichText(
-                          textAlign: TextAlign.center,
-                          text: const TextSpan(
-                            style: TextStyle(color: Color(0xFF37474F), fontSize: 14),
-                            children: [
-                              TextSpan(text: "Next available: "),
-                              TextSpan(
-                                text: "Tomorrow, 3:00 PM",
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.event_available,
+                                color: _primaryBrown, size: 20),
+                            const SizedBox(width: 8),
+                            RichText(
+                              text: const TextSpan(
                                 style: TextStyle(
-                                  color: Colors.deepOrange,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                    color: _textDark,
+                                    fontSize: 14,
+                                    fontFamily: 'Nunito'),
+                                children: [
+                                  TextSpan(text: "Next available: "),
+                                  TextSpan(
+                                    text: "Tomorrow, 3:00 PM",
+                                    style: TextStyle(
+                                      color: Color(0xFFD84315), // Deep orange
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 30),
+                      
+                      const SizedBox(height: 32),
+                      
                       // Booking Footer
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(24),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: _cardShadow,
+                          borderRadius: BorderRadius.circular(28),
+                          boxShadow: _softShadow,
                         ),
                         child: Column(
                           children: [
@@ -383,16 +388,17 @@ class TherapistInfoScreen extends StatelessWidget {
                                     Text(
                                       'RM ${therapist.price.toStringAsFixed(0)}',
                                       style: const TextStyle(
-                                        fontSize: 20,
+                                        fontSize: 24,
                                         fontWeight: FontWeight.bold,
-                                        color: Color(0xFF37474F),
+                                        color: _textDark,
                                       ),
                                     ),
                                     const Text(
-                                      "per 50-min session",
+                                      "per hour session",
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey,
+                                        color: _textGrey,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
@@ -402,7 +408,8 @@ class TherapistInfoScreen extends StatelessWidget {
                                     final booked = await Navigator.push<bool>(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => BookingSessionScreen(
+                                        builder: (context) =>
+                                            BookingSessionScreen(
                                           therapist: therapist,
                                           clientUserId: clientUserId,
                                         ),
@@ -414,18 +421,20 @@ class TherapistInfoScreen extends StatelessWidget {
                                     }
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF5D4037),
+                                    backgroundColor: _primaryBrown,
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 32, vertical: 14),
+                                        horizontal: 32, vertical: 16),
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
+                                    elevation: 0,
                                   ),
                                   child: const Text(
                                     "Book Session",
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.bold,
+                                      fontSize: 16,
                                     ),
                                   ),
                                 ),
@@ -436,12 +445,14 @@ class TherapistInfoScreen extends StatelessWidget {
                               width: double.infinity,
                               child: TextButton.icon(
                                 onPressed: () {},
-                                icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                                icon: const Icon(Icons.chat_bubble_outline_rounded,
+                                    size: 20),
                                 label: const Text("Free Consultation"),
                                 style: TextButton.styleFrom(
                                   backgroundColor: const Color(0xFFFFE0B2),
-                                  foregroundColor: const Color(0xFF5D4037),
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  foregroundColor: _primaryBrown,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -459,6 +470,18 @@ class TherapistInfoScreen extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: _textDark,
+        letterSpacing: 0.5,
       ),
     );
   }

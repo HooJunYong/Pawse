@@ -5,7 +5,6 @@ import 'package:intl/intl.dart';
 
 import '../../services/booking_service.dart';
 import '../../widgets/bottom_nav.dart';
-import '../../widgets/upcoming_session_card.dart'; // Keep this if used elsewhere, but we use a custom builder here now
 import 'therapist/find_therapist_screen.dart';
 // import '../../screens/chat/chat_session_screen.dart';
 
@@ -28,7 +27,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Colors extracted from design
   final Color _bgWhite = Colors.white;
   final Color _textDark = const Color(0xFF2D2D2D);
-  final Color _textBrown = const Color(0xFF9A3412);
   final Color _bronzeColor = const Color(0xFFCD7F32);
   final Color _btnBrown = const Color(0xFF5D3A1A);
   // final Color _lightOrange = const Color(0xFFFED7AA); // Unused in new design

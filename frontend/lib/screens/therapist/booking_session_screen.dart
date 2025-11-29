@@ -32,10 +32,12 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
   final BookingService _bookingService = BookingService();
   TherapistAvailability? _availability;
   bool _isLoading = false;
+  Set<String> _datesWithAvailability = {};
 
   @override
   void initState() {
     super.initState();
+    _loadMonthAvailability();
     _loadAvailability();
   }
 
@@ -94,15 +96,36 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
     }
   }
 
-  void _changeMonth(int delta) {
-    setState(() {
-      _selectedDate = DateTime(
+  Future<void> _loadMonthAvailability() async {
+    try {
+      final dates = await _bookingService.getTherapistScheduledDates(
+        widget.therapist.id,
         _selectedDate.year,
-        _selectedDate.month + delta,
-        1,
+        _selectedDate.month,
       );
-      _loadAvailability();
+      if (!mounted) return;
+      setState(() {
+        _datesWithAvailability = dates;
+      });
+    } catch (e) {
+      print('Failed to load monthly availability: $e');
+    }
+  }
+
+  void _changeMonth(int delta) {
+    final DateTime newDate = DateTime(
+      _selectedDate.year,
+      _selectedDate.month + delta,
+      1,
+    );
+
+    setState(() {
+      _selectedDate = newDate;
+      _selectedTimeSlot = null;
     });
+
+    _loadMonthAvailability();
+    _loadAvailability();
   }
 
   void _selectDate(DateTime date) {
@@ -482,6 +505,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
     // Add day cells
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(_selectedDate.year, _selectedDate.month, day);
+      final dateStr = DateFormat('yyyy-MM-dd').format(date);
       final isSelected = date.year == _selectedDate.year &&
           date.month == _selectedDate.month &&
           date.day == _selectedDate.day;
@@ -489,6 +513,7 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
           date.month == DateTime.now().month &&
           date.day == DateTime.now().day;
       final isPast = date.isBefore(DateTime.now().subtract(const Duration(days: 1)));
+      final hasAvailability = _datesWithAvailability.contains(dateStr);
 
       dayWidgets.add(
         GestureDetector(
@@ -499,8 +524,16 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
             decoration: BoxDecoration(
               color: isSelected
                   ? _primaryColor
-                  : Colors.transparent,
+                  : hasAvailability
+                      ? _primaryMuted
+                      : Colors.transparent,
               shape: BoxShape.circle,
+              border: hasAvailability && !isSelected
+                  ? Border.all(
+                      color: _primaryColor.withOpacity(0.4),
+                      width: 2,
+                    )
+                  : null,
             ),
             child: Center(
               child: Text(
@@ -513,7 +546,9 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                       ? _textSecondary.withOpacity(0.4)
                       : isSelected
                           ? Colors.white
-                          : _textPrimary,
+                          : hasAvailability
+                              ? _primaryColor
+                              : _textPrimary,
                 ),
               ),
             ),

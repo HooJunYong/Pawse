@@ -332,14 +332,18 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   void _changeMonth(int delta) {
+    final DateTime newDate = DateTime(
+      _selectedDate.year,
+      _selectedDate.month + delta,
+      1,
+    );
+
     setState(() {
-      _selectedDate = DateTime(
-        _selectedDate.year,
-        _selectedDate.month + delta,
-        1,
-      );
+      _selectedDate = newDate;
     });
+
     _loadMonthSchedule();
+    _loadSchedule();
   }
 
   void _selectDate(DateTime date) {
