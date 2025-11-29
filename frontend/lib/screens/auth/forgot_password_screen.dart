@@ -112,21 +112,12 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   // Mail Icon
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFED7AA),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color.fromRGBO(0, 0, 0, 0.1),
-                          offset: Offset(0, 2),
-                          blurRadius: 8,
-                        )
-                      ],
-                    ),
-                    child: const Icon(
+                  Image.asset(
+                    'assets/images/letter.png',
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.mail_outline,
                       size: 70,
                       color: Color.fromRGBO(249, 115, 22, 1),

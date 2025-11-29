@@ -213,10 +213,16 @@ class _ResetPasswordState extends State<ResetPassword> {
                     children: [
                       const SizedBox(height: 40),
                       // Lock icon
-                      const Icon(
-                        Icons.lock_reset,
-                        size: 64,
-                        color: Color.fromRGBO(249, 115, 22, 1),
+                      Image.asset(
+                        'assets/images/resetpassword1.png',
+                        width: 100,
+                        height: 100,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(
+                          Icons.lock_reset,
+                          size: 64,
+                          color: Color.fromRGBO(249, 115, 22, 1),
+                        ),
                       ),
                       const SizedBox(height: 24),
                   const Text(

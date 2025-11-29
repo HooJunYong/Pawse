@@ -212,21 +212,12 @@ class _OtpWidgetState extends State<OtpWidget> {
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   // Lock Icon
-                  Container(
+                  Image.asset(
+                    'assets/images/otp.png',
                     width: 100,
                     height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFED7AA),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color.fromRGBO(0, 0, 0, 0.1),
-                          offset: Offset(0, 2),
-                          blurRadius: 8,
-                        )
-                      ],
-                    ),
-                    child: const Icon(
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
                       Icons.lock_outline,
                       size: 50,
                       color: Color.fromRGBO(249, 115, 22, 1),
