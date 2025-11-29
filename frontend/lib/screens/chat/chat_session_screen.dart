@@ -86,6 +86,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => ChangeCompanionScreen(
+          userId: widget.userId,
           currentCompanionId: _currentCompanion!,
         ),
       ),

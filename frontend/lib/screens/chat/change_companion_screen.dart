@@ -4,9 +4,10 @@ import '../../models/companion_model.dart';
 import '../../services/companion_service.dart';
 
 class ChangeCompanionScreen extends StatefulWidget {
+  final String userId;
   final String currentCompanionId;
 
-  const ChangeCompanionScreen({Key? key, required this.currentCompanionId})
+  const ChangeCompanionScreen({Key? key, required this.userId, required this.currentCompanionId})
     : super(key: key);
 
   @override
@@ -39,8 +40,9 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
     });
 
     try {
-      // Load all companions
-      final companions = await CompanionService.getAllCompanions(
+      // Load available companions
+      final companions = await CompanionService.getAvailableCompanions(
+        widget.userId,
         activeOnly: true,
       );
 
