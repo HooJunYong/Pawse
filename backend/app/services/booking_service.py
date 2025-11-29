@@ -51,9 +51,17 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
     Get therapist's available time slots for a specific date
     Returns slots based on therapist's set availability minus already booked slots
     """
+    print(f"\n=== AVAILABILITY SERVICE DEBUG ===")
+    print(f"Therapist ID: {therapist_user_id}")
+    print(f"Date requested: {date_str}")
+    
     # Get therapist profile
     therapist = db.therapist_profile.find_one({"user_id": therapist_user_id})
+    print(f"Therapist found: {therapist is not None}")
+    if therapist:
+        print(f"Therapist name: {therapist.get('first_name', '')} {therapist.get('last_name', '')}")
     if not therapist:
+        print("ERROR: Therapist not found")
         raise ValueError("Therapist not found")
     
     # Parse date
@@ -64,22 +72,33 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
     
     # Get day of week (lowercase)
     day_of_week = target_date.strftime("%A").lower()
+    print(f"Day of week: {day_of_week}")
     
     # Attempt to find date-specific availability first, then fall back to recurring weekly slots
+    print(f"Querying for date-specific slots: user_id={therapist_user_id}, availability_date={date_str}")
     specific_slots = list(db.therapist_availability.find({
         "user_id": therapist_user_id,
         "availability_date": date_str
     }))
+    print(f"Found {len(specific_slots)} date-specific slots")
+    for slot in specific_slots:
+        print(f"  - {slot.get('start_time')} to {slot.get('end_time')}, available: {slot.get('is_available')}")
+    
     if specific_slots:
         availability_slots = specific_slots
     else:
+        print(f"No date-specific slots, checking recurring for day: {day_of_week}")
         availability_slots = list(db.therapist_availability.find({
             "user_id": therapist_user_id,
             "day_of_week": day_of_week,
             "availability_date": None
         }))
+        print(f"Found {len(availability_slots)} recurring slots")
+        for slot in availability_slots:
+            print(f"  - {slot.get('start_time')} to {slot.get('end_time')}, available: {slot.get('is_available')}")
     
     if not availability_slots:
+        print(f"No availability found, returning empty response")
         return TherapistAvailabilityResponse(
             therapist_id=therapist_user_id,
             therapist_name=f"{therapist.get('first_name', '')} {therapist.get('last_name', '')}".strip(),
@@ -169,6 +188,11 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
         ))
 
     available_slots = [entry[1] for entry in sorted(slot_entries, key=lambda entry: entry[0])]
+    print(f"\n=== FINAL RESULT ===")
+    print(f"Returning {len(available_slots)} total slots")
+    for slot in available_slots:
+        print(f"  - {slot.start_time} to {slot.end_time}, available: {slot.is_available}")
+    print(f"=================================\n")
     
     return TherapistAvailabilityResponse(
         therapist_id=therapist_user_id,

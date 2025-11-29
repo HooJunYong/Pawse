@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
 import 'otp_screen.dart';
 
 class ForgotPasswordWidget extends StatefulWidget {
@@ -172,13 +173,7 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              )
-                            ],
+                            boxShadow: kPillShadow,
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -210,33 +205,40 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
                   ),
                   const SizedBox(height: 32),
                   // Send Code button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999)),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9999),
+                      boxShadow: kButtonShadow,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999)),
+                        ),
+                        onPressed: _isLoading ? null : _submit,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Send Code',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: 'Nunito',
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
-                      onPressed: _isLoading ? null : _submit,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              'Send Code',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontFamily: 'Nunito',
-                                color: Colors.white,
-                              ),
-                            ),
                     ),
                   ),
                   const SizedBox(height: 32),

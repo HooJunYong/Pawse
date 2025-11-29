@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
+
 // A new SignupWidget that matches the style of your LoginWidget
 class SignupWidget extends StatefulWidget {
   const SignupWidget({Key? key}) : super(key: key);
@@ -118,13 +120,7 @@ class _SignupWidgetState extends State<SignupWidget> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Color.fromRGBO(0, 0, 0, 0.06),
-                offset: Offset(0, 2),
-                blurRadius: 4,
-              )
-            ],
+            boxShadow: kPillShadow,
             color: const Color.fromRGBO(255, 255, 255, 1),
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -173,8 +169,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Image.asset(
                           'assets/images/edit.png',
-                          width: 130,
-                          height: 130,
+                          width: 100,
+                          height: 100,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -299,23 +295,30 @@ class _SignupWidgetState extends State<SignupWidget> {
                     const SizedBox(height: 24),
                     
                     // Sign Up button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9999),
+                        boxShadow: kButtonShadow,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
                           ),
-                        ),
-                        onPressed: _submit,
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontFamily: 'Nunito',
-                            color: Colors.white,
+                          onPressed: _submit,
+                          child: const Text(
+                            'Sign Up',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontFamily: 'Nunito',
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),

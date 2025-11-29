@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
 import '../admin/admin_therapist_management.dart';
 import '../profile/profile_screen.dart';
 import 'forgot_password_screen.dart';
@@ -253,13 +254,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              )
-                            ],
+                            boxShadow: kPillShadow,
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -306,13 +301,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              )
-                            ],
+                            boxShadow: kPillShadow,
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -350,22 +339,29 @@ class _LoginWidgetState extends State<LoginWidget> {
                   ),
                   const SizedBox(height: 24),
                   // Log In button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999)),
-                      ),
-                      onPressed: _submit,
-                      child: const Text(
-                        'Log In',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontFamily: 'Nunito',
-                          color: Colors.white,
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9999),
+                      boxShadow: kButtonShadow,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999)),
+                        ),
+                        onPressed: _submit,
+                        child: const Text(
+                          'Log In',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontFamily: 'Nunito',
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

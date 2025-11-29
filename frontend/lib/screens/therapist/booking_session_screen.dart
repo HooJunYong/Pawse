@@ -46,15 +46,29 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      print('=== BOOKING SCREEN DEBUG ===');
+      print('Loading availability for therapist: ${widget.therapist.id}');
+      print('Selected date: $dateStr');
+      
       final availability = await _bookingService.getTherapistAvailability(
         widget.therapist.id,
         dateStr,
       );
+      
+      print('Received availability response:');
+      print('  - Therapist: ${availability.therapistName}');
+      print('  - Date: ${availability.date}');
+      print('  - Total slots: ${availability.availableSlots.length}');
+      for (var slot in availability.availableSlots) {
+        print('    * ${slot.startTime} - ${slot.endTime}, available: ${slot.isAvailable}');
+      }
+      
       setState(() {
         _availability = availability;
         _isLoading = false;
       });
     } catch (e) {
+      print('ERROR loading availability: $e');
       setState(() {
         _isLoading = false;
       });
