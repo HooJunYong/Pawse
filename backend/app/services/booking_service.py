@@ -128,7 +128,9 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
         },
         "$or": [
             {"session_status": {"$in": [SessionStatus.scheduled.value]}},
-            {"status": {"$in": [SessionStatus.scheduled.value]}}
+            {"status": {"$in": [SessionStatus.scheduled.value]}},
+            {"session_status": {"$regex": "cancel", "$options": "i"}},
+            {"status": {"$regex": "cancel", "$options": "i"}}
         ]
     }))
     
@@ -152,6 +154,12 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
                 except ValueError:
                     continue
         if scheduled_dt is None:
+            continue
+
+        status_value = session.get("session_status") or session.get("status")
+        status_text = (status_value or "").strip().lower()
+        is_cancelled = status_text == SessionStatus.cancelled.value or "cancel" in status_text
+        if is_cancelled and session.get("slot_released") is True:
             continue
 
         duration = int(session.get("duration_minutes", 50))

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/therapist_model.dart';
 import '../../services/booking_service.dart';
+import '../../services/session_event_bus.dart';
 import 'booking_success_screen.dart';
 
 const Color _backgroundColor = Color.fromRGBO(247, 244, 242, 1);
@@ -33,18 +36,42 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
   TherapistAvailability? _availability;
   bool _isLoading = false;
   Set<String> _datesWithAvailability = {};
+  Timer? _refreshTimer;
+  StreamSubscription<SessionEvent>? _sessionEventSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadMonthAvailability();
     _loadAvailability();
+    _setupRealtimeUpdates();
   }
 
-  Future<void> _loadAvailability() async {
-    setState(() {
-      _isLoading = true;
+  void _setupRealtimeUpdates() {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) _loadAvailability(silent: true);
     });
+
+    _sessionEventSubscription = SessionEventBus.instance.stream.listen((event) {
+      if (mounted && event.therapistUserId == widget.therapist.id) {
+        _loadAvailability(silent: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    _sessionEventSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadAvailability({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -81,17 +108,19 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
             _selectedTimeSlot = null;
           }
         }
-        _isLoading = false;
+        if (!silent) _isLoading = false;
       });
     } catch (e) {
       print('ERROR loading availability: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading availability: $e')),
-        );
+      if (!silent) {
+        setState(() {
+          _isLoading = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error loading availability: $e')),
+          );
+        }
       }
     }
   }

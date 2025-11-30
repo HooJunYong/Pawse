@@ -52,7 +52,6 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
       return;
     }
 
-    final TextEditingController reasonController = TextEditingController();
     String? errorMessage;
     bool isSubmitting = false;
 
@@ -62,175 +61,185 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setStateDialog) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFFF7F4F2),
+            return Dialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-              title: const Text(
-                'Cancel Booking',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                  color: Color.fromRGBO(66, 32, 6, 1),
-                ),
-              ),
-              content: SingleChildScrollView(
+              backgroundColor: Colors.white,
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Are you sure you want to cancel this session with ${session['client_name'] ?? 'the client'}?",
-                      style: const TextStyle(
-                        fontFamily: 'Nunito',
-                        fontSize: 14,
-                        color: Color.fromRGBO(66, 32, 6, 1),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFEE2E2), // Light red
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Color(0xFFDC2626), // Red
+                        size: 32,
                       ),
                     ),
                     const SizedBox(height: 16),
                     const Text(
-                      'Cancellation Reason',
+                      'Cancel Session?',
                       style: TextStyle(
                         fontFamily: 'Nunito',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        color: Color.fromRGBO(107, 114, 128, 1),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                        color: Color(0xFF1F2937),
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: reasonController,
-                      maxLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Let the client know why you are cancelling...',
-                        hintStyle: const TextStyle(
-                          fontFamily: 'Nunito',
-                          color: Color.fromRGBO(156, 163, 175, 1),
-                          fontSize: 14,
-                        ),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color.fromRGBO(229, 231, 235, 1),
-                          ),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color.fromRGBO(229, 231, 235, 1),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: const BorderSide(
-                            color: Color.fromRGBO(249, 115, 22, 1),
-                            width: 1.5,
-                          ),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    const SizedBox(height: 12),
+                    Text(
+                      "Are you sure you want to cancel the session with ${session['client_name'] ?? 'the client'}?",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 16,
+                        color: Color(0xFF4B5563),
+                        height: 1.5,
                       ),
                     ),
                     if (errorMessage != null) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontFamily: 'Nunito',
-                          fontWeight: FontWeight.w600,
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, size: 20, color: Color(0xFFDC2626)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xFFDC2626),
+                                  fontFamily: 'Nunito',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                side: const BorderSide(color: Color(0xFFE5E7EB)),
+                              ),
+                              foregroundColor: const Color(0xFF374151),
+                            ),
+                            child: const Text(
+                              'Keep Booking',
+                              style: TextStyle(
+                                fontFamily: 'Nunito',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSubmitting
+                                ? null
+                                : () async {
+                                    setStateDialog(() {
+                                      isSubmitting = true;
+                                      errorMessage = null;
+                                    });
+
+                                    try {
+                                      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+                                      final response = await http.post(
+                                        Uri.parse('$apiUrl/booking/cancel'),
+                                        headers: {'Content-Type': 'application/json'},
+                                        body: jsonEncode({
+                                          'session_id': sessionId,
+                                          'client_user_id': session['user_id'],
+                                          'reason': 'Cancelled by therapist',
+                                        }),
+                                      );
+
+                                      if (response.statusCode == 200) {
+                                        Navigator.of(dialogContext).pop();
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Booking cancelled successfully.'),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                          await _loadSchedule();
+                                          await _loadMonthSchedule();
+                                        }
+                                      } else {
+                                        final Map<String, dynamic>? payload = response.body.isNotEmpty
+                                            ? jsonDecode(response.body) as Map<String, dynamic>?
+                                            : null;
+                                        setStateDialog(() {
+                                          isSubmitting = false;
+                                          errorMessage = payload != null && payload['detail'] != null
+                                              ? payload['detail'].toString()
+                                              : 'Failed to cancel booking. Please try again.';
+                                        });
+                                      }
+                                    } catch (e) {
+                                      setStateDialog(() {
+                                        isSubmitting = false;
+                                        errorMessage = 'Failed to cancel booking: $e';
+                                      });
+                                    }
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFDC2626),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: isSubmitting
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Text(
+                                    'Yes, Cancel',
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
-              actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              actions: [
-                TextButton(
-                  onPressed: isSubmitting ? null : () => Navigator.of(dialogContext).pop(),
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                    textStyle: const TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w600),
-                  ),
-                  child: const Text('Keep Booking'),
-                ),
-                ElevatedButton(
-                  onPressed: isSubmitting
-                      ? null
-                      : () async {
-                          if (reasonController.text.trim().isEmpty) {
-                            setStateDialog(() {
-                              errorMessage = 'Please provide a reason for cancelling.';
-                            });
-                            return;
-                          }
-                          setStateDialog(() {
-                            isSubmitting = true;
-                            errorMessage = null;
-                          });
-
-                          try {
-                            final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-                            final response = await http.post(
-                              Uri.parse('$apiUrl/booking/cancel'),
-                              headers: {'Content-Type': 'application/json'},
-                              body: jsonEncode({
-                                'session_id': sessionId,
-                                'client_user_id': session['user_id'],
-                                'reason': reasonController.text.trim(),
-                              }),
-                            );
-
-                            if (response.statusCode == 200) {
-                              Navigator.of(dialogContext).pop();
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Booking cancelled successfully.'),
-                                  ),
-                                );
-                                await _loadSchedule();
-                                await _loadMonthSchedule();
-                              }
-                            } else {
-                              final Map<String, dynamic>? payload = response.body.isNotEmpty
-                                  ? jsonDecode(response.body) as Map<String, dynamic>?
-                                  : null;
-                              setStateDialog(() {
-                                isSubmitting = false;
-                                errorMessage = payload != null && payload['detail'] != null
-                                    ? payload['detail'].toString()
-                                    : 'Failed to cancel booking. Please try again.';
-                              });
-                            }
-                          } catch (e) {
-                            setStateDialog(() {
-                              isSubmitting = false;
-                              errorMessage = 'Failed to cancel booking: $e';
-                            });
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB91C1C),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9999)),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  ),
-                  child: isSubmitting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text(
-                          'Cancel Session',
-                          style: TextStyle(fontFamily: 'Nunito', fontWeight: FontWeight.w700),
-                        ),
-                ),
-              ],
             );
           },
         );

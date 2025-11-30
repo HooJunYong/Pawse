@@ -190,15 +190,29 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
             for (var slot in availabilitySlots) {
               final startTime = _parseTimeString(slot['start_time']);
               final endTime = _parseTimeString(slot['end_time']);
-              final bool isBooked = slot['is_booked'] == true ||
-                  (slot['status']?.toString().toLowerCase() == 'booked');
+              final List<dynamic> statusCandidates = [
+                slot['booked_session_status'],
+                slot['session_status'],
+                slot['booking_status'],
+                slot['status'],
+                slot['slot_status'],
+              ];
+              final dynamic rawStatusValue = statusCandidates.firstWhere(
+                (value) => value != null && value.toString().isNotEmpty,
+                orElse: () => '',
+              );
+              final String statusLower = rawStatusValue.toString().toLowerCase();
               final bool isReleased =
                   slot['slot_released'] == true || slot['is_released'] == true;
-              final String statusLower =
-                  slot['status']?.toString().toLowerCase() ?? '';
+                final bool isExplicitlyBooked =
+                  statusLower.contains('book');
+              final bool apiBookedFlag = slot['is_booked'] == true;
+              final bool isBooked =
+                !isReleased && !statusLower.contains('cancel') &&
+                (apiBookedFlag || isExplicitlyBooked);
               final bool awaitingRelease =
                   statusLower.contains('cancel') && !isReleased;
-              final bool isLocked = isBooked || isReleased || awaitingRelease;
+              final bool isLocked = isBooked || awaitingRelease || isReleased;
 
               _timeSlots.add({
                 'from': startTime,
@@ -1066,7 +1080,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                         lockMessage = 'Auto-released slot – edits disabled';
                         break;
                       case 'cancelled':
-                        lockMessage = 'Cancelled slot – edits disabled';
+                        lockMessage =
+                            'Cancelled slot – use "Set Available" on the dashboard.';
                         break;
                       default:
                         lockMessage = 'Managed slot – edits disabled';

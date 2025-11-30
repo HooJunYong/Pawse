@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/booking_service.dart';
 import '../../widgets/bottom_nav.dart';
@@ -19,12 +20,15 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  static const String _dismissedSessionsPrefsKey = 'dismissed_cancelled_session_ids';
+
   int _currentIndex = 0;
 
   final BookingService _bookingService = BookingService();
   late Future<List<TherapySession>> _upcomingSessionsFuture;
   Timer? _upcomingSessionExpiryTimer;
   bool _showAllUpcomingSessions = false;
+  final Set<String> _dismissedCancelledSessionIds = <String>{};
 
   // Colors extracted from design
   final Color _bgWhite = Colors.white;
@@ -36,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _initDismissedCancelledSessions();
     _loadUpcomingSessions(initialLoad: true, resetToggle: true);
   }
 
@@ -64,6 +69,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
     future.then((sessions) {
       if (!mounted) return;
+      final validIds = sessions.map((session) => session.sessionId).toSet();
+      bool removedAny = false;
+      if (_dismissedCancelledSessionIds.isNotEmpty) {
+        setState(() {
+          _dismissedCancelledSessionIds.removeWhere((id) {
+            final shouldRemove = !validIds.contains(id);
+            if (shouldRemove) removedAny = true;
+            return shouldRemove;
+          });
+        });
+      }
+      if (removedAny) {
+        _persistDismissedCancelledSessions();
+      }
       _scheduleUpcomingSessionRefresh(sessions);
     });
   }
@@ -165,7 +184,18 @@ class _HomeScreenState extends State<HomeScreen> {
                           );
                         }
                         final sessions = snapshot.data ?? [];
-                        if (sessions.isEmpty) {
+
+                        final filteredSessions = sessions.where((session) {
+                          final status = session.sessionStatus.toLowerCase();
+                          final isCancelled = status.contains('cancel');
+                          if (isCancelled &&
+                              _dismissedCancelledSessionIds.contains(session.sessionId)) {
+                            return false;
+                          }
+                          return true;
+                        }).toList();
+
+                        if (filteredSessions.isEmpty) {
                           return Container(
                             padding: const EdgeInsets.all(24),
                             width: double.infinity,
@@ -192,19 +222,32 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         final List<TherapySession> visibleSessions =
                             _showAllUpcomingSessions
-                            ? sessions
-                            : sessions.take(3).toList();
+                                ? filteredSessions
+                                : filteredSessions.take(3).toList();
 
                         return Column(
                           children: [
                             for (var session in visibleSessions)
-                              _buildStyledSessionCard(session),
+                              _buildStyledSessionCard(
+                                session,
+                                onDismissCancelled: session.sessionStatus
+                                        .toLowerCase()
+                                        .contains('cancel')
+                                    ? () {
+                                        setState(() {
+                                          _dismissedCancelledSessionIds
+                                              .add(session.sessionId);
+                                        });
+                                        _persistDismissedCancelledSessions();
+                                      }
+                                    : null,
+                              ),
 
                             // Show More / Show Less Logic
                             if (!_showAllUpcomingSessions &&
-                                sessions.length > visibleSessions.length)
+                                filteredSessions.length > visibleSessions.length)
                               const SizedBox(height: 8),
-                            if (sessions.length > 3)
+                            if (filteredSessions.length > 3)
                               Center(
                                 child: TextButton.icon(
                                   onPressed: () {
@@ -536,15 +579,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 5. New Styled Session Card (Ticket Style)
-  Widget _buildStyledSessionCard(TherapySession session) {
-    final String timeStr = DateFormat(
-      'h:mm a',
-    ).format(session.scheduledAt.toLocal());
-    final String dateStr = DateFormat(
-      'MMM d',
-    ).format(session.scheduledAt.toLocal());
+  Widget _buildStyledSessionCard(
+    TherapySession session, {
+    VoidCallback? onDismissCancelled,
+  }) {
+    final String timeStr = DateFormat('h:mm a').format(session.scheduledAt.toLocal());
+    final String dateStr = DateFormat('MMM d').format(session.scheduledAt.toLocal());
 
-    // Get initials
     final nameParts = session.therapistName.trim().split(' ');
     final initials = nameParts.length > 1
         ? '${nameParts[0][0]}${nameParts[1][0]}'
@@ -553,7 +594,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final statusChip = _buildStatusChip(session.sessionStatus);
     final avatarImage = _buildAvatarImage(session.therapistProfilePictureUrl);
 
-    return GestureDetector(
+    final card = GestureDetector(
       onTap: () => _showSessionDetails(session),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -571,11 +612,10 @@ class _HomeScreenState extends State<HomeScreen> {
         child: IntrinsicHeight(
           child: Row(
             children: [
-              // Left Colored Strip
               Container(
                 width: 6,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFCD7F32), // Bronze/Orange accent
+                  color: Color(0xFFCD7F32),
                   borderRadius: BorderRadius.only(
                     topLeft: Radius.circular(20),
                     bottomLeft: Radius.circular(20),
@@ -587,7 +627,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      // Avatar
                       CircleAvatar(
                         radius: 25,
                         backgroundColor: const Color(0xFFFFF7ED),
@@ -604,7 +643,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             : null,
                       ),
                       const SizedBox(width: 16),
-                      // Details
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -653,7 +691,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 8),
                       statusChip,
                       const SizedBox(width: 8),
-                      // Arrow Icon
                       Icon(
                         Icons.arrow_forward_ios_rounded,
                         size: 16,
@@ -667,6 +704,60 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+    );
+
+    final isCancelled = session.sessionStatus.toLowerCase().contains('cancel');
+    if (!isCancelled || onDismissCancelled == null) {
+      return card;
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        card,
+        Positioned(
+          top: 6,
+          right: 10,
+          child: GestureDetector(
+            onTap: onDismissCancelled,
+            child: Container(
+              width: 28,
+              height: 28,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.close,
+                size: 18,
+                color: Color(0xFF9A3412),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _initDismissedCancelledSessions() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList(_dismissedSessionsPrefsKey);
+    if (!mounted) return;
+    if (stored == null || stored.isEmpty) {
+      return;
+    }
+    setState(() {
+      _dismissedCancelledSessionIds
+        ..clear()
+        ..addAll(stored);
+    });
+  }
+
+  Future<void> _persistDismissedCancelledSessions() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      _dismissedSessionsPrefsKey,
+      _dismissedCancelledSessionIds.toList(),
     );
   }
 
