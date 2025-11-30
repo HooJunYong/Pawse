@@ -15,6 +15,47 @@ from ..models.chat_schemas import (
 from ..models.database import db
 
 
+def _guess_image_mime(image_base64: str) -> str:
+    sample = image_base64.strip()[:30]
+    if sample.startswith("/9j/"):
+        return "image/jpeg"
+    if sample.startswith("iVBORw0KGgo"):
+        return "image/png"
+    if sample.startswith("R0lGOD"):
+        return "image/gif"
+    if sample.startswith("Qk"):
+        return "image/bmp"
+    return "image/png"
+
+
+def _normalize_image_candidate(value: Optional[str]) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+
+    candidate = value.strip()
+    if not candidate:
+        return None
+
+    lower = candidate.lower()
+    if lower in {"null", "none"}:
+        return None
+    if lower.startswith("data:image/"):
+        return candidate
+    if lower.startswith("http://") or lower.startswith("https://"):
+        return candidate
+
+    mime_type = _guess_image_mime(candidate)
+    return f"data:{mime_type};base64,{candidate}"
+
+
+def _resolve_avatar(candidates: Iterable[Optional[str]]) -> Optional[str]:
+    for candidate in candidates:
+        normalized = _normalize_image_candidate(candidate)
+        if normalized:
+            return normalized
+    return None
+
+
 def _compose_full_name(parts: Iterable[Optional[str]]) -> str:
     name = " ".join(filter(None, (part.strip() for part in parts if part))).strip()
     return name
@@ -24,17 +65,37 @@ def _get_client_display(user_id: str) -> tuple[str, Optional[str]]:
     profile = db.user_profile.find_one({"user_id": user_id})
     if profile:
         name = _compose_full_name([profile.get("first_name"), profile.get("last_name")])
-        avatar_url = profile.get("avatar_url") or profile.get("avatar_base64")
+        avatar_url = _resolve_avatar(
+            [
+                profile.get("profile_picture_url"),
+                profile.get("profile_picture"),
+                profile.get("avatar_url"),
+                profile.get("avatar_base64"),
+                profile.get("profile_picture_base64"),
+            ]
+        )
         if name:
             return name, avatar_url
     user = db.users.find_one({"user_id": user_id})
     if user:
         full_name = user.get("full_name") or ""
         if full_name:
-            return full_name, user.get("profile_picture_url")
+            return full_name, _resolve_avatar(
+                [
+                    user.get("profile_picture_url"),
+                    user.get("avatar_url"),
+                    user.get("avatar_base64"),
+                ]
+            )
         email = user.get("email") or ""
         if email:
-            return email.split("@")[0], user.get("profile_picture_url")
+            return email.split("@")[0], _resolve_avatar(
+                [
+                    user.get("profile_picture_url"),
+                    user.get("avatar_url"),
+                    user.get("avatar_base64"),
+                ]
+            )
     return "Client", None
 
 
@@ -44,7 +105,13 @@ def _get_therapist_display(user_id: str) -> tuple[str, Optional[str]]:
         first = therapist.get("first_name") or therapist.get("firstName")
         last = therapist.get("last_name") or therapist.get("lastName")
         name = _compose_full_name(["Dr.", first, last])
-        avatar_url = therapist.get("profile_picture_url") or therapist.get("profile_picture")
+        avatar_url = _resolve_avatar(
+            [
+                therapist.get("profile_picture_url"),
+                therapist.get("profile_picture"),
+                therapist.get("profile_picture_base64"),
+            ]
+        )
         if name.strip():
             return name.strip(), avatar_url
     return "Therapist", None

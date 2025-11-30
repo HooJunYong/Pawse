@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../models/therapist_model.dart';
@@ -22,6 +25,8 @@ class TherapistCard extends StatelessWidget {
         ? therapist.rating.toStringAsFixed(1)
         : 'New';
     final String ratingCountLabel = hasRating ? ' (${therapist.ratingCount})' : '';
+
+    final avatarImage = _buildAvatarImage(therapist.imageUrl);
 
     return GestureDetector(
       onTap: () async {
@@ -54,23 +59,25 @@ class TherapistCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: const Color(0xFFFDFCF8), // Very light bg
-            child: Container(
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.grey.shade100, width: 1),
-              ),
-              child: Text(
-                therapist.imageUrl, // Using text initials as per UI
-                style: const TextStyle(
-                  color: Color(0xFF4E342E),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                ),
-              ),
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.grey.shade100, width: 1),
+            ),
+            child: CircleAvatar(
+              radius: 32,
+              backgroundColor: const Color(0xFFFDFCF8),
+              backgroundImage: avatarImage,
+              child: avatarImage == null
+                  ? Text(
+                      therapist.initials,
+                      style: const TextStyle(
+                        color: Color(0xFF4E342E),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: 16),
@@ -154,4 +161,39 @@ class TherapistCard extends StatelessWidget {
     ),
     );
   }
+
+    ImageProvider? _buildAvatarImage(String? source) {
+      if (source == null || source.isEmpty) {
+        return null;
+      }
+      if (_isDataUri(source)) {
+        final bytes = _decodeDataUri(source);
+        if (bytes != null && bytes.isNotEmpty) {
+          return MemoryImage(bytes);
+        }
+        return null;
+      }
+      return NetworkImage(source);
+    }
+
+    bool _isDataUri(String? value) {
+      if (value == null) {
+        return false;
+      }
+      final lower = value.toLowerCase();
+      return lower.startsWith('data:image/');
+    }
+
+    Uint8List? _decodeDataUri(String dataUri) {
+      final separator = dataUri.indexOf(',');
+      if (separator == -1 || separator == dataUri.length - 1) {
+        return null;
+      }
+      final payload = dataUri.substring(separator + 1).trim();
+      try {
+        return base64Decode(payload);
+      } catch (_) {
+        return null;
+      }
+    }
 }

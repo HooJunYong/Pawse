@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../services/booking_service.dart';
 import 'set_availability_screen.dart';
 import 'therapist_dashboard_screen.dart';
 import 'therapist_profile_screen.dart';
@@ -25,6 +26,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   Set<String> _datesWithSchedule = {};
   bool _isLoading = true;
   // int _selectedIndex = 2; // Calendar is selected by default
+  final BookingService _bookingService = BookingService();
 
   Map<String, dynamic>? _findSessionById(String? sessionId) {
     if (sessionId == null) return null;
@@ -269,17 +271,75 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
         Uri.parse('$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'),
       );
 
-      if (mounted) {
-        setState(() {
-          if (scheduleResponse.statusCode == 200) {
-            final scheduleData = jsonDecode(scheduleResponse.body);
-            _sessions = List<Map<String, dynamic>>.from(
-              scheduleData['sessions'] ?? [],
+      if (scheduleResponse.statusCode == 200) {
+        final scheduleData = jsonDecode(scheduleResponse.body);
+        final List<Map<String, dynamic>> sessions =
+            List<Map<String, dynamic>>.from(
+          scheduleData['sessions'] ?? [],
+        );
+        final List<Map<String, dynamic>> availabilitySlots =
+            List<Map<String, dynamic>>.from(
+          scheduleData['availability_slots'] ?? [],
+        );
+
+        for (final slot in availabilitySlots) {
+          final String? bookedSessionId =
+              (slot['booked_session_id'] ?? slot['session_id'])?.toString();
+          if (bookedSessionId == null || bookedSessionId.isEmpty) {
+            continue;
+          }
+
+          Map<String, dynamic>? session;
+          try {
+            session = sessions.firstWhere(
+              (element) =>
+                  (element['session_id'] ?? '').toString() == bookedSessionId,
             );
-            _availabilitySlots = List<Map<String, dynamic>>.from(
-              scheduleData['availability_slots'] ?? [],
-            );
-            // Sort slots by start time (chronological order)
+          } catch (_) {
+            session = null;
+          }
+          if (session == null) {
+            continue;
+          }
+
+          final String statusRaw =
+              (session['session_status'] ?? session['status'] ?? '')
+                  .toString()
+                  .toLowerCase();
+          bool slotReleased =
+              session['slot_released'] == true ||
+                  slot['slot_released'] == true ||
+                  slot['is_released'] == true;
+
+          if (statusRaw.contains('cancel') && !slotReleased) {
+            final String? scheduledAtRaw = session['scheduled_at']?.toString();
+            final DateTime? scheduledAt = scheduledAtRaw != null
+                ? DateTime.tryParse(scheduledAtRaw)
+                : null;
+            if (scheduledAt != null &&
+                scheduledAt.difference(DateTime.now()).inDays >= 5) {
+              try {
+                await _bookingService.releaseCancelledSessionSlot(
+                  sessionId: bookedSessionId,
+                  therapistUserId: widget.userId,
+                );
+                slotReleased = true;
+              } catch (_) {}
+            }
+          }
+
+          if (slotReleased) {
+            slot['slot_released'] = true;
+            slot['is_booked'] = false;
+            slot['status'] = 'available';
+            session['slot_released'] = true;
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _sessions = sessions;
+            _availabilitySlots = availabilitySlots;
             _availabilitySlots.sort((a, b) {
               final aTime = _parseTimeString(a['start_time']);
               final bTime = _parseTimeString(b['start_time']);
@@ -287,11 +347,13 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
               final bMinutes = bTime.hour * 60 + bTime.minute;
               return aMinutes.compareTo(bMinutes);
             });
-          } else {
-            _sessions = [];
-            _availabilitySlots = [];
-          }
-
+            _isLoading = false;
+          });
+        }
+      } else if (mounted) {
+        setState(() {
+          _sessions = [];
+          _availabilitySlots = [];
           _isLoading = false;
         });
       }
@@ -786,30 +848,52 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   Widget _buildAvailabilityCard(Map<String, dynamic> slot) {
-    final isBooked =
-        slot['is_booked'] == true ||
-        (slot['status']?.toString().toLowerCase() == 'booked');
+    final String rawStatus = (slot['booked_session_status'] ?? slot['status'] ?? '')
+      .toString()
+      .toLowerCase();
+    final bool slotReleased = slot['slot_released'] == true || slot['is_released'] == true;
+    final bool isCancelled = rawStatus.contains('cancel');
+    final bool isBooked =
+      slot['is_booked'] == true && !isCancelled && !slotReleased;
+    final bool awaitingRelease = isCancelled && !slotReleased;
 
-    final Color backgroundColor = isBooked
-        ? const Color.fromRGBO(59, 130, 246, 0.08)
-        : const Color.fromRGBO(249, 115, 22, 0.1);
-    final Color borderColor = isBooked
-        ? const Color.fromRGBO(59, 130, 246, 0.3)
-        : const Color.fromRGBO(249, 115, 22, 0.3);
-    final Color labelBackground = isBooked
-        ? const Color.fromRGBO(59, 130, 246, 0.12)
-        : Colors.green[50]!;
-    final Color labelBorder = isBooked
-        ? const Color.fromRGBO(59, 130, 246, 0.3)
-        : Colors.green[200]!;
-    final Color labelTextColor = isBooked
-        ? const Color.fromRGBO(30, 64, 175, 1)
-        : Colors.green[700]!;
-    final IconData statusIcon = isBooked ? Icons.event_busy : Icons.schedule;
-    final String statusLabel = isBooked ? 'Booked' : 'Available';
-    final String subtitleText = isBooked
-        ? 'Slot no longer available'
-        : 'Available for booking';
+    final Color backgroundColor;
+    final Color borderColor;
+    final Color labelBackground;
+    final Color labelBorder;
+    final Color labelTextColor;
+    final IconData statusIcon;
+    final String statusLabel;
+    final String subtitleText;
+
+    if (awaitingRelease) {
+      backgroundColor = const Color.fromRGBO(254, 226, 226, 1); // light red
+      borderColor = const Color.fromRGBO(239, 68, 68, 0.4);
+      labelBackground = const Color.fromRGBO(254, 202, 202, 1);
+      labelBorder = const Color.fromRGBO(239, 68, 68, 0.5);
+      labelTextColor = const Color.fromRGBO(185, 28, 28, 1);
+      statusIcon = Icons.cancel_outlined;
+      statusLabel = 'Cancelled';
+      subtitleText = 'Tap "Set Available" on the dashboard to reopen.';
+    } else if (isBooked) {
+      backgroundColor = const Color.fromRGBO(59, 130, 246, 0.08);
+      borderColor = const Color.fromRGBO(59, 130, 246, 0.3);
+      labelBackground = const Color.fromRGBO(59, 130, 246, 0.12);
+      labelBorder = const Color.fromRGBO(59, 130, 246, 0.3);
+      labelTextColor = const Color.fromRGBO(30, 64, 175, 1);
+      statusIcon = Icons.event_busy;
+      statusLabel = 'Booked';
+      subtitleText = 'Slot no longer available';
+    } else {
+      backgroundColor = const Color.fromRGBO(249, 115, 22, 0.1);
+      borderColor = const Color.fromRGBO(249, 115, 22, 0.3);
+      labelBackground = Colors.green[50]!;
+      labelBorder = Colors.green[200]!;
+      labelTextColor = Colors.green[700]!;
+      statusIcon = Icons.schedule;
+      statusLabel = 'Available';
+      subtitleText = 'Available for booking';
+    }
 
     final Widget cardContent = Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -823,7 +907,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
         children: [
           Icon(
             statusIcon,
-            color: isBooked
+            color: awaitingRelease
+              ? const Color.fromRGBO(185, 28, 28, 1)
+              : isBooked
                 ? const Color.fromRGBO(30, 64, 175, 1)
                 : const Color.fromRGBO(249, 115, 22, 1),
           ),
@@ -847,7 +933,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontFamily: 'Nunito',
-                    color: Colors.grey[600],
+                    color: awaitingRelease
+                        ? const Color.fromRGBO(127, 29, 29, 1)
+                        : Colors.grey[600],
                   ),
                 ),
               ],
@@ -874,8 +962,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
         ],
       ),
     );
-
-    if (!isBooked) {
+    if (awaitingRelease || !isBooked) {
       return cardContent;
     }
 

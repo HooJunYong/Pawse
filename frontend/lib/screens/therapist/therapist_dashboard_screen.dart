@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../../services/booking_service.dart';
+import '../../services/session_event_bus.dart';
 import '../chat/chat_contacts_screen.dart';
 import 'manage_schedule_screen.dart';
 import 'therapist_profile_screen.dart';
@@ -247,15 +249,82 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     return DateTime(baseDate.year, baseDate.month, baseDate.day, time.hour, time.minute);
   }
 
+  DateTime? _tryBuildSessionDateTime(Map<String, dynamic> schedule) {
+    final dynamic dateValue = schedule['date'];
+    final String? startTimeRaw = schedule['start_time']?.toString();
+    if (dateValue == null || startTimeRaw == null || startTimeRaw.isEmpty) {
+      return null;
+    }
+
+    String? normalizedDate;
+    if (dateValue is DateTime) {
+      normalizedDate = DateFormat('yyyy-MM-dd').format(dateValue);
+    } else if (dateValue is String && dateValue.isNotEmpty) {
+      normalizedDate = dateValue;
+    }
+    if (normalizedDate == null) {
+      return null;
+    }
+
+    try {
+      return _parseTimeWithDate(normalizedDate, startTimeRaw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _shouldAutoRelease(Map<String, dynamic> schedule) {
+    final DateTime? sessionDateTime = _tryBuildSessionDateTime(schedule);
+    if (sessionDateTime == null) {
+      return false;
+    }
+
+    final difference = sessionDateTime.difference(DateTime.now());
+    return difference.inDays >= 5;
+  }
+
+  Future<void> _autoReleaseIfNeeded(Map<String, dynamic> schedule) async {
+    final String? sessionId = schedule['session_id']?.toString();
+    if (sessionId == null || sessionId.isEmpty) {
+      return;
+    }
+    if (!_shouldAutoRelease(schedule)) {
+      return;
+    }
+
+    try {
+      await _bookingService.releaseCancelledSessionSlot(
+        sessionId: sessionId,
+        therapistUserId: widget.userId,
+      );
+      schedule['slot_released'] = true;
+      SessionEventBus.instance.emit(
+        SessionEvent(
+          type: SessionEventType.slotReleased,
+          sessionId: sessionId,
+          therapistUserId: widget.userId,
+        ),
+      );
+    } catch (_) {
+      // Silent fail; therapist can still release manually if needed.
+    }
+  }
+
   List<Map<String, dynamic>> _todaysAppointments = [];
   List<Map<String, dynamic>> _upcomingSchedule = [];
   String _therapistName = '';
   bool _isLoading = true;
   String? _activeCancelSessionId;
+  String? _activeCancelledTodaySessionId;
+  String? _activeUpcomingReleaseSessionId;
   Timer? _cancelButtonTimer;
   Timer? _upcomingRefreshTimer;
+  Timer? _upcomingReleaseTimer;
   String? _statusUpdatingSessionId;
   bool _isUpcomingLoading = false;
+  final BookingService _bookingService = BookingService();
+  StreamSubscription<SessionEvent>? _sessionEventSubscription;
+  final Set<String> _releasingSessionIds = <String>{};
 
   @override
   void initState() {
@@ -263,12 +332,24 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     _loadDashboardData();
     _upcomingRefreshTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _loadUpcomingSchedule());
+    _sessionEventSubscription = SessionEventBus.instance.stream.listen((event) {
+      if (!mounted) {
+        return;
+      }
+      if (event.therapistUserId == null || event.therapistUserId != widget.userId) {
+        return;
+      }
+      _loadUpcomingSchedule();
+      _loadTodaysAppointments();
+    });
   }
 
   @override
   void dispose() {
     _cancelButtonTimer?.cancel();
     _upcomingRefreshTimer?.cancel();
+    _upcomingReleaseTimer?.cancel();
+    _sessionEventSubscription?.cancel();
     super.dispose();
   }
 
@@ -326,14 +407,30 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
             'period': DateFormat('a').format(scheduledAt),
             'client_name': session['client_name'] ?? 'Client',
             'status': statusRaw,
+            'slot_released': session['slot_released'] == true,
           };
         }).toList();
-        if (mounted) setState(() => _todaysAppointments = todays);
+        if (mounted) {
+          setState(() {
+            _todaysAppointments = todays;
+            _activeCancelledTodaySessionId = null;
+          });
+        }
       } else {
-        if (mounted) setState(() => _todaysAppointments = []);
+        if (mounted) {
+          setState(() {
+            _todaysAppointments = [];
+            _activeCancelledTodaySessionId = null;
+          });
+        }
       }
     } catch (_) {
-      if (mounted) setState(() => _todaysAppointments = []);
+      if (mounted) {
+        setState(() {
+          _todaysAppointments = [];
+          _activeCancelledTodaySessionId = null;
+        });
+      }
     }
   }
 
@@ -363,6 +460,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
               String? sessionId;
               String? clientName;
               dynamic clientUserId;
+              Map<String, dynamic>? matchedSession;
 
               for (final session in sessions) {
                 final sessionTime = DateTime.parse(session['scheduled_at']);
@@ -372,19 +470,49 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                   sessionId = session['session_id']?.toString();
                   clientName = session['client_name'];
                   clientUserId = session['user_id'];
+                  matchedSession = session;
                   break;
                 }
               }
               if (sessionId != null) {
+                final Map<String, dynamic> sessionData =
+                    matchedSession ?? <String, dynamic>{};
+                final statusRaw =
+                    (sessionData['session_status'] ??
+                            sessionData['status'] ??
+                            'scheduled')
+                        .toString();
+                final statusLower = statusRaw.toLowerCase();
+                bool slotReleased = sessionData['slot_released'] == true;
+                if (statusLower.contains('cancel') && !slotReleased) {
+                  final Map<String, dynamic> releaseCandidate = {
+                    'session_id': sessionId,
+                    'date': dateStr,
+                    'start_time': slot['start_time'],
+                  };
+                  if (_shouldAutoRelease(releaseCandidate)) {
+                    await _autoReleaseIfNeeded(releaseCandidate);
+                    slotReleased = true;
+                    sessionData['slot_released'] = true;
+                  }
+                }
+                final bool isBooked =
+                    !(statusLower.contains('cancel') || slotReleased);
                 scheduleData.add({
                   'date': dateStr,
                   'start_time': slot['start_time'],
                   'end_time': slot['end_time'],
                   'availability_id': slot['availability_id'],
-                  'is_booked': true,
+                  'is_booked': isBooked,
                   'client_name': clientName,
                   'session_id': sessionId,
                   'client_user_id': clientUserId,
+                  'session_status': statusRaw,
+                  'slot_released': slotReleased,
+                  'booked_session_status':
+                      slot['booked_session_status']?.toString(),
+                  'cancellation_reason':
+                      sessionData['cancellation_reason']?.toString(),
                 });
               }
             }
@@ -395,6 +523,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         setState(() {
           _upcomingSchedule = scheduleData;
           _activeCancelSessionId = null;
+          _activeUpcomingReleaseSessionId = null;
         });
       }
     } finally {
@@ -735,114 +864,187 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     showDialog<void>(
       context: context,
       builder: (dialogContext) {
-        return AlertDialog(
+        return Dialog(
           backgroundColor: _bgCream,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              const Expanded(
-                child: Text(
-                  'Session Details',
-                  style: TextStyle(
-                    fontFamily: 'Nunito',
-                    fontWeight: FontWeight.bold,
-                    color: _textDark,
-                  ),
-                ),
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
-                    fontFamily: 'Nunito',
-                    fontWeight: FontWeight.w700,
-                    color: statusColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          content: SingleChildScrollView(
+          insetPadding: const EdgeInsets.all(20),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _historyDetailRow(
-                  'Client',
-                  record['client_name']?.toString() ?? 'Client',
+                // Header with Status
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Session Details',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: _textDark,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: statusColor,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                if (scheduledAt != null)
-                  _historyDetailRow(
-                    'Scheduled At',
-                    DateFormat('MMM d, yyyy · h:mm a')
-                        .format(scheduledAt.toLocal()),
+                const SizedBox(height: 24),
+                
+                // Content
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _historyDetailRow(
+                          'Client',
+                          record['client_name']?.toString() ?? 'Client',
+                          icon: Icons.person_outline,
+                        ),
+                        if (scheduledAt != null)
+                          _historyDetailRow(
+                            'Scheduled At',
+                            DateFormat('MMM d, yyyy · h:mm a')
+                                .format(scheduledAt.toLocal()),
+                            icon: Icons.calendar_today_outlined,
+                          ),
+                        if (endAt != null)
+                          _historyDetailRow(
+                            'Ended At',
+                            DateFormat('MMM d, yyyy · h:mm a')
+                                .format(endAt.toLocal()),
+                            icon: Icons.access_time,
+                          ),
+                        if (duration != null)
+                          _historyDetailRow(
+                            'Duration', 
+                            '$duration minutes',
+                            icon: Icons.timer_outlined,
+                          ),
+                        if (reason != null && reason.trim().isNotEmpty)
+                          _historyDetailRow(
+                            'Reason', 
+                            reason,
+                            icon: Icons.info_outline,
+                            valueColor: _errorRed,
+                          ),
+                        if (notes != null && notes.trim().isNotEmpty)
+                          _historyDetailRow(
+                            'Notes', 
+                            notes,
+                            icon: Icons.note_outlined,
+                          ),
+                        if (sessionNotes != null && sessionNotes.trim().isNotEmpty)
+                          _historyDetailRow(
+                            'Session Notes', 
+                            sessionNotes,
+                            icon: Icons.description_outlined,
+                          ),
+                        if (therapistNotes != null &&
+                            therapistNotes.trim().isNotEmpty)
+                          _historyDetailRow(
+                            'Therapist Notes', 
+                            therapistNotes,
+                            icon: Icons.edit_note,
+                          ),
+                      ],
+                    ),
                   ),
-                if (endAt != null)
-                  _historyDetailRow(
-                    'Ended At',
-                    DateFormat('MMM d, yyyy · h:mm a').format(endAt.toLocal()),
+                ),
+                const SizedBox(height: 24),
+                
+                // Close Button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _primaryBrown,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                   ),
-                if (duration != null)
-                  _historyDetailRow('Duration', '$duration minutes'),
-                if (reason != null && reason.trim().isNotEmpty)
-                  _historyDetailRow('Reason', reason),
-                if (notes != null && notes.trim().isNotEmpty)
-                  _historyDetailRow('Notes', notes),
-                if (sessionNotes != null && sessionNotes.trim().isNotEmpty)
-                  _historyDetailRow('Session Notes', sessionNotes),
-                if (therapistNotes != null &&
-                    therapistNotes.trim().isNotEmpty)
-                  _historyDetailRow('Therapist Notes', therapistNotes),
+                ),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text(
-                'Close',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.w600,
-                  color: _primaryBrown,
-                ),
-              ),
-            ),
-          ],
         );
       },
     );
   }
 
-  Widget _historyDetailRow(String label, String value, {Color? valueColor}) {
+  Widget _historyDetailRow(String label, String value, {Color? valueColor, IconData? icon}) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 13,
-              color: _textGrey,
-              fontWeight: FontWeight.w600,
+          if (icon != null) ...[
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _textGrey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, size: 16, color: _textGrey),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 15,
-              height: 1.4,
-              color: valueColor ?? _textDark,
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 12,
+                    color: _textGrey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: FontWeight.w600,
+                    color: valueColor ?? _textDark,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -851,68 +1053,178 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   }
 
   Future<void> _showCancelBookingDialog(Map<String, dynamic> schedule) async {
-    final TextEditingController reasonController = TextEditingController();
+    final String? sessionId = schedule['session_id']?.toString();
+    final String? clientUserId = schedule['client_user_id']?.toString();
+    if (sessionId == null || sessionId.isEmpty ||
+        clientUserId == null || clientUserId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to cancel this booking right now.')),
+      );
+      return;
+    }
+
     bool isSubmitting = false;
+    String? errorMessage;
 
     await showDialog(
-        context: context,
-        builder: (dialogContext) {
-          return StatefulBuilder(builder: (context, setStateDialog) {
-            return AlertDialog(
-                backgroundColor: _bgCream,
-                title: const Text('Cancel Booking',
-                    style: TextStyle(
-                        color: _textDark,
-                        fontFamily: 'Nunito',
-                        fontWeight: FontWeight.bold)),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text("Please provide a reason for cancellation."),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: reasonController,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none),
-                        hintText: 'Reason...',
-                      ),
-                    )
-                  ],
-                ),
-                actions: [
-                  TextButton(
-                      onPressed: () => Navigator.pop(dialogContext),
-                      child: const Text('Back',
-                          style: TextStyle(color: _textGrey))),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: _errorRed,
-                        foregroundColor: Colors.white),
-                    onPressed: isSubmitting
-                        ? null
-                        : () async {
-                            setStateDialog(() => isSubmitting = true);
-                            // Mock delay/API call
-                            await Future.delayed(const Duration(seconds: 1));
-                            if (mounted) {
-                              Navigator.pop(dialogContext);
-                              _loadUpcomingSchedule();
-                            }
-                          },
-                    child: isSubmitting
-                        ? const SizedBox(
-                            height: 16,
-                            width: 16,
-                            child: CircularProgressIndicator(color: Colors.white))
-                        : const Text('Confirm Cancel'),
-                  )
+      context: context,
+      barrierDismissible: !isSubmitting,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            Future<void> handleCancel() async {
+              if (isSubmitting) return;
+              setStateDialog(() {
+                isSubmitting = true;
+                errorMessage = null;
+              });
+
+              try {
+                await _bookingService.cancelBooking(
+                  sessionId: sessionId,
+                  clientUserId: clientUserId,
+                  therapistUserId: widget.userId,
+                );
+
+                if (!mounted) {
+                  return;
+                }
+
+                Navigator.pop(dialogContext);
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Booking cancelled successfully.')),
+                );
+
+                if (schedule.isNotEmpty && _shouldAutoRelease(schedule)) {
+                  await _autoReleaseIfNeeded(schedule);
+                }
+
+                await Future.wait([
+                  _loadUpcomingSchedule(),
+                  _loadTodaysAppointments(),
                 ]);
-          });
+              } catch (e) {
+                if (mounted) {
+                  setStateDialog(() {
+                    isSubmitting = false;
+                    errorMessage = 'Failed to cancel booking: $e';
+                  });
+                }
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: _bgCream,
+              title: const Text(
+                'Cancel Booking',
+                style: TextStyle(
+                  color: _textDark,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'This will cancel the selected session. The client will be notified and the slot can be reopened for other bookings.',
+                    style: TextStyle(
+                      color: _textDark.withOpacity(0.8),
+                      fontFamily: 'Nunito',
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (errorMessage != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        color: _errorRed,
+                        fontFamily: 'Nunito',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.pop(dialogContext),
+                  child: const Text(
+                    'Back',
+                    style: TextStyle(color: _textGrey),
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _errorRed,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: isSubmitting ? null : handleCancel,
+                  child: isSubmitting
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(color: Colors.white),
+                        )
+                      : const Text('Confirm Cancel'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _releaseCancelledSlot(Map<String, dynamic> schedule) async {
+    final String? sessionId = schedule['session_id']?.toString();
+    if (sessionId == null || _releasingSessionIds.contains(sessionId)) {
+      return;
+    }
+
+    setState(() => _releasingSessionIds.add(sessionId));
+    try {
+      await _bookingService.releaseCancelledSessionSlot(
+        sessionId: sessionId,
+        therapistUserId: widget.userId,
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      if (_activeUpcomingReleaseSessionId == sessionId) {
+        setState(() {
+          _activeUpcomingReleaseSessionId = null;
         });
+      }
+      _upcomingReleaseTimer?.cancel();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Slot marked available for booking.')),
+      );
+      await Future.wait([
+        _loadUpcomingSchedule(),
+        _loadTodaysAppointments(),
+      ]);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to release slot: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _releasingSessionIds.remove(sessionId));
+      } else {
+        _releasingSessionIds.remove(sessionId);
+      }
+    }
   }
 
   Future<void> _updateSessionStatus(
@@ -1051,6 +1363,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                             final String status =
                                 appointment['status']?.toString() ??
                                     'scheduled';
+                            final String statusLower = status.toLowerCase();
                             final String statusLabel =
                                 _formatStatusLabel(status);
                             final Color statusColor = _statusColor(status);
@@ -1059,180 +1372,329 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                     ? DateTime.tryParse(
                                         appointment['end_at'] as String)
                                     : null;
-                            final bool isScheduled =
-                                status.toLowerCase() == 'scheduled';
+                            final DateTime? startAt =
+                                appointment['scheduled_at'] != null
+                                    ? DateTime.tryParse(
+                                        appointment['scheduled_at'] as String)
+                                    : null;
+                            final int minutesUntilStart = startAt != null
+                                ? startAt.difference(DateTime.now()).inMinutes
+                                : -1;
+                            final bool isCancelled =
+                                statusLower.contains('cancel');
+                            final bool slotReleased =
+                                appointment['slot_released'] == true;
+                            final bool meetsReleaseWindow = startAt != null
+                                ? minutesUntilStart >= 120
+                                : false;
+                            final bool isScheduled = statusLower == 'scheduled';
                             final bool canUpdate = isScheduled &&
                                 endAt != null &&
                                 DateTime.now().isAfter(endAt);
                             final bool isUpdating =
                                 _statusUpdatingSessionId == sessionId;
+                            final bool revealRelease = isCancelled &&
+                                _activeCancelledTodaySessionId == sessionId;
+                            final bool isReleasing =
+                                _releasingSessionIds.contains(sessionId);
+                            final bool canRelease = isCancelled &&
+                                !slotReleased &&
+                                meetsReleaseWindow;
 
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 16),
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: _surfaceWhite,
-                                borderRadius: BorderRadius.circular(20),
-                                boxShadow: _softShadow,
-                                border: Border.all(
-                                    color: _primaryBrown.withOpacity(0.05)),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // Time Column
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            appointment['time'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              fontFamily: 'Nunito',
-                                              fontWeight: FontWeight.w800,
-                                              color: _accentOrange,
-                                            ),
-                                          ),
-                                          Text(
-                                            appointment['period'] ?? '',
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontFamily: 'Nunito',
-                                              fontWeight: FontWeight.w600,
-                                              color: _textGrey,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(width: 20),
-                                      // Info Column
-                                      Expanded(
-                                        child: Column(
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: isCancelled
+                                  ? () {
+                                      setState(() {
+                                        if (_activeCancelledTodaySessionId ==
+                                            sessionId) {
+                                          _activeCancelledTodaySessionId = null;
+                                        } else {
+                                          _activeCancelledTodaySessionId =
+                                              sessionId;
+                                        }
+                                      });
+                                    }
+                                  : null,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 16),
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: _surfaceWhite,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: _softShadow,
+                                  border: Border.all(
+                                      color: _primaryBrown.withOpacity(0.05)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      children: [
+                                        // Time Column
+                                        Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              appointment['client_name'] ?? '',
+                                              appointment['time'] ?? '',
                                               style: const TextStyle(
-                                                fontSize: 16,
+                                                fontSize: 18,
                                                 fontFamily: 'Nunito',
-                                                fontWeight: FontWeight.bold,
-                                                color: _textDark,
+                                                fontWeight: FontWeight.w800,
+                                                color: _accentOrange,
                                               ),
                                             ),
-                                            if (endAt != null)
-                                              Text(
-                                                'Ends ${DateFormat('h:mm a').format(endAt)}',
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  fontFamily: 'Nunito',
-                                                  color: _textGrey,
-                                                ),
+                                            Text(
+                                              appointment['period'] ?? '',
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontFamily: 'Nunito',
+                                                fontWeight: FontWeight.w600,
+                                                color: _textGrey,
                                               ),
+                                            ),
                                           ],
                                         ),
-                                      ),
-                                      // Status Pill
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        decoration: BoxDecoration(
-                                          color: statusColor.withOpacity(0.1),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        child: Text(
-                                          statusLabel,
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontFamily: 'Nunito',
-                                            fontWeight: FontWeight.bold,
-                                            color: statusColor,
+                                        const SizedBox(width: 20),
+                                        // Info Column
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                appointment['client_name'] ?? '',
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontFamily: 'Nunito',
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _textDark,
+                                                ),
+                                              ),
+                                              if (endAt != null)
+                                                Text(
+                                                  'Ends ${DateFormat('h:mm a').format(endAt)}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontFamily: 'Nunito',
+                                                    color: _textGrey,
+                                                  ),
+                                                ),
+                                            ],
                                           ),
                                         ),
+                                        // Status Pill
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: statusColor.withOpacity(0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(20),
+                                          ),
+                                          child: Text(
+                                            statusLabel,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontFamily: 'Nunito',
+                                              fontWeight: FontWeight.bold,
+                                              color: statusColor,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (isCancelled) ...[
+                                      const SizedBox(height: 16),
+                                      AnimatedSwitcher(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        child: revealRelease
+                                            ? Column(
+                                                key: ValueKey(
+                                                    'release-today-$sessionId'),
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  const Divider(
+                                                      height: 1,
+                                                      color: _bgCream),
+                                                  const SizedBox(height: 16),
+                                                  Text(
+                                                    'This session was cancelled. You can reopen the slot for other clients.',
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      fontFamily: 'Nunito',
+                                                      color: Colors
+                                                          .grey.shade600,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  if (slotReleased)
+                                                    Text(
+                                                      'Slot already available for rebooking.',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontFamily: 'Nunito',
+                                                        color:
+                                                            Colors.grey[500],
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    )
+                                                  else if (!meetsReleaseWindow)
+                                                    Text(
+                                                      'Too close to the start time to reopen this slot (2h rule).',
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontFamily: 'Nunito',
+                                                        color:
+                                                            Colors.grey[500],
+                                                        fontStyle:
+                                                            FontStyle.italic,
+                                                      ),
+                                                    )
+                                                  else
+                                                    SizedBox(
+                                                      width: double.infinity,
+                                                      child: ElevatedButton(
+                                                        onPressed: isReleasing
+                                                            ? null
+                                                            : () =>
+                                                                _releaseCancelledSlot(
+                                                                  {
+                                                                    'session_id':
+                                                                        sessionId,
+                                                                  },
+                                                                ),
+                                                        style: ElevatedButton
+                                                            .styleFrom(
+                                                          backgroundColor:
+                                                              _primaryBrown,
+                                                          foregroundColor:
+                                                              Colors.white,
+                                                          elevation: 0,
+                                                          padding: const EdgeInsets
+                                                                  .symmetric(
+                                                              vertical: 12),
+                                                          shape:
+                                                              RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius
+                                                                    .circular(
+                                                                        12),
+                                                          ),
+                                                        ),
+                                                        child: isReleasing
+                                                            ? const SizedBox(
+                                                                width: 18,
+                                                                height: 18,
+                                                                child:
+                                                                    CircularProgressIndicator(
+                                                                  strokeWidth:
+                                                                      2,
+                                                                  valueColor:
+                                                                      AlwaysStoppedAnimation<Color>(
+                                                                    Colors
+                                                                        .white,
+                                                                  ),
+                                                                ),
+                                                              )
+                                                            : const Text(
+                                                                'Set Available',
+                                                              ),
+                                                      ),
+                                                    ),
+                                                ],
+                                              )
+                                            : const SizedBox.shrink(),
                                       ),
                                     ],
-                                  ),
-                                  // Action Buttons
-                                  if (canUpdate) ...[
-                                    const SizedBox(height: 20),
-                                    const Divider(height: 1, color: _bgCream),
-                                    const SizedBox(height: 16),
-                                    if (isUpdating)
-                                      const Center(
-                                          child: CircularProgressIndicator(
-                                              color: _primaryBrown))
-                                    else
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: ElevatedButton(
-                                              style: ElevatedButton.styleFrom(
-                                                backgroundColor: _successGreen,
-                                                foregroundColor: Colors.white,
-                                                elevation: 0,
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
+                                    // Action Buttons
+                                    if (canUpdate) ...[
+                                      const SizedBox(height: 20),
+                                      const Divider(height: 1, color: _bgCream),
+                                      const SizedBox(height: 16),
+                                      if (isUpdating)
+                                        const Center(
+                                            child: CircularProgressIndicator(
+                                                color: _primaryBrown))
+                                      else
+                                        Row(
+                                          children: [
+                                            Expanded(
+                                              child: ElevatedButton(
+                                                style: ElevatedButton
+                                                    .styleFrom(
+                                                  backgroundColor:
+                                                      _successGreen,
+                                                  foregroundColor:
+                                                      Colors.white,
+                                                  elevation: 0,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                  ),
+                                                  padding: const EdgeInsets
+                                                          .symmetric(
+                                                      vertical: 14),
                                                 ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 14),
-                                              ),
-                                              onPressed: () {
-                                                _updateSessionStatus(
-                                                  sessionId: sessionId,
-                                                  newStatus: 'completed',
-                                                );
-                                              },
-                                              child: const Text(
-                                                'Completed',
-                                                style: TextStyle(
-                                                    fontFamily: 'Nunito',
-                                                    fontWeight:
-                                                        FontWeight.bold),
+                                                onPressed: () {
+                                                  _updateSessionStatus(
+                                                    sessionId: sessionId,
+                                                    newStatus: 'completed',
+                                                  );
+                                                },
+                                                child: const Text(
+                                                  'Completed',
+                                                  style: TextStyle(
+                                                      fontFamily: 'Nunito',
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: OutlinedButton(
-                                              style: OutlinedButton.styleFrom(
-                                                foregroundColor: _errorRed,
-                                                side: const BorderSide(
-                                                    color: _errorRed),
-                                                shape: RoundedRectangleBorder(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                style: OutlinedButton
+                                                    .styleFrom(
+                                                  foregroundColor: _errorRed,
+                                                  side: const BorderSide(
+                                                      color: _errorRed),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                  ),
+                                                  padding: const EdgeInsets
+                                                          .symmetric(
+                                                      vertical: 14),
                                                 ),
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 14),
-                                              ),
-                                              onPressed: () {
-                                                _updateSessionStatus(
-                                                  sessionId: sessionId,
-                                                  newStatus: 'no_show',
-                                                );
-                                              },
-                                              child: const Text(
-                                                'No Show',
-                                                style: TextStyle(
-                                                    fontFamily: 'Nunito',
-                                                    fontWeight:
-                                                        FontWeight.bold),
+                                                onPressed: () {
+                                                  _updateSessionStatus(
+                                                    sessionId: sessionId,
+                                                    newStatus: 'no_show',
+                                                  );
+                                                },
+                                                child: const Text(
+                                                  'No Show',
+                                                  style: TextStyle(
+                                                      fontFamily: 'Nunito',
+                                                      fontWeight:
+                                                          FontWeight.bold),
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
+                                          ],
+                                        ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             );
                           }).toList(),
@@ -1321,182 +1783,331 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                         )
                       : Column(
                           children: _upcomingSchedule.map((schedule) {
-                            final date = DateTime.parse(schedule['date']);
-                            final dateStr =
-                                DateFormat('EEE, MMM d').format(date);
                             final String? sessionId =
-                                schedule['session_id'] as String?;
-                            if (sessionId == null)
+                                schedule['session_id']?.toString();
+                            if (sessionId == null || sessionId.isEmpty) {
                               return const SizedBox.shrink();
+                            }
 
-                            final bool revealCancel =
-                                _activeCancelSessionId == sessionId;
-                            final DateTime sessionDateTime =
-                                _parseTimeWithDate(schedule['date'] as String,
-                                    schedule['start_time'] as String);
+                            DateTime parsedDate = DateTime.now();
+                            String normalizedSourceDate = '';
+                            final dynamic dateValue = schedule['date'];
+                            if (dateValue is DateTime) {
+                              parsedDate = dateValue;
+                            } else if (dateValue is String) {
+                              normalizedSourceDate = dateValue;
+                              try {
+                                parsedDate = DateTime.parse(dateValue);
+                              } catch (_) {}
+                            }
+                            if (normalizedSourceDate.isEmpty) {
+                              normalizedSourceDate =
+                                  DateFormat('yyyy-MM-dd').format(parsedDate);
+                            }
+                            final String dateStr =
+                                DateFormat('EEE, MMM d').format(parsedDate);
+
+                            final String startTimeLabel =
+                                schedule['start_time']?.toString() ?? '';
+                            final DateTime sessionDateTime = startTimeLabel.isNotEmpty
+                                ? _parseTimeWithDate(normalizedSourceDate, startTimeLabel)
+                                : parsedDate;
                             final int minutesUntilSession = sessionDateTime
                                 .difference(DateTime.now())
                                 .inMinutes;
-                            final bool canCancel = minutesUntilSession >= 720;
+
+                            final String statusRaw =
+                                schedule['session_status']?.toString() ??
+                                    'scheduled';
+                            final String statusLower = statusRaw.toLowerCase();
+                            final bool isCancelled =
+                                statusLower.contains('cancel');
+                            final bool slotReleased =
+                                schedule['slot_released'] == true;
+                            final bool revealCancel = !isCancelled &&
+                                _activeCancelSessionId == sessionId;
+                            final bool canCancel =
+                                !isCancelled && minutesUntilSession >= 720;
+                            final bool revealUpcomingRelease = isCancelled &&
+                              _activeUpcomingReleaseSessionId == sessionId;
+                            final bool meetsReleaseWindow =
+                              minutesUntilSession >= 120;
+                            final bool canReleaseSlot = isCancelled &&
+                              !slotReleased &&
+                              meetsReleaseWindow;
+                            final bool showReleaseButton =
+                              revealUpcomingRelease && canReleaseSlot;
+                            final bool showReleaseLockoutMessage =
+                              revealUpcomingRelease &&
+                                !meetsReleaseWindow &&
+                                !slotReleased;
+                            final bool isReleasing =
+                                _releasingSessionIds.contains(sessionId);
                             final String? clientName =
-                                schedule['client_name'] as String?;
+                                schedule['client_name']?.toString();
+                            final String? cancellationReason =
+                                schedule['cancellation_reason']?.toString();
+
+                            final Color statusColor =
+                                isCancelled ? _errorRed : _successGreen;
+                            final String statusLabel =
+                                _formatStatusLabel(statusRaw);
 
                             return GestureDetector(
-                              onTap: () {
-                                _cancelButtonTimer?.cancel();
-                                setState(() {
-                                  _activeCancelSessionId = sessionId;
-                                });
-                                _cancelButtonTimer = Timer(
-                                    const Duration(seconds: 5), () {
-                                  if (mounted &&
-                                      _activeCancelSessionId == sessionId) {
+                                onTap: () {
+                                  if (isCancelled) {
+                                    final bool shouldReveal =
+                                        _activeUpcomingReleaseSessionId !=
+                                            sessionId;
+                                    _upcomingReleaseTimer?.cancel();
                                     setState(() {
-                                      _activeCancelSessionId = null;
+                                      _activeUpcomingReleaseSessionId =
+                                          shouldReveal ? sessionId : null;
+                                    });
+                                    if (shouldReveal) {
+                                      _upcomingReleaseTimer =
+                                          Timer(const Duration(seconds: 5), () {
+                                        if (mounted &&
+                                            _activeUpcomingReleaseSessionId ==
+                                                sessionId) {
+                                          setState(() {
+                                            _activeUpcomingReleaseSessionId =
+                                                null;
+                                          });
+                                        }
+                                      });
+                                    }
+                                    return;
+                                  }
+
+                                  final bool shouldRevealCancel =
+                                      _activeCancelSessionId != sessionId;
+                                  _cancelButtonTimer?.cancel();
+                                  setState(() {
+                                    _activeCancelSessionId =
+                                        shouldRevealCancel ? sessionId : null;
+                                  });
+                                  if (shouldRevealCancel) {
+                                    _cancelButtonTimer =
+                                        Timer(const Duration(seconds: 5), () {
+                                      if (mounted &&
+                                          _activeCancelSessionId == sessionId) {
+                                        setState(() {
+                                          _activeCancelSessionId = null;
+                                        });
+                                      }
                                     });
                                   }
-                                });
-                              },
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                curve: Curves.easeOut,
-                                margin: const EdgeInsets.only(bottom: 12),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: _surfaceWhite,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: _successGreen.withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF22C55E)
-                                          .withOpacity(revealCancel ? 0.1 : 0.05),
-                                      blurRadius: revealCancel ? 12 : 8,
-                                      offset: const Offset(0, 4),
+                                },
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  curve: Curves.easeOut,
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: _surfaceWhite,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: statusColor.withOpacity(0.3),
+                                      width: 1,
                                     ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              dateStr,
-                                              style: const TextStyle(
-                                                fontSize: 14,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: statusColor
+                                            .withOpacity(revealCancel ? 0.12 : 0.06),
+                                        blurRadius: revealCancel ? 12 : 8,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                dateStr,
+                                                style: const TextStyle(
+                                                  fontSize: 14,
+                                                  fontFamily: 'Nunito',
+                                                  fontWeight: FontWeight.bold,
+                                                  color: _textDark,
+                                                ),
+                                              ),
+                                              Text(
+                                                '${schedule['start_time']} - ${schedule['end_time']}',
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  fontFamily: 'Nunito',
+                                                  color: _textGrey,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: statusColor.withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              statusLabel,
+                                              style: TextStyle(
+                                                fontSize: 11,
                                                 fontFamily: 'Nunito',
                                                 fontWeight: FontWeight.bold,
-                                                color: _textDark,
+                                                color: statusColor,
                                               ),
                                             ),
-                                            Text(
-                                              '${schedule['start_time']} - ${schedule['end_time']}',
-                                              style: const TextStyle(
-                                                fontSize: 13,
-                                                fontFamily: 'Nunito',
-                                                color: _textGrey,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 10, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: _successGreen.withOpacity(0.1),
-                                            borderRadius:
-                                                BorderRadius.circular(20),
                                           ),
-                                          child: const Text(
-                                            'Booked',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontFamily: 'Nunito',
-                                              fontWeight: FontWeight.bold,
-                                              color: _successGreen,
-                                            ),
+                                        ],
+                                      ),
+                                      if (clientName != null) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Client: $clientName',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontFamily: 'Nunito',
+                                            color: _textDark,
+                                            fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ],
-                                    ),
-                                    if (clientName != null) ...[
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        'Client: $clientName',
-                                        style: const TextStyle(
-                                          fontSize: 14,
-                                          fontFamily: 'Nunito',
-                                          color: _textDark,
-                                          fontWeight: FontWeight.w600,
+                                      if (isCancelled &&
+                                          cancellationReason != null &&
+                                          cancellationReason.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          'Cancellation reason: $cancellationReason',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Nunito',
+                                            color: Colors.grey[600],
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                    // Animated Cancel Button Area
-                                    AnimatedSwitcher(
-                                      duration: const Duration(milliseconds: 200),
-                                      child: revealCancel
-                                          ? Column(
-                                              key: ValueKey(
-                                                  'cancel-$sessionId'),
-                                              children: [
-                                                const SizedBox(height: 16),
-                                                SizedBox(
-                                                  width: double.infinity,
-                                                  child: ElevatedButton(
-                                                    onPressed: canCancel
-                                                        ? () {
-                                                            _cancelButtonTimer
-                                                                ?.cancel();
-                                                            _showCancelBookingDialog(
-                                                                schedule);
-                                                          }
-                                                        : null,
-                                                    style: ElevatedButton.styleFrom(
-                                                      backgroundColor: _accentOrange,
-                                                      foregroundColor: Colors.white,
-                                                      elevation: 0,
-                                                      padding: const EdgeInsets
-                                                          .symmetric(
-                                                          vertical: 12),
-                                                      shape: RoundedRectangleBorder(
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(12)),
-                                                    ),
-                                                    child: const Text(
-                                                        'Cancel Booking'),
+                                      ],
+                                      if (isCancelled) ...[
+                                        if (slotReleased)
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 8),
+                                            child: Text(
+                                              'Slot already available for rebooking.',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ),
+                                        if (!slotReleased && revealUpcomingRelease) ...[
+                                          const SizedBox(height: 16),
+                                          if (showReleaseButton)
+                                            SizedBox(
+                                              width: double.infinity,
+                                              child: ElevatedButton(
+                                                onPressed: (slotReleased || isReleasing)
+                                                    ? null
+                                                    : () =>
+                                                        _releaseCancelledSlot(schedule),
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: _primaryBrown,
+                                                  foregroundColor: Colors.white,
+                                                  elevation: 0,
+                                                  padding: const EdgeInsets.symmetric(
+                                                      vertical: 12),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(12),
                                                   ),
                                                 ),
-                                                if (!canCancel)
-                                                  Padding(
-                                                    padding: const EdgeInsets.only(
-                                                        top: 8),
-                                                    child: Text(
-                                                      'Too late to cancel (12h rule)',
-                                                      style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey[500],
-                                                          fontStyle:
-                                                              FontStyle.italic),
-                                                    ),
-                                                  ),
-                                              ],
+                                                child: isReleasing
+                                                    ? const SizedBox(
+                                                        width: 18,
+                                                        height: 18,
+                                                        child: CircularProgressIndicator(
+                                                          strokeWidth: 2,
+                                                          valueColor:
+                                                              const AlwaysStoppedAnimation<Color>(
+                                                            Colors.white,
+                                                          ),
+                                                        ),
+                                                      )
+                                                    : const Text('Set Available'),
+                                              ),
                                             )
-                                          : const SizedBox.shrink(),
-                                    ),
-                                  ],
+                                          else if (showReleaseLockoutMessage)
+                                            Text(
+                                              'Too close to start time to reopen this slot (2h window).',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey[500],
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                        ],
+                                      ] else ...[
+                                        AnimatedSwitcher(
+                                          duration: const Duration(milliseconds: 200),
+                                          child: revealCancel
+                                              ? Column(
+                                                  key: ValueKey('cancel-$sessionId'),
+                                                  children: [
+                                                    const SizedBox(height: 16),
+                                                    SizedBox(
+                                                      width: double.infinity,
+                                                      child: ElevatedButton(
+                                                        onPressed: canCancel
+                                                            ? () {
+                                                                _cancelButtonTimer
+                                                                    ?.cancel();
+                                                                _showCancelBookingDialog(
+                                                                    schedule);
+                                                              }
+                                                            : null,
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor: _accentOrange,
+                                                          foregroundColor: Colors.white,
+                                                          elevation: 0,
+                                                          padding: const EdgeInsets
+                                                              .symmetric(vertical: 12),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(12),
+                                                          ),
+                                                        ),
+                                                        child: const Text('Cancel Booking'),
+                                                      ),
+                                                    ),
+                                                    if (!canCancel)
+                                                      Padding(
+                                                        padding:
+                                                            const EdgeInsets.only(top: 8),
+                                                        child: Text(
+                                                          'Too late to cancel (12h rule)',
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors.grey[500],
+                                                            fontStyle: FontStyle.italic,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                )
+                                              : const SizedBox.shrink(),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
+                              );
                           }).toList(),
                         ),
                   const SizedBox(height: 32),

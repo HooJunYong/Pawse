@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -6,7 +8,7 @@ import 'package:intl/intl.dart';
 import '../../services/booking_service.dart';
 import '../../widgets/bottom_nav.dart';
 import 'therapist/find_therapist_screen.dart';
-// import '../../screens/chat/chat_session_screen.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -548,6 +550,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ? '${nameParts[0][0]}${nameParts[1][0]}'
         : (nameParts.isNotEmpty ? nameParts[0][0] : 'T');
 
+    final statusChip = _buildStatusChip(session.sessionStatus);
+    final avatarImage = _buildAvatarImage(session.therapistProfilePictureUrl);
+
     return GestureDetector(
       onTap: () => _showSessionDetails(session),
       child: Container(
@@ -583,24 +588,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Row(
                     children: [
                       // Avatar
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFF7ED),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: const Color(0xFFFFCC80)),
-                        ),
-                        child: Center(
-                          child: Text(
-                            initials.toUpperCase(),
-                            style: const TextStyle(
-                              color: Color(0xFF9A3412),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
+                      CircleAvatar(
+                        radius: 25,
+                        backgroundColor: const Color(0xFFFFF7ED),
+                        backgroundImage: avatarImage,
+                        child: avatarImage == null
+                            ? Text(
+                                initials.toUpperCase(),
+                                style: const TextStyle(
+                                  color: Color(0xFF9A3412),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 16),
                       // Details
@@ -615,6 +616,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.bold,
                                 color: _textDark,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 4),
                             Row(
@@ -647,6 +650,9 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      statusChip,
+                      const SizedBox(width: 8),
                       // Arrow Icon
                       Icon(
                         Icons.arrow_forward_ios_rounded,
@@ -671,9 +677,23 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (dialogContext) {
         bool isProcessing = false;
         String? errorMessage;
+        final statusLower = session.sessionStatus.toLowerCase();
+        final DateTime start = session.scheduledAt.toLocal();
+        final Duration timeUntilStart = start.difference(DateTime.now());
+        final bool canCancel =
+            statusLower == 'scheduled' && timeUntilStart > const Duration(hours: 1);
+
+        String? cancellationMessage;
+        if (!canCancel) {
+          if (statusLower == 'scheduled') {
+            cancellationMessage =
+                'Sessions can only be cancelled more than 1 hour before the scheduled start time.';
+          } else if (statusLower != 'cancelled') {
+            cancellationMessage = 'This session can no longer be cancelled.';
+          }
+        }
 
         // 1. Format Data
-        final DateTime start = session.scheduledAt.toLocal();
         final String dayStr = DateFormat('d').format(start);
         final String monthStr = DateFormat('MMM').format(start);
         
@@ -745,13 +765,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                "Scheduled Time",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey,
-                                  fontWeight: FontWeight.w600,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    "Scheduled Time",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  _buildStatusChip(session.sessionStatus),
+                                ],
                               ),
                               const SizedBox(height: 4),
                               Text(
@@ -791,6 +817,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       "RM ${session.sessionFee.toStringAsFixed(2)}"
                     ),
 
+                    if (cancellationMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Text(
+                          cancellationMessage!,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+
                     if (errorMessage != null) ...[
                       const SizedBox(height: 16),
                       Text(
@@ -819,14 +859,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: isProcessing 
-                              ? null 
+                            onPressed: (isProcessing || !canCancel)
+                              ? null
                               : () async {
                                   setStateDialog(() => isProcessing = true);
                                   try {
                                     await _bookingService.cancelBooking(
                                       sessionId: session.sessionId,
                                       clientUserId: widget.userId,
+                                      therapistUserId: session.therapistUserId,
                                     );
                                     if (!mounted) return;
                                     Navigator.pop(context);
@@ -908,5 +949,89 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildStatusChip(String status) {
+    final label = _statusLabel(status);
+    final color = _statusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.4)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: color,
+          letterSpacing: 0.2,
+        ),
+      ),
+    );
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'cancelled':
+        return const Color(0xFFDC2626);
+      case 'no_show':
+        return const Color(0xFFF59E0B);
+      case 'completed':
+        return const Color(0xFF6B7280);
+      default:
+        return const Color(0xFF16A34A);
+    }
+  }
+
+  String _statusLabel(String status) {
+    final lower = status.toLowerCase();
+    if (lower.isEmpty) {
+      return 'Unknown';
+    }
+    return lower.split('_').map((part) {
+      if (part.isEmpty) {
+        return part;
+      }
+      return part[0].toUpperCase() + part.substring(1);
+    }).join(' ');
+  }
+
+  ImageProvider? _buildAvatarImage(String? source) {
+    if (source == null || source.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(source)) {
+      final bytes = _decodeDataUri(source);
+      if (bytes != null && bytes.isNotEmpty) {
+        return MemoryImage(bytes);
+      }
+      return null;
+    }
+    return NetworkImage(source);
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final separator = dataUri.indexOf(',');
+    if (separator == -1 || separator == dataUri.length - 1) {
+      return null;
+    }
+    final payload = dataUri.substring(separator + 1).trim();
+    try {
+      return base64Decode(payload);
+    } catch (_) {
+      return null;
+    }
   }
 }

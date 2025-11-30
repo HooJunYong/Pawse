@@ -18,6 +18,8 @@ from ..models.booking_schemas import (
     PendingRatingSession,
     SubmitSessionRatingRequest,
     SubmitSessionRatingResponse,
+    ReleaseSessionSlotRequest,
+    ReleaseSessionSlotResponse,
 )
 from ..config.timezone import now_my
 
@@ -682,6 +684,10 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     session = db.therapy_sessions.find_one({
         "session_id": request.session_id,
         "user_id": request.client_user_id,
+        "$or": [
+            {"slot_released": {"$exists": False}},
+            {"slot_released": False},
+        ],
     })
 
     if not session:
@@ -703,6 +709,7 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
                 "status": SessionStatus.cancelled.value,
                 "updated_at": now_ts,
                 "cancellation_reason": request.reason or "",
+                "slot_released": False,
             }
         }
     )
@@ -710,4 +717,43 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     return CancelBookingResponse(
         success=True,
         message="Booking cancelled successfully",
+    )
+
+
+def release_cancelled_session_slot(request: ReleaseSessionSlotRequest) -> ReleaseSessionSlotResponse:
+    """Allow a therapist to mark a cancelled session slot as available again."""
+
+    session = db.therapy_sessions.find_one({
+        "session_id": request.session_id,
+        "therapist_user_id": request.therapist_user_id,
+    })
+
+    if not session:
+        raise ValueError("Session not found")
+
+    status = _coerce_session_status(session.get("session_status") or session.get("status"))
+    if status != SessionStatus.cancelled:
+        raise ValueError("Only cancelled sessions can be released")
+
+    if session.get("slot_released") is True:
+        return ReleaseSessionSlotResponse(
+            success=True,
+            message="Slot already released",
+        )
+
+    now_ts = now_my()
+
+    db.therapy_sessions.update_one(
+        {"session_id": request.session_id, "therapist_user_id": request.therapist_user_id},
+        {
+            "$set": {
+                "slot_released": True,
+                "updated_at": now_ts,
+            }
+        }
+    )
+
+    return ReleaseSessionSlotResponse(
+        success=True,
+        message="Cancelled slot released for new bookings",
     )

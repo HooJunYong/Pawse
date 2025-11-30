@@ -105,6 +105,20 @@ class CancelBookingResponse(BaseModel):
     message: str
 
 
+class ReleaseSessionSlotRequest(BaseModel):
+    """Request to make a cancelled session's slot available again"""
+
+    session_id: str
+    therapist_user_id: str
+
+
+class ReleaseSessionSlotResponse(BaseModel):
+    """Response returned after a therapist releases a cancelled slot"""
+
+    success: bool
+    message: str
+
+
 class UpdateSessionStatusRequest(BaseModel):
     """Request to update the status of an existing therapy session"""
 

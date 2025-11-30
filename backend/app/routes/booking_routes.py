@@ -13,6 +13,8 @@ from ..models.booking_schemas import (
     PendingRatingResponse,
     SubmitSessionRatingRequest,
     SubmitSessionRatingResponse,
+    ReleaseSessionSlotRequest,
+    ReleaseSessionSlotResponse,
 )
 from ..services import booking_service
 
@@ -113,6 +115,18 @@ def update_session_status(request: UpdateSessionStatusRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update session status: {str(e)}")
+
+
+@router.post("/session/release", response_model=ReleaseSessionSlotResponse)
+def release_cancelled_session(request: ReleaseSessionSlotRequest):
+    """Mark a cancelled session slot as available again for booking."""
+
+    try:
+        return booking_service.release_cancelled_session_slot(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to release session slot: {str(e)}")
 
 
 @router.get("/client/{client_user_id}/pending-rating", response_model=PendingRatingResponse)

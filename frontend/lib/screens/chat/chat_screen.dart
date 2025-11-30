@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/chat_conversation.dart';
 import '../../models/chat_message.dart';
 import '../../services/chat_service.dart';
 
@@ -49,12 +52,27 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = true;
   bool _isSending = false;
   Timer? _pollingTimer;
+  String? _counterpartAvatarUrl;
+  Uint8List? _counterpartAvatarBytes;
 
   @override
   void initState() {
     super.initState();
     _conversationId = widget.conversationId;
+    _counterpartAvatarUrl = widget.counterpartAvatarUrl;
+    _counterpartAvatarBytes = _prepareAvatarBytes(_counterpartAvatarUrl);
     _initializeConversation();
+  }
+
+  @override
+  void didUpdateWidget(covariant ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.counterpartAvatarUrl != oldWidget.counterpartAvatarUrl) {
+      setState(() {
+        _counterpartAvatarUrl = widget.counterpartAvatarUrl;
+        _counterpartAvatarBytes = _prepareAvatarBytes(_counterpartAvatarUrl);
+      });
+    }
   }
 
   @override
@@ -69,12 +87,24 @@ class _ChatScreenState extends State<ChatScreen> {
     setState(() => _isLoading = true);
     try {
       if (_conversationId == null) {
-        final conversation = await _chatService.createConversation(
+        final ChatConversation conversation = await _chatService.createConversation(
           clientUserId: widget.clientUserId,
           therapistUserId: widget.therapistUserId,
           isTherapistRequester: widget.isTherapist,
         );
         _conversationId = conversation.conversationId;
+        final counterpartAvatar = conversation.displayAvatar(
+          isTherapist: widget.isTherapist,
+        );
+        if (mounted) {
+          setState(() {
+            _counterpartAvatarUrl = counterpartAvatar ?? _counterpartAvatarUrl;
+            _counterpartAvatarBytes = _prepareAvatarBytes(_counterpartAvatarUrl);
+          });
+        } else {
+          _counterpartAvatarUrl = counterpartAvatar ?? _counterpartAvatarUrl;
+          _counterpartAvatarBytes = _prepareAvatarBytes(_counterpartAvatarUrl);
+        }
       }
       await _loadMessages();
       _startPolling();
@@ -196,6 +226,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final avatarImage = _buildCounterpartAvatarImage();
     return Scaffold(
       backgroundColor: _bgCream,
       appBar: AppBar(
@@ -211,12 +242,8 @@ class _ChatScreenState extends State<ChatScreen> {
             CircleAvatar(
               radius: 20,
               backgroundColor: _surfaceWhite,
-              backgroundImage: widget.counterpartAvatarUrl != null &&
-                      widget.counterpartAvatarUrl!.isNotEmpty
-                  ? NetworkImage(widget.counterpartAvatarUrl!)
-                  : null,
-              child: (widget.counterpartAvatarUrl == null ||
-                      widget.counterpartAvatarUrl!.isEmpty)
+              backgroundImage: avatarImage,
+              child: avatarImage == null
                   ? const Icon(Icons.person, color: _primaryBrown)
                   : null,
             ),
@@ -450,5 +477,45 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     );
+  }
+
+  ImageProvider? _buildCounterpartAvatarImage() {
+    if (_counterpartAvatarBytes != null && _counterpartAvatarBytes!.isNotEmpty) {
+      return MemoryImage(_counterpartAvatarBytes!);
+    }
+    final url = _counterpartAvatarUrl;
+    if (url != null && url.isNotEmpty && !_isDataUri(url)) {
+      return NetworkImage(url);
+    }
+    return null;
+  }
+
+  Uint8List? _prepareAvatarBytes(String? avatar) {
+    if (!_isDataUri(avatar)) {
+      return null;
+    }
+    final decoded = _decodeDataUri(avatar!);
+    return decoded != null && decoded.isNotEmpty ? decoded : null;
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final separator = dataUri.indexOf(',');
+    if (separator == -1 || separator == dataUri.length - 1) {
+      return null;
+    }
+    final dataPart = dataUri.substring(separator + 1).trim();
+    try {
+      return base64Decode(dataPart);
+    } catch (_) {
+      return null;
+    }
   }
 }

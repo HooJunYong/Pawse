@@ -80,6 +80,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           'from': from,
           'to': to,
           'locked': false,
+          'lockReason': null,
         };
       }
     }
@@ -114,6 +115,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           'from': from,
           'to': to,
           'locked': false,
+          'lockReason': null,
         };
       }
     }
@@ -147,6 +149,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         'from': TimeOfDay(hour: startHour, minute: startMinute),
         'to': TimeOfDay(hour: endHour, minute: endMinute),
         'locked': false,
+        'lockReason': null,
       };
     }
 
@@ -154,6 +157,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
       'from': const TimeOfDay(hour: 10, minute: 0),
       'to': const TimeOfDay(hour: 12, minute: 0),
       'locked': false,
+      'lockReason': null,
     };
   }
 
@@ -188,11 +192,25 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
               final endTime = _parseTimeString(slot['end_time']);
               final bool isBooked = slot['is_booked'] == true ||
                   (slot['status']?.toString().toLowerCase() == 'booked');
+              final bool isReleased =
+                  slot['slot_released'] == true || slot['is_released'] == true;
+              final String statusLower =
+                  slot['status']?.toString().toLowerCase() ?? '';
+              final bool awaitingRelease =
+                  statusLower.contains('cancel') && !isReleased;
+              final bool isLocked = isBooked || isReleased || awaitingRelease;
 
               _timeSlots.add({
                 'from': startTime,
                 'to': endTime,
-                'locked': isBooked,
+                'locked': isLocked,
+                'lockReason': isBooked
+                    ? 'booked'
+                    : isReleased
+                        ? 'released'
+                        : awaitingRelease
+                            ? 'cancelled'
+                            : null,
               });
               // Check if it's a recurring availability (availability_date is null)
               if (slot['availability_date'] == null) {
@@ -239,6 +257,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
       final nextSlot = _buildRecommendedSlot(usedKeys, isToday, nowMinutes) ??
           _buildNextAvailableSlot(usedKeys, isToday, nowMinutes);
+      nextSlot['lockReason'] = null;
       _timeSlots.add(nextSlot);
       _sortTimeSlots();
     });
@@ -246,7 +265,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
 
   void _removeTimeSlot(int index) {
     if (_timeSlots[index]['locked'] == true) {
-      _showLockedSlotMessage();
+      _showLockedSlotMessage(_timeSlots[index]['lockReason'] as String?);
       return;
     }
     setState(() {
@@ -256,7 +275,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
 
   Future<void> _selectTime(int index, String type) async {
     if (_timeSlots[index]['locked'] == true) {
-      _showLockedSlotMessage();
+      _showLockedSlotMessage(_timeSlots[index]['lockReason'] as String?);
       return;
     }
 
@@ -495,10 +514,24 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
     });
   }
 
-  void _showLockedSlotMessage() {
+  void _showLockedSlotMessage([String? reason]) {
+    final String helperText;
+    switch (reason) {
+      case 'booked':
+        helperText = 'Booked slots are managed automatically and cannot be edited.';
+        break;
+      case 'released':
+        helperText = 'This slot was auto-released and stays locked to keep records consistent.';
+        break;
+      case 'cancelled':
+        helperText = 'Cancelled slots awaiting release cannot be edited.';
+        break;
+      default:
+        helperText = 'This slot is managed automatically and cannot be edited.';
+    }
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Booked slots cannot be edited or removed.'),
+      SnackBar(
+        content: Text(helperText),
       ),
     );
   }
@@ -1022,6 +1055,22 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                     final bool isLocked = slot['locked'] == true;
                     final TimeOfDay fromTime = slot['from'] as TimeOfDay;
                     final TimeOfDay toTime = slot['to'] as TimeOfDay;
+                    final String lockReason =
+                        (slot['lockReason'] as String?) ?? '';
+                    final String lockMessage;
+                    switch (lockReason) {
+                      case 'booked':
+                        lockMessage = 'Booked slot – edits disabled';
+                        break;
+                      case 'released':
+                        lockMessage = 'Auto-released slot – edits disabled';
+                        break;
+                      case 'cancelled':
+                        lockMessage = 'Cancelled slot – edits disabled';
+                        break;
+                      default:
+                        lockMessage = 'Managed slot – edits disabled';
+                    }
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -1046,17 +1095,20 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                         children: [
                           if (isLocked)
                             Row(
-                              children: const [
-                                Icon(Icons.lock,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.lock,
                                     size: 16, color: Color(0xFF1E3A8A)),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Booked slot – edits disabled',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontFamily: 'Nunito',
-                                    color: Color(0xFF1E3A8A),
-                                    fontWeight: FontWeight.w600,
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    lockMessage,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontFamily: 'Nunito',
+                                      color: Color(0xFF1E3A8A),
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
                                 ),
                               ],

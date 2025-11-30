@@ -48,6 +48,12 @@ class TherapistService {
       final ratingValue = (json['average_rating'] as num?)?.toDouble();
       final ratingCount = (json['rating_count'] as num?)?.toInt() ?? 0;
     
+    final imageUrl = _resolveImageCandidate(json);
+    final initials = _getInitials(
+      json['first_name']?.toString(),
+      json['last_name']?.toString(),
+    );
+
     return Therapist(
       id: json['user_id']?.toString() ?? '',
       name: '${json['first_name']?.toString() ?? ''} ${json['last_name']?.toString() ?? ''}'.trim(),
@@ -59,7 +65,8 @@ class TherapistService {
           (json['languages_spoken'] as List<dynamic>?)?.join(', ') ?? 'English',
         rating: ratingValue ?? 0.0,
         ratingCount: ratingCount,
-      imageUrl: _getInitials(json['first_name']?.toString(), json['last_name']?.toString()),
+      imageUrl: imageUrl,
+      initials: initials,
       title: json['license_number'] != null
           ? 'Licensed Therapist'
           : 'Counselor',
@@ -78,6 +85,66 @@ class TherapistService {
       initials += lastName[0].toUpperCase();
     }
     return initials.isNotEmpty ? initials : '?';
+  }
+
+  String? _resolveImageCandidate(Map<String, dynamic> json) {
+    final candidates = <String?>[
+      json['profile_picture_url']?.toString(),
+      json['profile_picture']?.toString(),
+      json['profile_picture_base64']?.toString(),
+      json['avatar_url']?.toString(),
+      json['avatar_base64']?.toString(),
+    ];
+
+    for (final candidate in candidates) {
+      final normalized = _normalizeImage(candidate);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  String? _normalizeImage(String? value) {
+    if (value == null) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+
+    final lower = trimmed.toLowerCase();
+    if (lower.startsWith('data:image/')) {
+      return trimmed;
+    }
+    if (lower.startsWith('http://') || lower.startsWith('https://')) {
+      return trimmed;
+    }
+    if (lower == 'null' || lower == 'none') {
+      return null;
+    }
+
+    final mimeType = _guessImageMime(trimmed);
+    return 'data:$mimeType;base64,$trimmed';
+  }
+
+  String _guessImageMime(String base64) {
+    final snippet = base64.length > 30 ? base64.substring(0, 30) : base64;
+    if (snippet.startsWith('/9j/')) {
+      return 'image/jpeg';
+    }
+    if (snippet.startsWith('iVBORw0KGgo')) {
+      return 'image/png';
+    }
+    if (snippet.startsWith('R0lGOD')) {
+      return 'image/gif';
+    }
+    if (snippet.startsWith('Qk')) {
+      return 'image/bmp';
+    }
+    return 'image/png';
   }
 
   Future<Therapist> getTherapistById(String therapistId) async {

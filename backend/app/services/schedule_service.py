@@ -196,7 +196,11 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
         "scheduled_at": {
             "$gte": start_of_day,
             "$lte": end_of_day
-        }
+        },
+        "$or": [
+            {"slot_released": {"$exists": False}},
+            {"slot_released": False},
+        ]
     }, {"_id": 0}).sort("scheduled_at", 1))
     
     session_windows: list[dict[str, int | str | None]] = []
@@ -233,6 +237,7 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
                 "start": start_minutes,
                 "end": start_minutes + duration,
                 "session_id": session.get("session_id"),
+                "status": (session.get("session_status") or session.get("status") or "scheduled").lower(),
             })
 
         client = db.user_profile.find_one({"user_id": session["user_id"]}, {"_id": 0})
@@ -256,6 +261,7 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
         slot_end = _time_string_to_minutes(slot.get("end_time"))
 
         is_booked = False
+        booked_status = None
         if slot_start is not None and slot_end is not None and slot_end > slot_start:
             for window in session_windows:
                 window_start = window.get("start")
@@ -263,13 +269,17 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
                 if not isinstance(window_start, int) or not isinstance(window_end, int):
                     continue
                 if not (slot_end <= window_start or slot_start >= window_end):
-                    is_booked = True
+                    booked_status = window.get("status")
+                    is_booked = booked_status in {"scheduled", "confirmed"}
                     slot["booked_session_id"] = window.get("session_id")
+                    slot["booked_session_status"] = booked_status
                     break
 
         slot["is_booked"] = is_booked
         if is_booked:
             slot["is_available"] = False
+        if booked_status and not is_booked:
+            slot["booked_session_status"] = booked_status
     
     return TherapistScheduleResponse(
         date=date,

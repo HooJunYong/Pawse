@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 
 import '../../models/therapist_model.dart';
@@ -35,6 +38,7 @@ class TherapistInfoScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarImage = _buildAvatarImage(therapist.imageUrl);
     final bool hasRating = therapist.ratingCount > 0;
     final String ratingLabel =
         hasRating ? therapist.rating.toStringAsFixed(1) : 'New';
@@ -221,16 +225,17 @@ class TherapistInfoScreen extends StatelessWidget {
                             child: CircleAvatar(
                               radius: 48,
                               backgroundColor: const Color(0xFFFFF3E0),
-                              // You might want to switch to NetworkImage if available
-                              // backgroundImage: NetworkImage(therapist.imageUrl),
-                              child: Text(
-                                therapist.imageUrl, // Fallback initials
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: _primaryBrown,
-                                ),
-                              ),
+                              backgroundImage: avatarImage,
+                              child: avatarImage == null
+                                  ? Text(
+                                      therapist.initials,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: _primaryBrown,
+                                      ),
+                                    )
+                                  : null,
                             ),
                           ),
                         ),
@@ -499,5 +504,40 @@ class TherapistInfoScreen extends StatelessWidget {
         letterSpacing: 0.5,
       ),
     );
+  }
+
+  ImageProvider? _buildAvatarImage(String? source) {
+    if (source == null || source.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(source)) {
+      final bytes = _decodeDataUri(source);
+      if (bytes != null && bytes.isNotEmpty) {
+        return MemoryImage(bytes);
+      }
+      return null;
+    }
+    return NetworkImage(source);
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final separator = dataUri.indexOf(',');
+    if (separator == -1 || separator == dataUri.length - 1) {
+      return null;
+    }
+    final payload = dataUri.substring(separator + 1).trim();
+    try {
+      return base64Decode(payload);
+    } catch (_) {
+      return null;
+    }
   }
 }

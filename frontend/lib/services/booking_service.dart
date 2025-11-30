@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import 'session_event_bus.dart';
+
 class AvailableTimeSlot {
   final String slotId;
   final String startTime;
@@ -315,13 +317,21 @@ class BookingService {
       }
 
       final now = DateTime.now();
+      final allowedStatuses = {'scheduled', 'cancelled', 'no_show'};
+
       final sessions = bookingsRaw
           .map((item) => item is Map<String, dynamic> ? TherapySession.fromJson(item) : null)
           .whereType<TherapySession>()
           .where((session) {
             final sessionStart = session.scheduledAt.toLocal();
-            final status = session.sessionStatus.toLowerCase();
-            return status.contains('scheduled') && sessionStart.isAfter(now);
+            final status = session.sessionStatus.toLowerCase().trim();
+            if (!sessionStart.isAfter(now)) {
+              return false;
+            }
+            if (status == 'completed') {
+              return false;
+            }
+            return allowedStatuses.contains(status);
           })
           .toList()
         ..sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
@@ -354,6 +364,7 @@ class BookingService {
   Future<void> cancelBooking({
     required String sessionId,
     required String clientUserId,
+    String? therapistUserId,
     String? reason,
   }) async {
     try {
@@ -368,6 +379,12 @@ class BookingService {
       );
 
       if (response.statusCode == 200) {
+        SessionEventBus.instance.emit(SessionEvent(
+          type: SessionEventType.cancelled,
+          sessionId: sessionId,
+          therapistUserId: therapistUserId,
+          clientUserId: clientUserId,
+        ));
         return;
       }
 
@@ -378,6 +395,39 @@ class BookingService {
       throw Exception(message ?? 'Failed to cancel booking: ${response.statusCode}');
     } catch (e) {
       throw Exception('Error cancelling booking: $e');
+    }
+  }
+
+  Future<void> releaseCancelledSessionSlot({
+    required String sessionId,
+    required String therapistUserId,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/booking/session/release'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'session_id': sessionId,
+          'therapist_user_id': therapistUserId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        SessionEventBus.instance.emit(SessionEvent(
+          type: SessionEventType.slotReleased,
+          sessionId: sessionId,
+          therapistUserId: therapistUserId,
+        ));
+        return;
+      }
+
+      final decoded = json.decode(response.body);
+      final message = decoded is Map<String, dynamic>
+          ? decoded['detail']?.toString() ?? decoded['message']?.toString()
+          : null;
+      throw Exception(message ?? 'Failed to release cancelled slot: ${response.statusCode}');
+    } catch (e) {
+      throw Exception('Error releasing cancelled session slot: $e');
     }
   }
 

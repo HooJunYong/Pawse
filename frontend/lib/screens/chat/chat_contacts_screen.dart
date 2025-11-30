@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -42,6 +45,7 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
   final DateFormat _dayFormat = DateFormat('MMM d');
   List<ChatConversation> _conversations = [];
   bool _isLoading = true;
+  final Map<String, Uint8List?> _avatarCache = {};
 
   @override
   void initState() {
@@ -251,10 +255,7 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
                   ),
                   child: CircleAvatar(
                     backgroundColor: const Color(0xFFFFF3E0),
-                    backgroundImage:
-                        avatarUrl != null && avatarUrl.isNotEmpty
-                            ? NetworkImage(avatarUrl)
-                            : null,
+                    backgroundImage: _buildAvatarImage(avatarUrl),
                     child: (avatarUrl == null || avatarUrl.isEmpty)
                         ? Text(
                             name.isNotEmpty ? name[0].toUpperCase() : '?',
@@ -360,5 +361,51 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         ),
       ),
     );
+  }
+
+  ImageProvider? _buildAvatarImage(String? avatar) {
+    if (avatar == null || avatar.isEmpty) {
+      return null;
+    }
+
+    if (_isDataUri(avatar)) {
+      final bytes = _getCachedDataUri(avatar);
+      if (bytes != null && bytes.isNotEmpty) {
+        return MemoryImage(bytes);
+      }
+      return null;
+    }
+
+    return NetworkImage(avatar);
+  }
+
+  Uint8List? _getCachedDataUri(String dataUri) {
+    if (_avatarCache.containsKey(dataUri)) {
+      return _avatarCache[dataUri];
+    }
+    final decoded = _decodeDataUri(dataUri);
+    _avatarCache[dataUri] = decoded;
+    return decoded;
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final splitIndex = dataUri.indexOf(',');
+    if (splitIndex == -1 || splitIndex == dataUri.length - 1) {
+      return null;
+    }
+    final dataPart = dataUri.substring(splitIndex + 1).trim();
+    try {
+      return base64Decode(dataPart);
+    } catch (_) {
+      return null;
+    }
   }
 }
