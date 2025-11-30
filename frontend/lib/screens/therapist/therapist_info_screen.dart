@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../models/therapist_model.dart';
 import '../../widgets/contact_row.dart';
 import '../../widgets/expertise_chip.dart';
+import '../chat/chat_screen.dart';
 import 'booking_session_screen.dart';
 
 // --- Theme Colors ---
@@ -444,7 +445,21 @@ class TherapistInfoScreen extends StatelessWidget {
                             SizedBox(
                               width: double.infinity,
                               child: TextButton.icon(
-                                onPressed: () {},
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => ChatScreen(
+                                        conversationId: null,
+                                        clientUserId: clientUserId,
+                                        therapistUserId: therapist.id,
+                                        currentUserId: clientUserId,
+                                        isTherapist: false,
+                                        counterpartName: therapist.displayName,
+                                        counterpartAvatarUrl: therapist.imageUrl,
+                                      ),
+                                    ),
+                                  );
+                                },
                                 icon: const Icon(Icons.chat_bubble_outline_rounded,
                                     size: 20),
                                 label: const Text("Free Consultation"),

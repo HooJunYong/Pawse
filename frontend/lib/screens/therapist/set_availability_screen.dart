@@ -20,16 +20,16 @@ class SetAvailabilityScreen extends StatefulWidget {
 }
 
 class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
-    // Sort slots chronologically so locked entries remain in place.
-    void _sortTimeSlots() {
-      _timeSlots.sort((a, b) {
-        final TimeOfDay aFrom = a['from'] as TimeOfDay;
-        final TimeOfDay bFrom = b['from'] as TimeOfDay;
-        final int aMinutes = aFrom.hour * 60 + aFrom.minute;
-        final int bMinutes = bFrom.hour * 60 + bFrom.minute;
-        return aMinutes.compareTo(bMinutes);
-      });
-    }
+  // Sort slots chronologically so locked entries remain in place.
+  void _sortTimeSlots() {
+    _timeSlots.sort((a, b) {
+      final TimeOfDay aFrom = a['from'] as TimeOfDay;
+      final TimeOfDay bFrom = b['from'] as TimeOfDay;
+      final int aMinutes = aFrom.hour * 60 + aFrom.minute;
+      final int bMinutes = bFrom.hour * 60 + bFrom.minute;
+      return aMinutes.compareTo(bMinutes);
+    });
+  }
 
   static const List<Map<String, int>> _recommendedSlotTemplates = [
     {
@@ -230,10 +230,13 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
   void _addTimeSlot() {
     setState(() {
       final usedKeys = _timeSlots
-          .map((slot) => _slotKey(slot['from'] as TimeOfDay, slot['to'] as TimeOfDay))
+          .map((slot) =>
+              _slotKey(slot['from'] as TimeOfDay, slot['to'] as TimeOfDay))
           .toSet();
-      final bool isToday = DateUtils.isSameDay(widget.selectedDate, DateTime.now());
-      final int nowMinutes = TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
+      final bool isToday =
+          DateUtils.isSameDay(widget.selectedDate, DateTime.now());
+      final int nowMinutes =
+          TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
       final nextSlot = _buildRecommendedSlot(usedKeys, isToday, nowMinutes) ??
           _buildNextAvailableSlot(usedKeys, isToday, nowMinutes);
       _timeSlots.add(nextSlot);
@@ -269,7 +272,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         return StatefulBuilder(
           builder: (context, setState) {
             return Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24)),
               backgroundColor: const Color(0xFFF7F4F2),
               child: Padding(
                 padding: const EdgeInsets.all(24),
@@ -278,7 +282,9 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                   children: [
                     const Align(
                       alignment: Alignment.centerLeft,
-                      child: Text('Select time', style: TextStyle(fontSize: 16, color: Color(0xFF422006))),
+                      child: Text('Select time',
+                          style: TextStyle(
+                              fontSize: 16, color: Color(0xFF422006))),
                     ),
                     const SizedBox(height: 16),
                     Row(
@@ -290,37 +296,46 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                             color: const Color(0xFFEDE6FF),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.keyboard_arrow_up, size: 28),
+                                icon: const Icon(Icons.keyboard_arrow_up,
+                                    size: 28),
                                 onPressed: () {
                                   setState(() {
                                     hour = hour == 1 ? 12 : hour - 1;
                                   });
                                 },
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
                               ),
-                              Text('$hour', style: const TextStyle(fontSize: 36, color: Color(0xFF422006))),
+                              Text('$hour',
+                                  style: const TextStyle(
+                                      fontSize: 36, color: Color(0xFF422006))),
                               IconButton(
-                                icon: const Icon(Icons.keyboard_arrow_down, size: 28),
+                                icon: const Icon(Icons.keyboard_arrow_down,
+                                    size: 28),
                                 onPressed: () {
                                   setState(() {
                                     hour = hour == 12 ? 1 : hour + 1;
                                   });
                                 },
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 12),
                         // Colon
-                        const Text(':', style: TextStyle(fontSize: 36, color: Color(0xFF422006))),
+                        const Text(':',
+                            style: TextStyle(
+                                fontSize: 36, color: Color(0xFF422006))),
                         const SizedBox(width: 12),
                         // Minute
                         Container(
@@ -328,30 +343,39 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                             color: const Color(0xFFF3F0F6),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.keyboard_arrow_up, size: 28),
+                                icon: const Icon(Icons.keyboard_arrow_up,
+                                    size: 28),
                                 onPressed: () {
                                   setState(() {
-                                    minute = minute == 0 ? 59 : minute - 1;
+                                    // Upper Click: -10 minutes (wrapping)
+                                    minute = (minute - 10 + 60) % 60;
                                   });
                                 },
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
                               ),
-                              Text(minute.toString().padLeft(2, '0'), style: const TextStyle(fontSize: 36, color: Color(0xFF422006))),
+                              Text(minute.toString().padLeft(2, '0'),
+                                  style: const TextStyle(
+                                      fontSize: 36, color: Color(0xFF422006))),
                               IconButton(
-                                icon: const Icon(Icons.keyboard_arrow_down, size: 28),
+                                icon: const Icon(Icons.keyboard_arrow_down,
+                                    size: 28),
                                 onPressed: () {
                                   setState(() {
-                                    minute = minute == 59 ? 0 : minute + 1;
+                                    // Down Click: +10 minutes (wrapping)
+                                    minute = (minute + 10) % 60;
                                   });
                                 },
                                 padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                                constraints: const BoxConstraints(
+                                    minWidth: 32, minHeight: 32),
                               ),
                             ],
                           ),
@@ -361,31 +385,54 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                         Column(
                           children: [
                             GestureDetector(
-                              onTap: () => setState(() { isPM = false; }),
+                              onTap: () => setState(() {
+                                isPM = false;
+                              }),
                               child: Container(
                                 width: 48,
                                 height: 36,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: !isPM ? const Color(0xFFF7F4F2) : Colors.transparent,
-                                  border: Border.all(color: const Color(0xFFBDBDBD)),
-                                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(6), topRight: Radius.circular(6)),
+                                  color: !isPM
+                                      ? const Color(0xFFF7F4F2)
+                                      : Colors.transparent,
+                                  border: Border.all(
+                                      color: const Color(0xFFBDBDBD)),
+                                  borderRadius: const BorderRadius.only(
+                                      topLeft: Radius.circular(6),
+                                      topRight: Radius.circular(6)),
                                 ),
-                                child: Text('AM', style: TextStyle(color: !isPM ? Colors.black : Colors.black54, fontWeight: FontWeight.w600)),
+                                child: Text('AM',
+                                    style: TextStyle(
+                                        color: !isPM
+                                            ? Colors.black
+                                            : Colors.black54,
+                                        fontWeight: FontWeight.w600)),
                               ),
                             ),
                             GestureDetector(
-                              onTap: () => setState(() { isPM = true; }),
+                              onTap: () => setState(() {
+                                isPM = true;
+                              }),
                               child: Container(
                                 width: 48,
                                 height: 36,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
-                                  color: isPM ? const Color(0xFFFFE4EA) : Colors.transparent,
-                                  border: Border.all(color: const Color(0xFFBDBDBD)),
-                                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(6), bottomRight: Radius.circular(6)),
+                                  color: isPM
+                                      ? const Color(0xFFFFE4EA)
+                                      : Colors.transparent,
+                                  border: Border.all(
+                                      color: const Color(0xFFBDBDBD)),
+                                  borderRadius: const BorderRadius.only(
+                                      bottomLeft: Radius.circular(6),
+                                      bottomRight: Radius.circular(6)),
                                 ),
-                                child: Text('PM', style: TextStyle(color: isPM ? Colors.black : Colors.black54, fontWeight: FontWeight.w600)),
+                                child: Text('PM',
+                                    style: TextStyle(
+                                        color:
+                                            isPM ? Colors.black : Colors.black54,
+                                        fontWeight: FontWeight.w600)),
                               ),
                             ),
                           ],
@@ -405,13 +452,15 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF97316),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
                           ),
                           onPressed: () {
                             int saveHour = hour % 12;
                             if (isPM) saveHour += 12;
                             if (!isPM && saveHour == 12) saveHour = 0;
-                            Navigator.pop(context, TimeOfDay(hour: saveHour, minute: minute));
+                            Navigator.pop(context,
+                                TimeOfDay(hour: saveHour, minute: minute));
                           },
                           child: const Text('OK'),
                         ),
@@ -437,7 +486,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
               endHour = 23;
               endMinute = 59;
             }
-            _timeSlots[index]['to'] = TimeOfDay(hour: endHour, minute: endMinute);
+            _timeSlots[index]['to'] =
+                TimeOfDay(hour: endHour, minute: endMinute);
           }
           _sortTimeSlots();
         });
@@ -474,113 +524,19 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
   }
 
   Future<void> _saveAvailability() async {
-            // Prevent setting slots in the past if selected date is today
-            if (DateUtils.isSameDay(widget.selectedDate, DateTime.now())) {
-              final now = TimeOfDay.now();
-              for (int i = 0; i < _timeSlots.length; i++) {
-                final TimeOfDay from = _timeSlots[i]['from'] as TimeOfDay;
-                // If the slot starts before now, show error
-                if (from.hour < now.hour || (from.hour == now.hour && from.minute < now.minute)) {
-                  await showDialog(
-                    context: context,
-                    builder: (context) => Dialog(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      backgroundColor: const Color(0xFFF7F4F2),
-                      child: SizedBox(
-                        width: 350,
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Invalid Time Slot',
-                                style: TextStyle(
-                                  fontFamily: 'Nunito',
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Color(0xFF422006),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'You cannot set a time slot that starts before the current time.',
-                                style: const TextStyle(
-                                  fontFamily: 'Nunito',
-                                  fontSize: 15,
-                                  color: Color(0xFF422006),
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  style: TextButton.styleFrom(
-                                    backgroundColor: const Color(0xFFF97316),
-                                    foregroundColor: Colors.white,
-                                    textStyle: const TextStyle(
-                                      fontFamily: 'Nunito',
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                                  ),
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('OK'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                  return;
-                }
-              }
-            }
-        // Validate for overlapping/duplicate slots before saving
-        bool hasOverlap = false;
-        String? overlapMsg;
-        int toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
-        for (int i = 0; i < _timeSlots.length; i++) {
-          final slotA = _timeSlots[i];
-          final TimeOfDay fromTimeA = slotA['from'] as TimeOfDay;
-          final TimeOfDay toTimeA = slotA['to'] as TimeOfDay;
-          final fromA = toMinutes(fromTimeA);
-          final toA = toMinutes(toTimeA);
-          // Enforce max 2 hour duration
-          if (toA - fromA > 120) {
-            hasOverlap = true;
-            overlapMsg = 'Each slot can be a maximum of 2 hours.';
-            break;
-          }
-          if (fromA >= toA) {
-            hasOverlap = true;
-            overlapMsg = 'The start time must be before the end time in all slots.';
-            break;
-          }
-          for (int j = 0; j < _timeSlots.length; j++) {
-            if (i == j) continue;
-            final slotB = _timeSlots[j];
-            final TimeOfDay fromTimeB = slotB['from'] as TimeOfDay;
-            final TimeOfDay toTimeB = slotB['to'] as TimeOfDay;
-            final fromB = toMinutes(fromTimeB);
-            final toB = toMinutes(toTimeB);
-            if (!(toA <= fromB || fromA >= toB)) {
-              hasOverlap = true;
-              overlapMsg = 'Duplicate/Overlapping Slot: ${_formatTimeOfDay(fromTimeA)} - ${_formatTimeOfDay(toTimeA)} overlaps with ${_formatTimeOfDay(fromTimeB)} - ${_formatTimeOfDay(toTimeB)}.';
-              break;
-            }
-          }
-          if (hasOverlap) break;
-        }
-        if (hasOverlap) {
+    // Prevent setting slots in the past if selected date is today
+    if (DateUtils.isSameDay(widget.selectedDate, DateTime.now())) {
+      final now = TimeOfDay.now();
+      for (int i = 0; i < _timeSlots.length; i++) {
+        final TimeOfDay from = _timeSlots[i]['from'] as TimeOfDay;
+        // If the slot starts before now, show error
+        if (from.hour < now.hour ||
+            (from.hour == now.hour && from.minute < now.minute)) {
           await showDialog(
             context: context,
             builder: (context) => Dialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
               backgroundColor: const Color(0xFFF7F4F2),
               child: SizedBox(
                 width: 350,
@@ -591,7 +547,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'Invalid Slot',
+                        'Invalid Time Slot',
                         style: TextStyle(
                           fontFamily: 'Nunito',
                           fontWeight: FontWeight.bold,
@@ -601,7 +557,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        overlapMsg ?? 'This time slot overlaps with another slot. Please choose a different time.',
+                        'You cannot set a time slot that starts before the current time.',
                         style: const TextStyle(
                           fontFamily: 'Nunito',
                           fontSize: 15,
@@ -619,8 +575,10 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                               fontFamily: 'Nunito',
                               fontWeight: FontWeight.bold,
                             ),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 10),
                           ),
                           onPressed: () => Navigator.pop(context),
                           child: const Text('OK'),
@@ -634,6 +592,108 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           );
           return;
         }
+      }
+    }
+    // Validate for overlapping/duplicate slots before saving
+    bool hasOverlap = false;
+    String? overlapMsg;
+    int toMinutes(TimeOfDay t) => t.hour * 60 + t.minute;
+    for (int i = 0; i < _timeSlots.length; i++) {
+      final slotA = _timeSlots[i];
+      final TimeOfDay fromTimeA = slotA['from'] as TimeOfDay;
+      final TimeOfDay toTimeA = slotA['to'] as TimeOfDay;
+      final fromA = toMinutes(fromTimeA);
+      final toA = toMinutes(toTimeA);
+      // Enforce max 2 hour duration
+      if (toA - fromA > 120) {
+        hasOverlap = true;
+        overlapMsg = 'Each slot can be a maximum of 2 hours.';
+        break;
+      }
+      if (fromA >= toA) {
+        hasOverlap = true;
+        overlapMsg =
+            'The start time must be before the end time in all slots.';
+        break;
+      }
+      for (int j = 0; j < _timeSlots.length; j++) {
+        if (i == j) continue;
+        final slotB = _timeSlots[j];
+        final TimeOfDay fromTimeB = slotB['from'] as TimeOfDay;
+        final TimeOfDay toTimeB = slotB['to'] as TimeOfDay;
+        final fromB = toMinutes(fromTimeB);
+        final toB = toMinutes(toTimeB);
+        if (!(toA <= fromB || fromA >= toB)) {
+          hasOverlap = true;
+          overlapMsg =
+              'Duplicate/Overlapping Slot: ${_formatTimeOfDay(fromTimeA)} - ${_formatTimeOfDay(toTimeA)} overlaps with ${_formatTimeOfDay(fromTimeB)} - ${_formatTimeOfDay(toTimeB)}.';
+          break;
+        }
+      }
+      if (hasOverlap) break;
+    }
+    if (hasOverlap) {
+      await showDialog(
+        context: context,
+        builder: (context) => Dialog(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20)),
+          backgroundColor: const Color(0xFFF7F4F2),
+          child: SizedBox(
+            width: 350,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Invalid Slot',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      color: Color(0xFF422006),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    overlapMsg ??
+                        'This time slot overlaps with another slot. Please choose a different time.',
+                    style: const TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 15,
+                      color: Color(0xFF422006),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: const Color(0xFFF97316),
+                        foregroundColor: Colors.white,
+                        textStyle: const TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                        ),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 10),
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('OK'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return;
+    }
     // Show loading dialog
     showDialog(
       context: context,
@@ -666,8 +726,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         Navigator.pop(context); // Close loading dialog
 
         final message = _timeSlots.isNotEmpty
-          ? 'Availability saved successfully'
-          : 'No Availability set for this date';
+            ? 'Availability saved successfully'
+            : 'No Availability set for this date';
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -687,7 +747,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         String? errorMsg;
         try {
           final errStr = e.toString();
-          final match = RegExp(r'\{"detail":\s*"([^"]+)"\}').firstMatch(errStr);
+          final match =
+              RegExp(r'\{"detail":\s*"([^"]+)"\}').firstMatch(errStr);
           if (match != null) {
             errorMsg = match.group(1);
           }
@@ -695,7 +756,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         await showDialog(
           context: context,
           builder: (context) => Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
             backgroundColor: const Color(0xFFF7F4F2),
             child: SizedBox(
               width: 330,
@@ -734,8 +796,10 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                             fontFamily: 'Nunito',
                             fontWeight: FontWeight.bold,
                           ),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 10),
                         ),
                         onPressed: () => Navigator.pop(context),
                         child: const Text('OK'),
@@ -970,7 +1034,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                             : null,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(isLocked ? 0.02 : 0.06),
+                            color:
+                                Colors.black.withOpacity(isLocked ? 0.02 : 0.06),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -982,7 +1047,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                           if (isLocked)
                             Row(
                               children: const [
-                                Icon(Icons.lock, size: 16, color: Color(0xFF1E3A8A)),
+                                Icon(Icons.lock,
+                                    size: 16, color: Color(0xFF1E3A8A)),
                                 SizedBox(width: 6),
                                 Text(
                                   'Booked slot – edits disabled',
@@ -1022,9 +1088,12 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                           vertical: 12,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: isLocked ? const Color(0xFFE5E7EB) : null,
+                                          color: isLocked
+                                              ? const Color(0xFFE5E7EB)
+                                              : null,
                                           border: Border.all(
-                                            color: const Color.fromRGBO(229, 231, 235, 1),
+                                            color: const Color.fromRGBO(
+                                                229, 231, 235, 1),
                                           ),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
@@ -1040,7 +1109,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                                 fontWeight: FontWeight.w600,
                                                 color: isLocked
                                                     ? const Color(0xFF4B5563)
-                                                    : const Color.fromRGBO(66, 32, 6, 1),
+                                                    : const Color.fromRGBO(
+                                                        66, 32, 6, 1),
                                               ),
                                             ),
                                             Icon(
@@ -1048,7 +1118,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                               size: 18,
                                               color: isLocked
                                                   ? const Color(0xFF9CA3AF)
-                                                  : const Color.fromRGBO(107, 114, 128, 1),
+                                                  : const Color.fromRGBO(
+                                                      107, 114, 128, 1),
                                             ),
                                           ],
                                         ),
@@ -1073,17 +1144,21 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                     ),
                                     const SizedBox(height: 8),
                                     GestureDetector(
-                                      onTap:
-                                          isLocked ? null : () => _selectTime(index, 'to'),
+                                      onTap: isLocked
+                                          ? null
+                                          : () => _selectTime(index, 'to'),
                                       child: Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 12,
                                           vertical: 12,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: isLocked ? const Color(0xFFE5E7EB) : null,
+                                          color: isLocked
+                                              ? const Color(0xFFE5E7EB)
+                                              : null,
                                           border: Border.all(
-                                            color: const Color.fromRGBO(229, 231, 235, 1),
+                                            color: const Color.fromRGBO(
+                                                229, 231, 235, 1),
                                           ),
                                           borderRadius: BorderRadius.circular(8),
                                         ),
@@ -1099,7 +1174,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                                 fontWeight: FontWeight.w600,
                                                 color: isLocked
                                                     ? const Color(0xFF4B5563)
-                                                    : const Color.fromRGBO(66, 32, 6, 1),
+                                                    : const Color.fromRGBO(
+                                                        66, 32, 6, 1),
                                               ),
                                             ),
                                             Icon(
@@ -1107,7 +1183,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                                               size: 18,
                                               color: isLocked
                                                   ? const Color(0xFF9CA3AF)
-                                                  : const Color.fromRGBO(107, 114, 128, 1),
+                                                  : const Color.fromRGBO(
+                                                      107, 114, 128, 1),
                                             ),
                                           ],
                                         ),
@@ -1119,7 +1196,9 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                               IconButton(
                                 icon: Icon(
                                   Icons.delete_outline,
-                                  color: isLocked ? const Color(0xFF9CA3AF) : Colors.red,
+                                  color: isLocked
+                                      ? const Color(0xFF9CA3AF)
+                                      : Colors.red,
                                 ),
                                 onPressed: () {
                                   if (isLocked) {

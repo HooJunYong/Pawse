@@ -6,6 +6,7 @@ import '../../services/booking_service.dart';
 import '../../services/therapist_service.dart';
 import '../../widgets/crisis_banner.dart';
 import '../../widgets/therapist_card.dart';
+import '../chat/chat_contacts_screen.dart';
 
 class FindTherapistScreen extends StatefulWidget {
   final String userId;
@@ -283,7 +284,14 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
           IconButton(
             icon: const Icon(Icons.chat_bubble_outline),
             onPressed: () {
-              // Navigate to chat list screen
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatContactsScreen(
+                    currentUserId: widget.userId,
+                    isTherapist: false,
+                  ),
+                ),
+              );
             },
           ),
         ],

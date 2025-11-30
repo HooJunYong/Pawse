@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
+import '../chat/chat_contacts_screen.dart';
 import 'manage_schedule_screen.dart';
 import 'therapist_profile_screen.dart';
 
@@ -252,17 +253,22 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   bool _isLoading = true;
   String? _activeCancelSessionId;
   Timer? _cancelButtonTimer;
+  Timer? _upcomingRefreshTimer;
   String? _statusUpdatingSessionId;
+  bool _isUpcomingLoading = false;
 
   @override
   void initState() {
     super.initState();
     _loadDashboardData();
+    _upcomingRefreshTimer =
+        Timer.periodic(const Duration(seconds: 30), (_) => _loadUpcomingSchedule());
   }
 
   @override
   void dispose() {
     _cancelButtonTimer?.cancel();
+    _upcomingRefreshTimer?.cancel();
     super.dispose();
   }
 
@@ -332,61 +338,68 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   }
 
   Future<void> _loadUpcomingSchedule() async {
+    if (_isUpcomingLoading) return;
+    _isUpcomingLoading = true;
     final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
     final List<Map<String, dynamic>> scheduleData = [];
     final now = DateTime.now();
 
-    for (int i = 1; i <= 5; i++) {
-      final date = now.add(Duration(days: i));
-      final dateStr =
-          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      try {
-        final response = await http.get(Uri.parse(
-            '$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'));
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          final sessions =
-              List<Map<String, dynamic>>.from(data['sessions'] ?? []);
-          final availabilitySlots =
-              List<Map<String, dynamic>>.from(data['availability_slots'] ?? []);
+    try {
+      for (int i = 1; i <= 5; i++) {
+        final date = now.add(Duration(days: i));
+        final dateStr =
+            '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        try {
+          final response = await http.get(Uri.parse(
+              '$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'));
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final sessions =
+                List<Map<String, dynamic>>.from(data['sessions'] ?? []);
+            final availabilitySlots =
+                List<Map<String, dynamic>>.from(data['availability_slots'] ?? []);
 
-          for (final slot in availabilitySlots) {
-            String? sessionId;
-            String? clientName;
-            dynamic clientUserId;
+            for (final slot in availabilitySlots) {
+              String? sessionId;
+              String? clientName;
+              dynamic clientUserId;
 
-            for (final session in sessions) {
-              final sessionTime = DateTime.parse(session['scheduled_at']);
-              final slotStart =
-                  _parseTimeWithDate(dateStr, slot['start_time']);
-              if (sessionTime.isAtSameMomentAs(slotStart)) {
-                sessionId = session['session_id']?.toString();
-                clientName = session['client_name'];
-                clientUserId = session['user_id'];
-                break;
+              for (final session in sessions) {
+                final sessionTime = DateTime.parse(session['scheduled_at']);
+                final slotStart =
+                    _parseTimeWithDate(dateStr, slot['start_time']);
+                if (sessionTime.isAtSameMomentAs(slotStart)) {
+                  sessionId = session['session_id']?.toString();
+                  clientName = session['client_name'];
+                  clientUserId = session['user_id'];
+                  break;
+                }
+              }
+              if (sessionId != null) {
+                scheduleData.add({
+                  'date': dateStr,
+                  'start_time': slot['start_time'],
+                  'end_time': slot['end_time'],
+                  'availability_id': slot['availability_id'],
+                  'is_booked': true,
+                  'client_name': clientName,
+                  'session_id': sessionId,
+                  'client_user_id': clientUserId,
+                });
               }
             }
-            if (sessionId != null) {
-              scheduleData.add({
-                'date': dateStr,
-                'start_time': slot['start_time'],
-                'end_time': slot['end_time'],
-                'availability_id': slot['availability_id'],
-                'is_booked': true,
-                'client_name': clientName,
-                'session_id': sessionId,
-                'client_user_id': clientUserId,
-              });
-            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      }
+      if (mounted) {
+        setState(() {
+          _upcomingSchedule = scheduleData;
+          _activeCancelSessionId = null;
+        });
+      }
+    } finally {
+      _isUpcomingLoading = false;
     }
-    if (!mounted) return;
-    setState(() {
-      _upcomingSchedule = scheduleData;
-      _activeCancelSessionId = null;
-    });
   }
 
   String _formatStatusLabel(String status) {
@@ -488,6 +501,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Session marked as $newStatus')));
         _loadTodaysAppointments();
+        _loadUpcomingSchedule();
       }
     } catch (e) {
       // Handle error
@@ -1104,7 +1118,15 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                       icon: const Icon(Icons.chat_bubble_outline),
                       color: const Color.fromRGBO(107, 114, 128, 1),
                       onPressed: () {
-                        // Navigate to chat
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ChatContactsScreen(
+                              currentUserId: widget.userId,
+                              isTherapist: true,
+                            ),
+                          ),
+                        );
                       },
                     ),
                     // Calendar Button
