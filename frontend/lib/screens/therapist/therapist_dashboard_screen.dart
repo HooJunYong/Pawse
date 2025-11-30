@@ -403,21 +403,451 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   }
 
   String _formatStatusLabel(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed': return 'Completed';
-      case 'no_show': return 'No-Show';
-      case 'cancelled': return 'Cancelled';
-      default: return 'Scheduled';
+    final lower = status.toLowerCase();
+    switch (lower) {
+      case 'completed':
+        return 'Completed';
+      case 'no_show':
+        return 'No-Show';
+      case 'cancelled':
+      case 'cancelled_by_client':
+      case 'cancelled_by_therapist':
+        return 'Cancelled';
+      default:
+        if (lower.contains('cancel')) {
+          return 'Cancelled';
+        }
+        return 'Scheduled';
     }
   }
 
   Color _statusColor(String status) {
-    switch (status.toLowerCase()) {
-      case 'completed': return _successGreen;
-      case 'no_show': return _errorRed;
-      case 'cancelled': return _errorRed;
-      default: return Colors.blueAccent;
+    final lower = status.toLowerCase();
+    switch (lower) {
+      case 'completed':
+        return _successGreen;
+      case 'no_show':
+        return _errorRed;
+      case 'cancelled':
+      case 'cancelled_by_client':
+      case 'cancelled_by_therapist':
+        return _errorRed;
+      default:
+        if (lower.contains('cancel')) {
+          return _errorRed;
+        }
+        return Colors.blueAccent;
     }
+  }
+
+  IconData _historyStatusIcon(String status) {
+    final lower = status.toLowerCase();
+    if (lower == 'completed') {
+      return Icons.check_circle_outline;
+    }
+    if (lower == 'no_show') {
+      return Icons.event_busy;
+    }
+    if (lower.contains('cancel')) {
+      return Icons.cancel_outlined;
+    }
+    return Icons.history_toggle_off;
+  }
+
+  bool _isHistoryStatus(String status) {
+    final lower = status.toLowerCase();
+    return lower == 'completed' || lower == 'no_show' || lower.contains('cancel');
+  }
+
+  DateTime? _tryParseDateTime(dynamic value) {
+    if (value is DateTime) {
+      return value;
+    }
+    if (value is String && value.isNotEmpty) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchSessionHistory({
+    int lookbackDays = 30,
+    int maxEntries = 20,
+  }) async {
+    final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+    final now = DateTime.now();
+    final seenSessionIds = <String>{};
+    final history = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < lookbackDays && history.length < maxEntries; i++) {
+      final date = now.subtract(Duration(days: i + 1));
+      final dateStr =
+          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+
+      try {
+        final response = await http.get(Uri.parse(
+            '$apiUrl/therapist/schedule/${widget.userId}?date=$dateStr'));
+        if (response.statusCode != 200) {
+          continue;
+        }
+
+        final data = jsonDecode(response.body);
+        final sessions =
+            List<Map<String, dynamic>>.from(data['sessions'] ?? []);
+
+        for (final session in sessions) {
+          final statusRaw =
+              (session['session_status'] ?? session['status'] ?? '').toString();
+          if (!_isHistoryStatus(statusRaw)) {
+            continue;
+          }
+
+          final sessionId = session['session_id']?.toString() ?? '';
+          if (sessionId.isEmpty || seenSessionIds.contains(sessionId)) {
+            continue;
+          }
+
+          final scheduledAt = _tryParseDateTime(session['scheduled_at']);
+          final dynamic durationRaw = session['duration_minutes'];
+          final int? durationMinutes = durationRaw is int
+              ? durationRaw
+              : int.tryParse(durationRaw?.toString() ?? '');
+          DateTime? endAt = _tryParseDateTime(session['end_at']);
+          if (endAt == null && scheduledAt != null && durationMinutes != null) {
+            endAt = scheduledAt.add(Duration(minutes: durationMinutes));
+          }
+
+          final String? notes = session['notes']?.toString();
+          final String? sessionNotes = session['session_notes']?.toString();
+          final String? therapistNotes = session['therapist_notes']?.toString();
+          final String? cancellationReason =
+              session['cancellation_reason']?.toString() ??
+                  session['cancel_reason']?.toString();
+
+          history.add({
+            'session_id': sessionId,
+            'status': statusRaw.toLowerCase(),
+            'client_name': session['client_name'] ?? 'Client',
+            'scheduled_at': scheduledAt,
+            'end_at': endAt,
+            'duration_minutes': durationMinutes,
+            'notes': notes,
+            'session_notes': sessionNotes,
+            'therapist_notes': therapistNotes,
+            'cancellation_reason': cancellationReason,
+          });
+          seenSessionIds.add(sessionId);
+
+          if (history.length >= maxEntries) {
+            break;
+          }
+        }
+      } catch (_) {
+        // Ignore day-level fetch errors to keep history resilient.
+      }
+    }
+
+    history.sort((a, b) {
+      final aDate = _tryParseDateTime(a['scheduled_at']) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = _tryParseDateTime(b['scheduled_at']) ??
+          DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
+
+    return history;
+  }
+
+  Future<void> _showHistorySheet() async {
+    if (!mounted) return;
+    final future = _fetchSessionHistory();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final maxHeight = MediaQuery.of(sheetContext).size.height * 0.75;
+        return Container(
+          height: maxHeight,
+          decoration: const BoxDecoration(
+            color: _surfaceWhite,
+            borderRadius: BorderRadius.only(
+              topLeft: Radius.circular(28),
+              topRight: Radius.circular(28),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: _textGrey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Session History',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontFamily: 'Nunito',
+                      fontWeight: FontWeight.bold,
+                      color: _textDark,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Expanded(
+                    child: FutureBuilder<List<Map<String, dynamic>>>(
+                      future: future,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(color: _primaryBrown),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return Center(
+                            child: Text(
+                              'Unable to load history right now.',
+                              style: const TextStyle(
+                                fontFamily: 'Nunito',
+                                color: _textGrey,
+                              ),
+                            ),
+                          );
+                        }
+
+                        final records = snapshot.data ?? [];
+                        if (records.isEmpty) {
+                          return Center(
+                            child: Text(
+                              'No past sessions yet.',
+                              style: const TextStyle(
+                                fontFamily: 'Nunito',
+                                color: _textGrey,
+                              ),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          itemCount: records.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final record = records[index];
+                            final status = (record['status'] ?? '').toString();
+                            final statusLabel = _formatStatusLabel(status);
+                            final statusColor = _statusColor(status);
+                            final scheduledAt = _tryParseDateTime(record['scheduled_at']);
+
+                            return ListTile(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              tileColor: _surfaceWhite,
+                              onTap: () => _showHistoryDetailDialog(record),
+                              leading: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: statusColor.withOpacity(0.12),
+                                child: Icon(
+                                  _historyStatusIcon(status),
+                                  color: statusColor,
+                                ),
+                              ),
+                              title: Text(
+                                record['client_name']?.toString() ?? 'Client',
+                                style: const TextStyle(
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.w700,
+                                  color: _textDark,
+                                ),
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (scheduledAt != null)
+                                    Text(
+                                      DateFormat('MMM d, yyyy · h:mm a')
+                                          .format(scheduledAt.toLocal()),
+                                      style: const TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 13,
+                                        color: _textGrey,
+                                      ),
+                                    ),
+                                  Text(
+                                    statusLabel,
+                                    style: TextStyle(
+                                      fontFamily: 'Nunito',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: statusColor,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: _textGrey,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showHistoryDetailDialog(Map<String, dynamic> record) {
+    if (!mounted) return;
+    final status = (record['status'] ?? '').toString();
+    final statusLabel = _formatStatusLabel(status);
+    final statusColor = _statusColor(status);
+    final scheduledAt = _tryParseDateTime(record['scheduled_at']);
+    final endAt = _tryParseDateTime(record['end_at']);
+    final dynamic durationRaw = record['duration_minutes'];
+    final int? duration = durationRaw is int
+        ? durationRaw
+        : int.tryParse(durationRaw?.toString() ?? '');
+    final String? reason = record['cancellation_reason']?.toString();
+    final String? notes = record['notes']?.toString();
+    final String? sessionNotes = record['session_notes']?.toString();
+    final String? therapistNotes = record['therapist_notes']?.toString();
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: _bgCream,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Session Details',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.bold,
+                    color: _textDark,
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _historyDetailRow(
+                  'Client',
+                  record['client_name']?.toString() ?? 'Client',
+                ),
+                if (scheduledAt != null)
+                  _historyDetailRow(
+                    'Scheduled At',
+                    DateFormat('MMM d, yyyy · h:mm a')
+                        .format(scheduledAt.toLocal()),
+                  ),
+                if (endAt != null)
+                  _historyDetailRow(
+                    'Ended At',
+                    DateFormat('MMM d, yyyy · h:mm a').format(endAt.toLocal()),
+                  ),
+                if (duration != null)
+                  _historyDetailRow('Duration', '$duration minutes'),
+                if (reason != null && reason.trim().isNotEmpty)
+                  _historyDetailRow('Reason', reason),
+                if (notes != null && notes.trim().isNotEmpty)
+                  _historyDetailRow('Notes', notes),
+                if (sessionNotes != null && sessionNotes.trim().isNotEmpty)
+                  _historyDetailRow('Session Notes', sessionNotes),
+                if (therapistNotes != null &&
+                    therapistNotes.trim().isNotEmpty)
+                  _historyDetailRow('Therapist Notes', therapistNotes),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.w600,
+                  color: _primaryBrown,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _historyDetailRow(String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 13,
+              color: _textGrey,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 15,
+              height: 1.4,
+              color: valueColor ?? _textDark,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showCancelBookingDialog(Map<String, dynamic> schedule) async {
@@ -566,9 +996,10 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                           boxShadow: _softShadow,
                         ),
                         child: IconButton(
-                          icon: const Icon(Icons.settings_outlined,
+                          tooltip: 'Session history',
+                          icon: const Icon(Icons.history,
                               color: _primaryBrown, size: 22),
-                          onPressed: () {},
+                          onPressed: _showHistorySheet,
                         ),
                       ),
                     ],
