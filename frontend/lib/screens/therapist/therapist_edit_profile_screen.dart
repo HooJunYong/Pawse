@@ -289,20 +289,42 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
         ),
       );
     } else if (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty) {
-      avatarWidget = Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: const Color(0xFFF97316),
-            width: 3,
+      if (_isDataUri(_profilePictureUrl!)) {
+        final decoded = _decodeDataUri(_profilePictureUrl!);
+        if (decoded != null) {
+          avatarWidget = Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFF97316),
+                width: 3,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 48,
+              backgroundColor: const Color(0xFFFED7AA),
+              backgroundImage: MemoryImage(decoded),
+            ),
+          );
+        } else {
+          avatarWidget = _initialsCircle();
+        }
+      } else {
+        avatarWidget = Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFF97316),
+              width: 3,
+            ),
           ),
-        ),
-        child: CircleAvatar(
-          radius: 48,
-          backgroundColor: const Color(0xFFFED7AA),
-          backgroundImage: NetworkImage(_profilePictureUrl!),
-        ),
-      );
+          child: CircleAvatar(
+            radius: 48,
+            backgroundColor: const Color(0xFFFED7AA),
+            backgroundImage: NetworkImage(_profilePictureUrl!),
+          ),
+        );
+      }
     } else {
       avatarWidget = _initialsCircle();
     }
@@ -372,6 +394,23 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
         ),
       ),
     );
+  }
+
+  bool _isDataUri(String value) {
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String value) {
+    final parts = value.split(',');
+    if (parts.length < 2) {
+      return null;
+    }
+    try {
+      return base64Decode(parts.last);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _buildStateDropdown() {

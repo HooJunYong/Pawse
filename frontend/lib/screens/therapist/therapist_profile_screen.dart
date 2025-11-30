@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -126,13 +127,33 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                   final int ratingCount = (data['rating_count'] as num?)?.toInt() ?? 0;
                   final bool hasRating = ratingCount > 0;
                   String? displayUrl = profilePictureUrl;
-                  if (displayUrl != null && displayUrl.isNotEmpty && _profileImageVersion != 0) {
+                  if (displayUrl != null && _isRemoteUrl(displayUrl) && _profileImageVersion != 0) {
                     final separator = displayUrl.contains('?') ? '&' : '?';
                     displayUrl = '$displayUrl${separator}v=$_profileImageVersion';
                   }
-                  
+
                   Widget avatarWidget;
-                  if (displayUrl != null && displayUrl.isNotEmpty) {
+                  if (_isDataUri(displayUrl)) {
+                    final bytes = _decodeDataUri(displayUrl!);
+                    if (bytes != null) {
+                      avatarWidget = Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _accent,
+                            width: 3,
+                          ),
+                        ),
+                        child: CircleAvatar(
+                          radius: 48,
+                          backgroundColor: const Color(0xFFFED7AA),
+                          backgroundImage: MemoryImage(bytes),
+                        ),
+                      );
+                    } else {
+                      avatarWidget = _initialsCircle(initials);
+                    }
+                  } else if (displayUrl != null && displayUrl.isNotEmpty) {
                     avatarWidget = Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -411,5 +432,29 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
         onTap: onTap,
       ),
     );
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) return false;
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  bool _isRemoteUrl(String? value) {
+    if (value == null) return false;
+    final lower = value.toLowerCase();
+    return lower.startsWith('http://') || lower.startsWith('https://');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final parts = dataUri.split(',');
+    if (parts.length < 2) {
+      return null;
+    }
+    try {
+      return base64Decode(parts.last);
+    } catch (_) {
+      return null;
+    }
   }
 }
