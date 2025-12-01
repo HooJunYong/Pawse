@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-// import 'meditation_player_screen.dart'; // Uncomment when you have the player
+import 'breathing_player_screen.dart';
 
 // --- Theme Constants ---
 const Color _bgCream = Color(0xFFF7F4F2);
@@ -12,6 +12,55 @@ const Color _surfaceWhite = Colors.white;
 const Color _orangeAccent = Color(0xFFFB923C);
 const Color _blueAccent = Color(0xFF60A5FA);
 const Color _greenAccent = Color(0xFF34D399);
+
+const _breathingExercises = [
+  (
+    icon: Icons.crop_square_rounded,
+    color: _orangeAccent,
+    title: 'Box Breathing',
+    subtitle:
+        'A simple technique to calm your nervous system and enhance focus.',
+    durationLabel: '4 min',
+    pattern: BreathPattern(
+      steps: [
+        BreathStep(label: 'Inhale', seconds: 4),
+        BreathStep(label: 'Hold', seconds: 4),
+        BreathStep(label: 'Exhale', seconds: 4),
+        BreathStep(label: 'Hold', seconds: 4),
+      ],
+      cycles: 4,
+    ),
+  ),
+  (
+    icon: Icons.nightlight_round,
+    color: _blueAccent,
+    title: '4-7-8 Breathing',
+    subtitle: 'Helps reduce anxiety and can aid in falling asleep.',
+    durationLabel: '5 min',
+    pattern: BreathPattern(
+      steps: [
+        BreathStep(label: 'Inhale', seconds: 4),
+        BreathStep(label: 'Hold', seconds: 7),
+        BreathStep(label: 'Exhale', seconds: 8),
+      ],
+      cycles: 4,
+    ),
+  ),
+  (
+    icon: Icons.air,
+    color: _greenAccent,
+    title: 'Diaphragmatic',
+    subtitle: 'Strengthens your diaphragm and increases lung efficiency.',
+    durationLabel: '3 min',
+    pattern: BreathPattern(
+      steps: [
+        BreathStep(label: 'Inhale', seconds: 4),
+        BreathStep(label: 'Exhale', seconds: 6),
+      ],
+      cycles: 6,
+    ),
+  ),
+];
 
 class BreathingListScreen extends StatelessWidget {
   const BreathingListScreen({super.key});
@@ -43,32 +92,28 @@ class BreathingListScreen extends StatelessWidget {
           constraints: const BoxConstraints(maxWidth: 375),
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            children: const [
-              BreathingExerciseTile(
-                icon: Icons.crop_square_rounded,
-                color: _orangeAccent,
-                title: 'Box Breathing',
-                subtitle:
-                    'A simple technique to calm your nervous system and enhance focus.',
-                duration: '4 min',
-              ),
-              SizedBox(height: 16),
-              BreathingExerciseTile(
-                icon: Icons.nightlight_round,
-                color: _blueAccent,
-                title: '4-7-8 Breathing',
-                subtitle: 'Helps reduce anxiety and can aid in falling asleep.',
-                duration: '5 min',
-              ),
-              SizedBox(height: 16),
-              BreathingExerciseTile(
-                icon: Icons.air,
-                color: _greenAccent,
-                title: 'Diaphragmatic',
-                subtitle:
-                    'Strengthens your diaphragm and increases lung efficiency.',
-                duration: '3 min',
-              ),
+            children: [
+              for (final exercise in _breathingExercises) ...[
+                BreathingExerciseTile(
+                  icon: exercise.icon,
+                  color: exercise.color,
+                  title: exercise.title,
+                  subtitle: exercise.subtitle,
+                  duration: exercise.durationLabel,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BreathingPlayerScreen(
+                          title: exercise.title,
+                          pattern: exercise.pattern,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
             ],
           ),
         ),
@@ -83,6 +128,7 @@ class BreathingExerciseTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final String duration;
+  final VoidCallback onTap;
 
   const BreathingExerciseTile({
     super.key,
@@ -90,6 +136,7 @@ class BreathingExerciseTile extends StatelessWidget {
     required this.color,
     required this.title,
     required this.subtitle,
+    required this.onTap,
     this.duration = '',
   });
 
@@ -111,9 +158,7 @@ class BreathingExerciseTile extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            // Navigator.push(context, MaterialPageRoute(builder: (_) => MeditationPlayerScreen()));
-          },
+          onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Row(

@@ -24,10 +24,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
       appBar: AppBar(
         backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
-          onPressed: () => Navigator.pop(context),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Wellness Activities',
           style: TextStyle(
