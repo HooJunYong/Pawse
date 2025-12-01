@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/therapist_model.dart';
+import '../../services/therapist_service.dart';
 import '../../widgets/contact_row.dart';
 import '../../widgets/expertise_chip.dart';
 import '../chat/chat_screen.dart';
@@ -26,7 +28,7 @@ final List<BoxShadow> _softShadow = [
   ),
 ];
 
-class TherapistInfoScreen extends StatelessWidget {
+class TherapistInfoScreen extends StatefulWidget {
   final Therapist therapist;
   final String clientUserId;
 
@@ -37,7 +39,166 @@ class TherapistInfoScreen extends StatelessWidget {
   });
 
   @override
+  State<TherapistInfoScreen> createState() => _TherapistInfoScreenState();
+}
+
+class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
+  final TherapistService _therapistService = TherapistService();
+  late Future<TherapistNextAvailability> _nextAvailabilityFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _nextAvailabilityFuture = _fetchNextAvailability();
+  }
+
+  Future<TherapistNextAvailability> _fetchNextAvailability() async {
+    try {
+      final availability =
+          await _therapistService.getNextAvailability(widget.therapist.id);
+      if (availability != null) {
+        return availability;
+      }
+      return TherapistNextAvailability(
+        hasAvailability: false,
+        message: 'No upcoming availability found',
+      );
+    } catch (error) {
+      debugPrint('Failed to fetch next availability: $error');
+      return TherapistNextAvailability(
+        hasAvailability: false,
+        message: 'Unable to load availability',
+      );
+    }
+  }
+
+  DateTime? _parseStartDateTime(TherapistNextAvailability availability) {
+    if (availability.startIso != null && availability.startIso!.isNotEmpty) {
+      try {
+        return DateTime.parse(availability.startIso!);
+      } catch (_) {
+        // Ignore parsing error and attempt fallback below.
+      }
+    }
+
+    if (availability.date != null && availability.startTime != null) {
+      final raw = '${availability.date} ${availability.startTime}';
+      try {
+        return DateFormat('yyyy-MM-dd h:mm a').parse(raw, true).toLocal();
+      } catch (_) {
+        return null;
+      }
+    }
+
+    return null;
+  }
+
+  String _formatAvailabilityLabel(TherapistNextAvailability availability) {
+    if (!availability.hasAvailability) {
+      return availability.message ?? 'No upcoming availability found';
+    }
+
+    final DateTime? start = _parseStartDateTime(availability);
+    if (start == null) {
+      return 'Availability details coming soon';
+    }
+
+    final DateTime localStart = start.toLocal();
+    final DateTime now = DateTime.now();
+    final DateTime today = DateTime(now.year, now.month, now.day);
+    final DateTime slotDay =
+        DateTime(localStart.year, localStart.month, localStart.day);
+    final int dayDifference = slotDay.difference(today).inDays;
+
+    final String timeLabel = DateFormat('h:mm a').format(localStart);
+
+    if (dayDifference == 0) {
+      return 'Today, $timeLabel';
+    }
+    if (dayDifference == 1) {
+      return 'Tomorrow, $timeLabel';
+    }
+    if (dayDifference > 1 && dayDifference <= 7) {
+      final String weekday = DateFormat('EEEE').format(localStart);
+      return '$weekday, $timeLabel';
+    }
+
+    final String dateLabel = DateFormat('d MMM yyyy').format(localStart);
+    return '$dateLabel · $timeLabel';
+  }
+
+  Widget _buildAvailabilitySection() {
+    return FutureBuilder<TherapistNextAvailability>(
+      future: _nextAvailabilityFuture,
+      builder: (context, snapshot) {
+        final bool isLoading =
+            snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData;
+        final TherapistNextAvailability? availability = snapshot.data;
+
+        String highlightText;
+        Color highlightColor = _textGrey;
+
+        if (isLoading) {
+          highlightText = 'Checking availability...';
+        } else if (snapshot.hasError) {
+          highlightText = 'Unable to load availability';
+        } else if (availability == null) {
+          highlightText = 'No upcoming availability found';
+        } else if (!availability.hasAvailability) {
+          highlightText =
+              availability.message ?? 'No upcoming availability found';
+        } else {
+          highlightText = _formatAvailabilityLabel(availability);
+          highlightColor = const Color(0xFFD84315);
+        }
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _primaryBrown.withOpacity(0.1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.event_available, color: _primaryBrown, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(
+                    style: const TextStyle(
+                      color: _textDark,
+                      fontSize: 14,
+                      fontFamily: 'Nunito',
+                    ),
+                    children: [
+                      const TextSpan(text: 'Next available: '),
+                      TextSpan(
+                        text: highlightText,
+                        style: TextStyle(
+                          color: highlightColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final therapist = widget.therapist;
+    final clientUserId = widget.clientUserId;
     final avatarImage = _buildAvatarImage(therapist.imageUrl);
     final bool hasRating = therapist.ratingCount > 0;
     final String ratingLabel =
@@ -335,43 +496,7 @@ class TherapistInfoScreen extends StatelessWidget {
                       // Availability
                       _buildSectionTitle("Availability"),
                       const SizedBox(height: 12),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                            vertical: 18, horizontal: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                              color: _primaryBrown.withOpacity(0.1)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.event_available,
-                                color: _primaryBrown, size: 20),
-                            const SizedBox(width: 8),
-                            RichText(
-                              text: const TextSpan(
-                                style: TextStyle(
-                                    color: _textDark,
-                                    fontSize: 14,
-                                    fontFamily: 'Nunito'),
-                                children: [
-                                  TextSpan(text: "Next available: "),
-                                  TextSpan(
-                                    text: "Tomorrow, 3:00 PM",
-                                    style: TextStyle(
-                                      color: Color(0xFFD84315), // Deep orange
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                      _buildAvailabilitySection(),
                       
                       const SizedBox(height: 32),
                       

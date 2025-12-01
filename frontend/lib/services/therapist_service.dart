@@ -31,6 +31,35 @@ class TherapistService {
     }
   }
 
+  Future<TherapistNextAvailability?> getNextAvailability(
+    String therapistId, {
+    int searchDays = 30,
+  }) async {
+    try {
+      final uri = Uri.parse('$baseUrl/therapist/next-availability/$therapistId')
+          .replace(queryParameters: {'search_days': '$searchDays'});
+
+      final response = await http.get(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final dynamic data = jsonDecode(response.body);
+        if (data is Map<String, dynamic>) {
+          return TherapistNextAvailability.fromJson(data);
+        }
+        throw Exception('Unexpected response format for next availability');
+      } else if (response.statusCode == 404) {
+        return null;
+      } else {
+        throw Exception('Failed to load next availability');
+      }
+    } catch (e) {
+      throw Exception('Error getting next availability: $e');
+    }
+  }
+
   Therapist _mapTherapistFromBackend(Map<String, dynamic> json) {
     // Map backend therapist profile to frontend Therapist model
     // Build full address from backend fields with null safety

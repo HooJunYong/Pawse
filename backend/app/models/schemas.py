@@ -228,3 +228,14 @@ class EditAvailabilityRequest(BaseModel):
     start_time: str
     end_time: str
 
+class NextAvailabilityResponse(BaseModel):
+    has_availability: bool
+    message: Optional[str] = None
+    date: Optional[str] = None
+    day_name: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    start_iso: Optional[str] = None
+    end_iso: Optional[str] = None
+    minutes_until: Optional[int] = None
+

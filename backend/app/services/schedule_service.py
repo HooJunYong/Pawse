@@ -7,7 +7,7 @@ from ..models.database import db
 from ..models.schemas import (
     SetAvailabilityRequest, AvailabilityResponse, TherapistScheduleResponse, 
     DashboardAppointment, TherapistDashboardResponse, UpcomingAvailability,
-    EditAvailabilityRequest
+    EditAvailabilityRequest, NextAvailabilityResponse
 )
 from ..config.timezone import now_my
 
@@ -399,6 +399,69 @@ def get_upcoming_availability(user_id: str, days: int = 5) -> list[UpcomingAvail
             ))
     
     return upcoming_list
+
+def get_next_available_slot(user_id: str, search_days: int = 30) -> NextAvailabilityResponse:
+    """Find the next available slot for a therapist within the next search_days."""
+
+    now = now_my()
+    current_minutes = now.hour * 60 + now.minute
+    tzinfo = now.tzinfo
+
+    for offset in range(search_days + 1):
+        target_datetime = now + timedelta(days=offset)
+        date_str = target_datetime.strftime("%Y-%m-%d")
+        try:
+            schedule = get_therapist_schedule(user_id, date_str)
+        except HTTPException:
+            continue
+
+        for slot in schedule.availability_slots:
+            if not slot.get("is_available", True):
+                continue
+            if slot.get("is_booked"):
+                continue
+
+            start_label = slot.get("start_time")
+            end_label = slot.get("end_time")
+            if not start_label or not end_label:
+                continue
+
+            start_minutes = _time_string_to_minutes(start_label)
+            end_minutes = _time_string_to_minutes(end_label)
+            if start_minutes is None or end_minutes is None:
+                continue
+            if end_minutes <= start_minutes:
+                continue
+            if offset == 0 and start_minutes <= current_minutes:
+                # Skip slots that already started today
+                continue
+
+            start_time = _parse_time_string(start_label)
+            end_time = _parse_time_string(end_label)
+            start_dt = datetime.combine(target_datetime.date(), start_time)
+            end_dt = datetime.combine(target_datetime.date(), end_time)
+            if tzinfo is not None:
+                start_dt = start_dt.replace(tzinfo=tzinfo)
+                end_dt = end_dt.replace(tzinfo=tzinfo)
+
+            minutes_until = max(0, int((start_dt - now).total_seconds() // 60))
+            day_name = start_dt.strftime("%A")
+
+            return NextAvailabilityResponse(
+                has_availability=True,
+                date=date_str,
+                day_name=day_name,
+                start_time=start_label,
+                end_time=end_label,
+                start_iso=start_dt.isoformat(),
+                end_iso=end_dt.isoformat(),
+                minutes_until=minutes_until,
+            )
+
+    return NextAvailabilityResponse(
+        has_availability=False,
+        message="No upcoming availability found",
+    )
 
 def edit_availability_slot(availability_id: str, user_id: str, payload: EditAvailabilityRequest) -> dict:
     """Edit an existing availability slot"""

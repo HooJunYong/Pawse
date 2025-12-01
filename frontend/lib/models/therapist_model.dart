@@ -80,3 +80,45 @@ class Therapist {
     );
   }
 }
+
+class TherapistNextAvailability {
+  final bool hasAvailability;
+  final String? message;
+  final String? date;
+  final String? dayName;
+  final String? startTime;
+  final String? endTime;
+  final String? startIso;
+  final String? endIso;
+  final int? minutesUntil;
+
+  TherapistNextAvailability({
+    required this.hasAvailability,
+    this.message,
+    this.date,
+    this.dayName,
+    this.startTime,
+    this.endTime,
+    this.startIso,
+    this.endIso,
+    this.minutesUntil,
+  });
+
+  factory TherapistNextAvailability.fromJson(Map<String, dynamic> json) {
+    return TherapistNextAvailability(
+      hasAvailability: json['has_availability'] as bool? ?? false,
+      message: json['message'] as String?,
+      date: json['date'] as String?,
+      dayName: json['day_name'] as String?,
+      startTime: json['start_time'] as String?,
+      endTime: json['end_time'] as String?,
+      startIso: json['start_iso'] as String?,
+      endIso: json['end_iso'] as String?,
+      minutesUntil: json['minutes_until'] is int
+          ? json['minutes_until'] as int
+          : (json['minutes_until'] is num
+              ? (json['minutes_until'] as num).toInt()
+              : null),
+    );
+  }
+}
