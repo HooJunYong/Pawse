@@ -64,36 +64,39 @@ def _compose_full_name(parts: Iterable[Optional[str]]) -> str:
 def _get_client_display(user_id: str) -> tuple[str, Optional[str]]:
     profile = db.user_profile.find_one({"user_id": user_id})
     if profile:
-        name = _compose_full_name([profile.get("first_name"), profile.get("last_name")])
+        # Support both snake_case and camelCase keys that may exist in legacy documents
+        first_name = profile.get("first_name") or profile.get("firstName")
+        last_name = profile.get("last_name") or profile.get("lastName")
+        name = _compose_full_name([first_name, last_name])
         avatar_url = _resolve_avatar(
             [
-                profile.get("profile_picture_url"),
-                profile.get("profile_picture"),
-                profile.get("avatar_url"),
-                profile.get("avatar_base64"),
-                profile.get("profile_picture_base64"),
+                profile.get("profile_picture_url") or profile.get("profilePictureUrl"),
+                profile.get("profile_picture") or profile.get("profilePicture"),
+                profile.get("avatar_url") or profile.get("avatarUrl"),
+                profile.get("avatar_base64") or profile.get("avatarBase64"),
+                profile.get("profile_picture_base64") or profile.get("profilePictureBase64"),
             ]
         )
         if name:
             return name, avatar_url
     user = db.users.find_one({"user_id": user_id})
     if user:
-        full_name = user.get("full_name") or ""
+        full_name = user.get("full_name") or user.get("fullName") or ""
         if full_name:
             return full_name, _resolve_avatar(
                 [
-                    user.get("profile_picture_url"),
-                    user.get("avatar_url"),
-                    user.get("avatar_base64"),
+                    user.get("profile_picture_url") or user.get("profilePictureUrl"),
+                    user.get("avatar_url") or user.get("avatarUrl"),
+                    user.get("avatar_base64") or user.get("avatarBase64"),
                 ]
             )
         email = user.get("email") or ""
         if email:
             return email.split("@")[0], _resolve_avatar(
                 [
-                    user.get("profile_picture_url"),
-                    user.get("avatar_url"),
-                    user.get("avatar_base64"),
+                    user.get("profile_picture_url") or user.get("profilePictureUrl"),
+                    user.get("avatar_url") or user.get("avatarUrl"),
+                    user.get("avatar_base64") or user.get("avatarBase64"),
                 ]
             )
     return "Client", None
@@ -107,9 +110,9 @@ def _get_therapist_display(user_id: str) -> tuple[str, Optional[str]]:
         name = _compose_full_name(["Dr.", first, last])
         avatar_url = _resolve_avatar(
             [
-                therapist.get("profile_picture_url"),
-                therapist.get("profile_picture"),
-                therapist.get("profile_picture_base64"),
+                therapist.get("profile_picture_url") or therapist.get("profilePictureUrl"),
+                therapist.get("profile_picture") or therapist.get("profilePicture"),
+                therapist.get("profile_picture_base64") or therapist.get("profilePictureBase64"),
             ]
         )
         if name.strip():

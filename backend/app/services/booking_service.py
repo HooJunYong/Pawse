@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import logging
 import secrets
+
 from ..models.database import db
 from ..models.booking_schemas import (
     TherapistAvailabilityResponse,
@@ -22,6 +24,10 @@ from ..models.booking_schemas import (
     ReleaseSessionSlotResponse,
 )
 from ..config.timezone import now_my
+from ..models.chat_schemas import SendChatMessageRequest
+from ..services.chat_service import send_message
+
+logger = logging.getLogger(__name__)
 
 
 def _coerce_session_status(value: Optional[str]) -> SessionStatus:
@@ -354,6 +360,29 @@ def create_booking(request: BookingRequest) -> BookingResponse:
     }
 
     db.therapy_sessions.insert_one(session_doc)
+
+    booking_label = scheduled_datetime.strftime("%A, %d %B %Y at %I:%M %p")
+    duration_label = f"{request.duration_minutes} minutes"
+    message_lines = [
+        "Booking confirmed ✅",
+        f"Date & Time: {booking_label}",
+        f"Duration: {duration_label}",
+    ]
+
+    message_content = "\n".join(message_lines)
+
+    try:
+        send_message(
+            SendChatMessageRequest(
+                sender_id=request.client_user_id,
+                sender_role="client",
+                content=message_content,
+                client_user_id=request.client_user_id,
+                therapist_user_id=request.therapist_user_id,
+            )
+        )
+    except Exception as exc:  # pragma: no cover - best effort notification
+        logger.warning("Failed to send booking confirmation chat message: %s", exc)
 
     return BookingResponse(
         booking_id=session_id,

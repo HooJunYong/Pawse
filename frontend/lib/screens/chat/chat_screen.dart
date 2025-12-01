@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui show TextDirection;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -15,9 +17,9 @@ const Color _surfaceWhite = Colors.white;
 const Color _textDark = Color(0xFF3E2723); // Dark Brown
 const Color _textGrey = Color(0xFF8D6E63); // Warm Grey
 const Color _primaryBrown = Color(0xFF5D4037);
-const Color _accentOrange = Color(0xFFFFCCBC); // Lighter Orange
 const Color _bubbleSent = Color(0xFFFFCCBC); // Lighter Orange for sent messages
 const Color _bubbleReceived = Colors.white; // White for received messages
+//const Color _bubbleReceived = Color(0xFFFEEDE7); // Light Cream for received messages
 
 class ChatScreen extends StatefulWidget {
   final String? conversationId;
@@ -293,63 +295,65 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Expanded(
-            child: Container(
-              decoration: const BoxDecoration(
-                // Optional: Add a subtle pattern or just keep the cream background
-                color: _bgCream,
-              ),
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: _primaryBrown),
-                    )
-                  : _messages.isEmpty
-                      ? Center(
-                          child: Text(
-                            'Say hello to start the conversation.',
-                            style: TextStyle(
-                              color: _textGrey.withOpacity(0.7),
-                              fontSize: 15,
-                              fontFamily: 'Nunito',
-                            ),
-                          ),
+          const Positioned.fill(child: _ChatBackgroundPattern()),
+          Column(
+            children: [
+              Expanded(
+                child: Container(
+                  color: Colors.transparent,
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: _primaryBrown),
                         )
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                          itemCount: _messages.length,
-                          itemBuilder: (context, index) {
-                            final message = _messages[index];
-                            final isMine = message.isFromCurrentUser(widget.currentUserId);
-                            
-                            // Show date header if needed (simplified logic)
-                            bool showDate = index == 0; 
-                            
-                            return Column(
-                              children: [
-                                if (showDate)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
-                                    child: Text(
-                                      "Today", 
-                                      style: TextStyle(
-                                        color: _textGrey.withOpacity(0.8),
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        fontFamily: 'Nunito',
+                      : _messages.isEmpty
+                          ? Center(
+                              child: Text(
+                                'Say hello to start the conversation.',
+                                style: TextStyle(
+                                  color: _textGrey.withOpacity(0.7),
+                                  fontSize: 15,
+                                  fontFamily: 'Nunito',
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                              itemCount: _messages.length,
+                              itemBuilder: (context, index) {
+                                final message = _messages[index];
+                                final isMine = message.isFromCurrentUser(widget.currentUserId);
+
+                                // Show date header if needed (simplified logic)
+                                final bool showDate = index == 0;
+
+                                return Column(
+                                  children: [
+                                    if (showDate)
+                                      Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 16),
+                                        child: Text(
+                                          'Today',
+                                          style: TextStyle(
+                                            color: _textGrey.withOpacity(0.8),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            fontFamily: 'Nunito',
+                                          ),
+                                        ),
                                       ),
-                                    ),
-                                  ),
-                                _buildChatBubble(message, isMine),
-                              ],
-                            );
-                          },
-                        ),
-            ),
+                                    _buildChatBubble(message, isMine),
+                                  ],
+                                );
+                              },
+                            ),
+                ),
+              ),
+              _buildInputArea(),
+            ],
           ),
-          _buildInputArea(),
         ],
       ),
     );
@@ -358,59 +362,86 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildChatBubble(ChatMessage message, bool isMine) {
     final timeStr = DateFormat('h:mm a').format(message.createdAt.toLocal());
 
-    return Align(
-      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isMine ? _bubbleSent : _bubbleReceived,
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: isMine ? const Radius.circular(16) : const Radius.circular(0),
-              bottomRight: isMine ? const Radius.circular(0) : const Radius.circular(16),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                message.content,
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.4,
-                  fontFamily: 'Nunito',
-                  color: isMine ? _textDark : _textDark, // Changed from Colors.white to _textDark for light bubble
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const double horizontalPadding = 16;
+        final double maxBubbleWidth = constraints.maxWidth * 0.75;
+        final double maxTextWidth = math.max(1, maxBubbleWidth - (horizontalPadding * 2));
+        final ui.TextDirection textDirection = Directionality.of(context);
+
+        final TextStyle messageStyle = TextStyle(
+          fontSize: 15,
+          height: 1.4,
+          fontFamily: 'Nunito',
+          color: _textDark,
+        );
+        final TextStyle timeStyle = TextStyle(
+          fontSize: 10,
+          fontFamily: 'Nunito',
+          color: _textGrey,
+        );
+
+        final double contentWidth = _calculateIntrinsicTextWidth(
+          text: message.content,
+          style: messageStyle,
+          textDirection: textDirection,
+          maxWidth: maxTextWidth,
+        );
+        final double timeWidth = _calculateIntrinsicTextWidth(
+          text: timeStr,
+          style: timeStyle,
+          textDirection: textDirection,
+          maxWidth: maxTextWidth,
+        );
+
+        final double targetWidth = math.max(contentWidth, timeWidth) + (horizontalPadding * 2);
+        final double bubbleWidth = targetWidth.clamp(80.0, maxBubbleWidth);
+
+        return Align(
+          alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+          child: SizedBox(
+            width: bubbleWidth,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.all(horizontalPadding),
+              decoration: BoxDecoration(
+                color: isMine ? _bubbleSent : _bubbleReceived,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(16),
+                  topRight: const Radius.circular(16),
+                  bottomLeft: isMine ? const Radius.circular(16) : const Radius.circular(0),
+                  bottomRight: isMine ? const Radius.circular(0) : const Radius.circular(16),
                 ),
-              ),
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.bottomRight,
-                child: Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontFamily: 'Nunito',
-                    color: isMine ? _textGrey : _textGrey, // Changed from Colors.white.withOpacity(0.8) to _textGrey for light bubble
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
                   ),
-                ),
+                ],
               ),
-            ],
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.content,
+                    style: messageStyle,
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Text(
+                      timeStr,
+                      style: timeStyle,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -517,5 +548,68 @@ class _ChatScreenState extends State<ChatScreen> {
     } catch (_) {
       return null;
     }
+  }
+
+  double _calculateIntrinsicTextWidth({
+    required String text,
+    required TextStyle style,
+    required ui.TextDirection textDirection,
+    required double maxWidth,
+  }) {
+    if (text.isEmpty) {
+      return 0;
+    }
+    final painter = TextPainter(
+      text: TextSpan(text: text, style: style),
+      textDirection: textDirection,
+      maxLines: null,
+    )
+      ..layout(maxWidth: maxWidth);
+    return painter.size.width;
+  }
+}
+
+class _ChatBackgroundPattern extends StatelessWidget {
+  const _ChatBackgroundPattern();
+
+  static const int _columns = 4;
+  static const int _rows = 6;
+  static const String _assetPath = 'assets/images/tile001.png';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: _bgCream,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double tileWidth = constraints.maxWidth / _columns;
+          final double tileHeight = constraints.maxHeight / _rows;
+
+          final List<Widget> tiles = [];
+          for (int row = 0; row < _rows; row++) {
+            for (int column = 0; column < _columns; column++) {
+              tiles.add(
+                Positioned(
+                  left: column * tileWidth,
+                  top: row * tileHeight,
+                  width: tileWidth,
+                  height: tileHeight,
+                  child: Center(
+                    child: Image.asset(
+                      _assetPath,
+                      width: tileWidth * 0.7,
+                      height: tileHeight * 0.7,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ),
+              );
+            }
+          }
+
+          return Stack(children: tiles);
+        },
+      ),
+    );
   }
 }

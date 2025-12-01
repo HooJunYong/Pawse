@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../services/booking_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/session_event_bus.dart';
 import '../chat/chat_contacts_screen.dart';
 import 'manage_schedule_screen.dart';
@@ -323,6 +324,9 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   String? _statusUpdatingSessionId;
   bool _isUpcomingLoading = false;
   final BookingService _bookingService = BookingService();
+  final ChatService _chatService = ChatService();
+  int _unreadMessageCount = 0;
+  Timer? _chatUnreadTimer;
   StreamSubscription<SessionEvent>? _sessionEventSubscription;
   final Set<String> _releasingSessionIds = <String>{};
 
@@ -330,6 +334,9 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   void initState() {
     super.initState();
     _loadDashboardData();
+    _loadUnreadCount();
+    _chatUnreadTimer =
+        Timer.periodic(const Duration(seconds: 25), (_) => _loadUnreadCount());
     _upcomingRefreshTimer =
         Timer.periodic(const Duration(seconds: 30), (_) => _loadUpcomingSchedule());
     _sessionEventSubscription = SessionEventBus.instance.stream.listen((event) {
@@ -341,6 +348,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
       }
       _loadUpcomingSchedule();
       _loadTodaysAppointments();
+      _loadUnreadCount();
     });
   }
 
@@ -349,6 +357,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     _cancelButtonTimer?.cancel();
     _upcomingRefreshTimer?.cancel();
     _upcomingReleaseTimer?.cancel();
+    _chatUnreadTimer?.cancel();
     _sessionEventSubscription?.cancel();
     super.dispose();
   }
@@ -528,6 +537,24 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
       }
     } finally {
       _isUpcomingLoading = false;
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final conversations = await _chatService.getConversations(
+        userId: widget.userId,
+        isTherapist: true,
+      );
+      if (!mounted) {
+        return;
+      }
+      final int total = conversations.fold<int>(0, (sum, conv) => sum + conv.unreadCount);
+      setState(() {
+        _unreadMessageCount = total;
+      });
+    } catch (_) {
+      // Ignore unread count fetch errors silently to keep dashboard responsive.
     }
   }
 
@@ -2156,20 +2183,55 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                       ),
                     ),
                     // Chat Button
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ChatContactsScreen(
-                              currentUserId: widget.userId,
-                              isTherapist: true,
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          color: const Color.fromRGBO(107, 114, 128, 1),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => ChatContactsScreen(
+                                  currentUserId: widget.userId,
+                                  isTherapist: true,
+                                ),
+                              ),
+                            ).then((_) => _loadUnreadCount());
+                          },
+                        ),
+                        if (_unreadMessageCount > 0)
+                          Positioned(
+                            right: 6,
+                            top: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: _errorRed,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.15),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                _unreadMessageCount > 99
+                                    ? '99+'
+                                    : _unreadMessageCount.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Nunito',
+                                ),
+                              ),
                             ),
                           ),
-                        );
-                      },
+                      ],
                     ),
                     // Calendar Button
                     IconButton(

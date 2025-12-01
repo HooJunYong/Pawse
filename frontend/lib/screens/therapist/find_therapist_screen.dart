@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../models/chat_conversation.dart';
 import '../../models/therapist_model.dart';
 import '../../services/booking_service.dart';
+import '../../services/chat_service.dart';
 import '../../services/therapist_service.dart';
 import '../../widgets/crisis_banner.dart';
 import '../../widgets/therapist_card.dart';
@@ -20,18 +22,21 @@ class FindTherapistScreen extends StatefulWidget {
 class _FindTherapistScreenState extends State<FindTherapistScreen> {
   final TherapistService _apiService = TherapistService();
   final BookingService _bookingService = BookingService();
+  final ChatService _chatService = ChatService();
   late Future<List<Therapist>> _therapistsFuture;
   final TextEditingController _searchController = TextEditingController();
   PendingRatingSession? _pendingRating;
   int _selectedRating = 0;
   bool _isSubmittingRating = false;
   final DateFormat _sessionFormatter = DateFormat('MMM d, h:mm a');
+  int _unreadMessageCount = 0;
 
   @override
   void initState() {
     super.initState();
     _therapistsFuture = _apiService.getTherapists();
     _loadPendingRating();
+    _loadUnreadCount();
   }
 
   @override
@@ -66,6 +71,22 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
       });
     } catch (_) {
       // Ignore rating fetch errors
+    }
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final List<ChatConversation> conversations = await _chatService.getConversations(
+        userId: widget.userId,
+        isTherapist: false,
+      );
+      if (!mounted) return;
+      final int total = conversations.fold<int>(0, (sum, conv) => sum + conv.unreadCount);
+      setState(() {
+        _unreadMessageCount = total;
+      });
+    } catch (_) {
+      // Ignore unread count fetch errors silently for now.
     }
   }
 
@@ -281,18 +302,50 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
         ),
         actions: [
           // CHANGED: Replaced Filter button with Chat button
-          IconButton(
-            icon: const Icon(Icons.chat_bubble_outline),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => ChatContactsScreen(
-                    currentUserId: widget.userId,
-                    isTherapist: false,
-                  ),
+          Padding(
+            padding: const EdgeInsets.only(right: 4.0),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.chat_bubble_outline),
+                  onPressed: () {
+                    Navigator.of(context)
+                        .push(
+                      MaterialPageRoute(
+                        builder: (context) => ChatContactsScreen(
+                          currentUserId: widget.userId,
+                          isTherapist: false,
+                        ),
+                      ),
+                    )
+                        .then((_) => _loadUnreadCount());
+                  },
                 ),
-              );
-            },
+                if (_unreadMessageCount > 0)
+                  Positioned(
+                    right: 4,
+                    top: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _unreadMessageCount > 99
+                            ? '99+'
+                            : _unreadMessageCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ),

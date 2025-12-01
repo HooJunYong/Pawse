@@ -4,6 +4,7 @@ import '../../widgets/bottom_nav.dart';
 import 'breathing_list_screen.dart';
 import 'journaling_screen.dart';
 import 'meditation_screen.dart';
+import 'music_screen.dart';
 
 
 class WellnessScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class WellnessScreen extends StatefulWidget {
 class _WellnessScreenState extends State<WellnessScreen> {
   @override
   Widget build(BuildContext context) {
+    final _DailyRecommendation recommendation = _getDailyRecommendation(context);
     return Scaffold(
       backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
       appBar: AppBar(
@@ -49,11 +51,8 @@ class _WellnessScreenState extends State<WellnessScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [
-                          Color.fromRGBO(254, 215, 170, 1),
-                          Color.fromRGBO(254, 237, 213, 1),
-                        ],
+                      gradient: LinearGradient(
+                        colors: recommendation.gradientColors,
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -79,9 +78,37 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'A 5-minute gratitude journaling session to start your day.',
-                          style: TextStyle(
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.45),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                recommendation.icon,
+                                size: 18,
+                                color: const Color.fromRGBO(66, 32, 6, 1),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                recommendation.activityLabel,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.w700,
+                                  color: Color.fromRGBO(66, 32, 6, 1),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          recommendation.description,
+                          style: const TextStyle(
                             fontSize: 14,
                             fontFamily: 'Nunito',
                             color: Color.fromRGBO(92, 64, 51, 1),
@@ -91,21 +118,14 @@ class _WellnessScreenState extends State<WellnessScreen> {
                         const SizedBox(height: 16),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            backgroundColor: recommendation.buttonColor,
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(24),
                             ),
                             elevation: 2,
                           ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => JournalingScreen(userId: widget.userId),
-                              ),
-                            );
-                          },
+                          onPressed: recommendation.onStart,
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -201,7 +221,12 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           Icons.music_note,
                           const Color.fromRGBO(236, 72, 153, 1),
                           () {
-                            // Navigate to music
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MusicScreen(),
+                              ),
+                            );
                           },
                         ),
                       ),
@@ -248,6 +273,78 @@ class _WellnessScreenState extends State<WellnessScreen> {
         },
       ),
     );
+  }
+
+  _DailyRecommendation _getDailyRecommendation(BuildContext context) {
+    final List<_DailyRecommendation> options = [
+      _DailyRecommendation(
+        activityLabel: 'Gratitude Journaling',
+        description: 'Write down three moments you appreciated today to cultivate a grateful mindset.',
+        gradientColors: const [Color(0xFFFED7AA), Color(0xFFFEE6D4)],
+        buttonColor: const Color.fromRGBO(66, 32, 6, 1),
+        icon: Icons.menu_book_rounded,
+        onStart: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => JournalingScreen(userId: widget.userId),
+            ),
+          );
+        },
+      ),
+      _DailyRecommendation(
+        activityLabel: 'Deep Breathing',
+        description: 'Spend four minutes with box breathing—inhale, hold, exhale, and rest on a steady four-count.',
+        gradientColors: const [Color(0xFFBBF7D0), Color(0xFFD1FAE5)],
+        buttonColor: const Color(0xFF047857),
+        icon: Icons.air,
+        onStart: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const BreathingListScreen(),
+            ),
+          );
+        },
+      ),
+      _DailyRecommendation(
+        activityLabel: 'Guided Meditation',
+        description: 'Take a mindful pause with a gentle body-scan meditation to release lingering tension.',
+        gradientColors: const [Color(0xFFC7D2FE), Color(0xFFE0E7FF)],
+        buttonColor: const Color(0xFF4338CA),
+        icon: Icons.self_improvement,
+        onStart: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MeditationScreen(),
+            ),
+          );
+        },
+      ),
+      _DailyRecommendation(
+        activityLabel: 'Mindful Music Break',
+        description: 'Choose a soothing playlist and notice one instrument at a time as you listen without distractions.',
+        gradientColors: const [Color(0xFFFBCFE8), Color(0xFFFCE7F3)],
+        buttonColor: const Color(0xFFBE185D),
+        icon: Icons.music_note,
+        onStart: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const MusicScreen(),
+            ),
+          );
+        },
+      ),
+    ];
+
+    final DateTime today = DateTime.now().toUtc();
+    final int daySeed =
+        DateTime.utc(today.year, today.month, today.day).millisecondsSinceEpoch ~/
+            Duration.millisecondsPerDay;
+    final int index = daySeed % options.length;
+    return options[index];
   }
 
   Widget _buildActivityCard(String title, IconData icon, Color color, VoidCallback onTap) {
@@ -363,4 +460,22 @@ class _WellnessScreenState extends State<WellnessScreen> {
       ),
     );
   }
+}
+
+class _DailyRecommendation {
+  const _DailyRecommendation({
+    required this.activityLabel,
+    required this.description,
+    required this.gradientColors,
+    required this.buttonColor,
+    required this.icon,
+    required this.onStart,
+  });
+
+  final String activityLabel;
+  final String description;
+  final List<Color> gradientColors;
+  final Color buttonColor;
+  final IconData icon;
+  final VoidCallback onStart;
 }
