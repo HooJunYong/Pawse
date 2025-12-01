@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/bottom_nav.dart';
 import '../screens/chat/chat_session_screen.dart';
+import '../screens/driftbottle/drift_bottle_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -46,9 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 _buildActionCard(
-                  imagePath: 'assets/images/Drift_bottle.png',
+                  imagePath: 'assets/images/drift_bottle.png',
                   color: Colors.blueAccent,
                   title: "Drift & Heal",
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => DriftBottleScreen(userId: widget.userId),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 24),
                 Text(
@@ -214,40 +222,44 @@ class _HomeScreenState extends State<HomeScreen> {
     String? imagePath,
     required Color color,
     required String title,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        color: _bgWhite,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          if (imagePath != null)
-            ColorFiltered(
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              child: Image.asset(imagePath, height: 48, width: 48),
-            )
-          else if (icon != null)
-            Icon(icon, size: 32, color: color),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _textDark,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: _bgWhite,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          children: [
+            if (imagePath != null)
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                child: Image.asset(imagePath, height: 48, width: 48),
+              )
+            else if (icon != null)
+              Icon(icon, size: 32, color: color),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _textDark,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
