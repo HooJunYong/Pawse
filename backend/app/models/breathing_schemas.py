@@ -50,7 +50,7 @@ class BreathingExerciseResponse(BaseModel):
 class BreathingSessionCreate(BaseModel):
     user_id: str = Field(..., min_length=1)
     exercise_id: str = Field(..., min_length=1)
-    cycles_completed: int = Field(..., gt=0, lt=200)
+    cycles_completed: int = Field(..., ge=0, lt=200)
     duration_seconds: Optional[int] = Field(default=None, gt=0, lt=7200)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

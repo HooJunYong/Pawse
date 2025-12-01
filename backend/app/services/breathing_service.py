@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import List, Optional
-from uuid import uuid4
+from uuid import uuid4, uuid5, NAMESPACE_DNS
 
 from pymongo.database import Database
 
@@ -84,7 +84,13 @@ class BreathingService:
         self.db = db
         self.exercises = db["breathing_exercises"]
         self.sessions = db["user_breathing_sessions"]
-        self._seed_defaults()
+        try:
+            self._seed_defaults()
+        except Exception:
+            # If the database is unavailable we still want the API to respond
+            # with static defaults. The exception is swallowed so routes can
+            # fall back gracefully.
+            pass
 
     def _seed_defaults(self) -> None:
         if self.exercises.count_documents({}) > 0:
@@ -111,16 +117,46 @@ class BreathingService:
 
     def list_exercises(self, *, active_only: bool = True) -> List[BreathingExerciseResponse]:
         query = {"is_active": True} if active_only else {}
-        cursor = self.exercises.find(query).sort("name")
-        return [BreathingExerciseResponse(**self._map_exercise(doc)) for doc in cursor]
+        try:
+            cursor = self.exercises.find(query).sort("name")
+            docs = [self._map_exercise(doc) for doc in cursor]
+            if docs:
+                return [BreathingExerciseResponse(**doc) for doc in docs]
+        except Exception:
+            # Fall back to static defaults if the database is unreachable.
+            pass
+
+        fallback = [self._build_fallback_entry(entry) for entry in DEFAULT_EXERCISES]
+        if active_only:
+            fallback = [entry for entry in fallback if entry["is_active"]]
+        fallback.sort(key=lambda item: item["name"].lower())
+        return [BreathingExerciseResponse(**entry) for entry in fallback]
 
     def get_exercise(self, exercise_id: str) -> Optional[dict]:
-        doc = self.exercises.find_one({"exercise_id": exercise_id})
-        return self._map_exercise(doc) if doc else None
+        try:
+            doc = self.exercises.find_one({"exercise_id": exercise_id})
+            if doc:
+                return self._map_exercise(doc)
+        except Exception:
+            pass
+        for entry in DEFAULT_EXERCISES:
+            candidate = self._build_fallback_entry(entry)
+            if candidate["exercise_id"] == exercise_id or candidate.get("slug") == exercise_id:
+                return candidate
+        return None
 
     def get_exercise_by_slug(self, slug: str) -> Optional[dict]:
-        doc = self.exercises.find_one({"slug": slug})
-        return self._map_exercise(doc) if doc else None
+        try:
+            doc = self.exercises.find_one({"slug": slug})
+            if doc:
+                return self._map_exercise(doc)
+        except Exception:
+            pass
+        for entry in DEFAULT_EXERCISES:
+            candidate = self._build_fallback_entry(entry)
+            if candidate.get("slug") == slug:
+                return candidate
+        return None
 
     def create_exercise(self, payload: BreathingExerciseCreate) -> BreathingExerciseResponse:
         data = payload.model_dump()
@@ -230,6 +266,31 @@ class BreathingService:
         data = dict(doc)
         data.pop("_id", None)
         return data
+
+    @staticmethod
+    def _build_fallback_entry(entry: dict) -> dict:
+        now = datetime.utcnow()
+        pattern = BreathPatternSchema(**entry["pattern"]).model_dump()
+        cycle_seconds = sum(step["seconds"] for step in pattern["steps"])
+        total_duration = cycle_seconds * pattern["cycles"]
+        seed_value = entry.get("exercise_id") or entry.get("slug") or entry.get("name") or "breathing"
+        exercise_id = entry.get("exercise_id") or str(uuid5(NAMESPACE_DNS, f"pawse-breathing:{seed_value}"))
+        return {
+            **entry,
+            "exercise_id": exercise_id,
+            "description": entry.get("description", ""),
+            "focus_area": entry.get("focus_area"),
+            "duration_seconds": entry.get("duration_seconds") or total_duration,
+            "duration_label": entry.get("duration_label"),
+            "tags": entry.get("tags", []),
+            "is_active": entry.get("is_active", True),
+            "pattern": pattern,
+            "slug": entry.get("slug"),
+            "audio_url": entry.get("audio_url"),
+            "metadata": entry.get("metadata"),
+            "created_at": entry.get("created_at", now),
+            "updated_at": entry.get("updated_at", now),
+        }
 
     @staticmethod
     def _map_session(doc: Optional[dict]) -> dict:

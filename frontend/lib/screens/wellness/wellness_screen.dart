@@ -185,7 +185,9 @@ class _WellnessScreenState extends State<WellnessScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const BreathingListScreen(),
+                                builder: (context) => BreathingListScreen(
+                                  userId: widget.userId,
+                                ),
                               ),
                             );
                           },
@@ -299,7 +301,9 @@ class _WellnessScreenState extends State<WellnessScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const BreathingListScreen(),
+              builder: (context) => BreathingListScreen(
+                userId: widget.userId,
+              ),
             ),
           );
         },
