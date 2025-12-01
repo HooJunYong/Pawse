@@ -6,9 +6,9 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 
 import '../../services/booking_service.dart';
+import '../../services/chat_service.dart';
+import '../../widgets/therapist_bottom_navigation.dart';
 import 'set_availability_screen.dart';
-import 'therapist_dashboard_screen.dart';
-import 'therapist_profile_screen.dart';
 
 class ManageScheduleScreen extends StatefulWidget {
   final String userId;
@@ -27,6 +27,35 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   bool _isLoading = true;
   // int _selectedIndex = 2; // Calendar is selected by default
   final BookingService _bookingService = BookingService();
+  final ChatService _chatService = ChatService();
+  int _unreadCount = 0;
+
+  DateTime _startOfDay(DateTime date) => DateTime(date.year, date.month, date.day);
+
+  bool _isBeforeToday(DateTime date) {
+    final DateTime today = _startOfDay(DateTime.now());
+    return _startOfDay(date).isBefore(today);
+  }
+
+  bool _canNavigateToPreviousMonth() {
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime currentMonthStart = DateTime(today.year, today.month, 1);
+    final DateTime previousMonthStart = DateTime(
+      _selectedDate.year,
+      _selectedDate.month - 1,
+      1,
+    );
+    return !previousMonthStart.isBefore(currentMonthStart);
+  }
+
+  void _showPastDateMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Past dates cannot be managed. Please choose today or a future date.'),
+      ),
+    );
+  }
 
   Map<String, dynamic>? _findSessionById(String? sessionId) {
     if (sessionId == null) return null;
@@ -264,6 +293,26 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     super.initState();
     _loadSchedule();
     _loadMonthSchedule();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final conversations = await _chatService.getConversations(
+        userId: widget.userId,
+        isTherapist: true,
+      );
+      if (!mounted) return;
+      final int totalUnread = conversations.fold<int>(
+        0,
+        (sum, conversation) => sum + conversation.unreadCount,
+      );
+      setState(() {
+        _unreadCount = totalUnread;
+      });
+    } catch (_) {
+      // Ignore count failures; nav badge can stay hidden.
+    }
   }
 
   Future<void> _loadSchedule() async {
@@ -403,14 +452,38 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   void _changeMonth(int delta) {
-    final DateTime newDate = DateTime(
+    final DateTime today = _startOfDay(DateTime.now());
+    final DateTime targetMonthStart = DateTime(
       _selectedDate.year,
       _selectedDate.month + delta,
       1,
     );
+    final DateTime currentMonthStart = DateTime(today.year, today.month, 1);
+
+    if (targetMonthStart.isBefore(currentMonthStart)) {
+      _showPastDateMessage();
+      return;
+    }
+
+    final int lastDayOfTargetMonth = DateTime(
+      targetMonthStart.year,
+      targetMonthStart.month + 1,
+      0,
+    ).day;
+    final int normalizedDay = _selectedDate.day.clamp(1, lastDayOfTargetMonth);
+
+    DateTime newSelection = DateTime(
+      targetMonthStart.year,
+      targetMonthStart.month,
+      normalizedDay,
+    );
+
+    if (_isBeforeToday(newSelection)) {
+      newSelection = today;
+    }
 
     setState(() {
-      _selectedDate = newDate;
+      _selectedDate = newSelection;
     });
 
     _loadMonthSchedule();
@@ -418,6 +491,10 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
   }
 
   void _selectDate(DateTime date) {
+    if (_isBeforeToday(date)) {
+      _showPastDateMessage();
+      return;
+    }
     setState(() {
       _selectedDate = date;
     });
@@ -485,7 +562,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                           children: [
                             IconButton(
                               icon: const Icon(Icons.chevron_left),
-                              onPressed: () => _changeMonth(-1),
+                              onPressed: _canNavigateToPreviousMonth()
+                                  ? () => _changeMonth(-1)
+                                  : null,
                               color: const Color.fromRGBO(66, 32, 6, 1),
                             ),
                             Text(
@@ -686,92 +765,11 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: _buildBottomNavigationBar(),
-    );
-  }
-
-  Widget _buildBottomNavigationBar() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Container(
-          width: 375,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(32),
-              topRight: Radius.circular(32),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 8,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  // Home Button
-                  IconButton(
-                    icon: const Icon(Icons.home_outlined),
-                    color: const Color.fromRGBO(107, 114, 128, 1),
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              TherapistDashboardScreen(userId: widget.userId),
-                        ),
-                      );
-                    },
-                  ),
-                  // Chat Button
-                  IconButton(
-                    icon: const Icon(Icons.chat_bubble_outline),
-                    color: const Color.fromRGBO(107, 114, 128, 1),
-                    onPressed: () {
-                      // Navigate to chat
-                    },
-                  ),
-                  // Calendar Button (Active)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color.fromRGBO(249, 115, 22, 1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: IconButton(
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      color: Colors.white,
-                      onPressed: () {
-                        // Already on schedule screen
-                      },
-                    ),
-                  ),
-                  // Profile Button
-                  IconButton(
-                    icon: const Icon(Icons.person),
-                    color: const Color.fromRGBO(107, 114, 128, 1),
-                    onPressed: () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              TherapistProfileScreen(userId: widget.userId),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
+      bottomNavigationBar: TherapistBottomNavigation(
+        userId: widget.userId,
+        currentTab: TherapistNavTab.schedule,
+        unreadCount: _unreadCount,
+      ),
     );
   }
 
@@ -790,6 +788,7 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     final firstWeekday = firstDayOfMonth.weekday % 7; // 0 = Sunday
 
     final List<Widget> dayWidgets = [];
+    final DateTime today = _startOfDay(DateTime.now());
 
     // Add empty cells for days before month starts
     for (int i = 0; i < firstWeekday; i++) {
@@ -808,22 +807,29 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
           date.year == DateTime.now().year &&
           date.month == DateTime.now().month &&
           date.day == DateTime.now().day;
-      final hasSchedule = _datesWithSchedule.contains(dateStr);
+      final bool hasSchedule = _datesWithSchedule.contains(dateStr);
+      final bool isPast = _startOfDay(date).isBefore(today);
 
       dayWidgets.add(
         GestureDetector(
-          onTap: () => _selectDate(date),
+          onTap: () {
+            if (isPast) {
+              _showPastDateMessage();
+              return;
+            }
+            _selectDate(date);
+          },
           child: Container(
             width: 32,
             height: 32,
             decoration: BoxDecoration(
               color: isSelected
                   ? const Color.fromRGBO(249, 115, 22, 1)
-                  : hasSchedule
+                  : hasSchedule && !isPast
                   ? const Color.fromRGBO(249, 115, 22, 0.2)
                   : Colors.transparent,
               shape: BoxShape.circle,
-              border: hasSchedule && !isSelected
+              border: hasSchedule && !isSelected && !isPast
                   ? Border.all(
                       color: const Color.fromRGBO(249, 115, 22, 0.5),
                       width: 2,
@@ -839,7 +845,9 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                   fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                   color: isSelected
                       ? Colors.white
-                      : hasSchedule
+                      : isPast
+                        ? const Color.fromRGBO(156, 163, 175, 1)
+                        : hasSchedule
                       ? const Color.fromRGBO(249, 115, 22, 1)
                       : const Color.fromRGBO(66, 32, 6, 1),
                 ),

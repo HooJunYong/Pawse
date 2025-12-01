@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../services/booking_service.dart';
+import '../../services/profile_service.dart';
 import '../../widgets/bottom_nav.dart';
 import 'therapist/find_therapist_screen.dart';
 
@@ -29,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _upcomingSessionExpiryTimer;
   bool _showAllUpcomingSessions = false;
   final Set<String> _dismissedCancelledSessionIds = <String>{};
+  String _userFirstName = 'Friend';
+  String _userInitials = 'U';
+  ImageProvider? _userAvatarImage;
 
   // Colors extracted from design
   final Color _bgWhite = Colors.white;
@@ -42,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _initDismissedCancelledSessions();
     _loadUpcomingSessions(initialLoad: true, resetToggle: true);
+    _loadUserProfile();
   }
 
   @override
@@ -121,6 +126,121 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       _refreshUpcomingSession();
     });
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final response = await ProfileService.getProfile(widget.userId);
+      if (response.statusCode != 200) {
+        return;
+      }
+      final dynamic decoded = jsonDecode(response.body);
+      if (!mounted) {
+        return;
+      }
+      if (decoded is Map<String, dynamic>) {
+        final String firstName = _extractFirstName(decoded['full_name']);
+        final String initials = _extractInitials(
+          decoded['initials'],
+          decoded['full_name'],
+        );
+        final ImageProvider? avatar = _resolveProfileAvatar(
+          decoded['avatar_base64']?.toString(),
+          decoded['avatar_url']?.toString(),
+        );
+
+        setState(() {
+          if (firstName.isNotEmpty) {
+            _userFirstName = firstName;
+          }
+          if (initials.isNotEmpty) {
+            _userInitials = initials;
+          }
+          _userAvatarImage = avatar;
+        });
+      }
+    } catch (_) {
+      // Silently ignore profile load failures; keep friendly fallback.
+    }
+  }
+
+  String _extractFirstName(dynamic fullNameValue) {
+    if (fullNameValue is! String) {
+      return '';
+    }
+    final String trimmed = fullNameValue.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final List<String> parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.isEmpty) {
+      return '';
+    }
+    final String first = parts.first.trim();
+    if (first.isEmpty) {
+      return '';
+    }
+    if (first.length == 1) {
+      return first.toUpperCase();
+    }
+    return first[0].toUpperCase() + first.substring(1);
+  }
+
+  String _extractInitials(dynamic initialsValue, dynamic fullNameValue) {
+    if (initialsValue is String && initialsValue.trim().isNotEmpty) {
+      final trimmed = initialsValue.trim();
+      return trimmed.length > 2 ? trimmed.substring(0, 2).toUpperCase() : trimmed.toUpperCase();
+    }
+    if (fullNameValue is! String) {
+      return '';
+    }
+    final parts = fullNameValue.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) {
+      return '';
+    }
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+    final firstInitial = parts[0][0].toUpperCase();
+    final secondInitial = parts[1][0].toUpperCase();
+    return '$firstInitial$secondInitial';
+  }
+
+  ImageProvider? _resolveProfileAvatar(String? base64Value, String? urlValue) {
+    final ImageProvider? fromBase64 = _decodeAvatarBase64(base64Value);
+    if (fromBase64 != null) {
+      return fromBase64;
+    }
+
+    final String? trimmedUrl = urlValue?.trim();
+    if (trimmedUrl == null || trimmedUrl.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(trimmedUrl)) {
+      final bytes = _decodeDataUri(trimmedUrl);
+      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    }
+    return NetworkImage(trimmedUrl);
+  }
+
+  ImageProvider? _decodeAvatarBase64(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(trimmed)) {
+      final bytes = _decodeDataUri(trimmed);
+      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    }
+    try {
+      final bytes = base64Decode(trimmed);
+      return bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    } catch (_) {
+      return null;
+    }
   }
 
   @override
@@ -329,16 +449,26 @@ class _HomeScreenState extends State<HomeScreen> {
             shape: BoxShape.circle,
             border: Border.all(color: Colors.black, width: 1),
           ),
-          child: const CircleAvatar(
+          child: CircleAvatar(
             radius: 28,
             backgroundColor: Colors.white,
-            backgroundImage: AssetImage('assets/images/defaultcat.png'),
+            backgroundImage: _userAvatarImage,
+            child: _userAvatarImage == null
+                ? Text(
+                    _userInitials,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF9A3412),
+                    ),
+                  )
+                : null,
           ),
         ),
         const SizedBox(width: 16),
         Expanded(
           child: Text(
-            "Welcome, Jerry",
+            "Welcome, ${_userFirstName.isNotEmpty ? _userFirstName : 'Friend'}",
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,

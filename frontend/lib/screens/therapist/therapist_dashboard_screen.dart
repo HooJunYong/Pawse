@@ -9,7 +9,7 @@ import 'package:intl/intl.dart';
 import '../../services/booking_service.dart';
 import '../../services/chat_service.dart';
 import '../../services/session_event_bus.dart';
-import '../chat/chat_contacts_screen.dart';
+import '../../widgets/therapist_bottom_navigation.dart';
 import 'manage_schedule_screen.dart';
 import 'therapist_profile_screen.dart';
 
@@ -2144,129 +2144,10 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
           ),
         ),
       ),
-      // --- Bottom Nav (Restored Original Design) ---
-      bottomNavigationBar: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 375,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    // Home Button (Active)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: _accentOrange,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.home_outlined),
-                        color: Colors.white,
-                        onPressed: () {},
-                      ),
-                    ),
-                    // Chat Button
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.chat_bubble_outline),
-                          color: const Color.fromRGBO(107, 114, 128, 1),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => ChatContactsScreen(
-                                  currentUserId: widget.userId,
-                                  isTherapist: true,
-                                ),
-                              ),
-                            ).then((_) => _loadUnreadCount());
-                          },
-                        ),
-                        if (_unreadMessageCount > 0)
-                          Positioned(
-                            right: 6,
-                            top: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: _errorRed,
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.15),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Text(
-                                _unreadMessageCount > 99
-                                    ? '99+'
-                                    : _unreadMessageCount.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Nunito',
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    // Calendar Button
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ManageScheduleScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
-                    ),
-                    // Profile Button
-                    IconButton(
-                      icon: const Icon(Icons.person),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                TherapistProfileScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+      bottomNavigationBar: TherapistBottomNavigation(
+        userId: widget.userId,
+        currentTab: TherapistNavTab.dashboard,
+        unreadCount: _unreadMessageCount,
       ),
     );
   }

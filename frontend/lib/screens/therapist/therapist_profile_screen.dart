@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/chat_service.dart';
+import '../../widgets/therapist_bottom_navigation.dart';
 import '../profile/profile_screen.dart';
-import 'manage_schedule_screen.dart';
-import 'therapist_dashboard_screen.dart';
 import 'therapist_edit_profile_screen.dart';
 
 class TherapistProfileScreen extends StatefulWidget {
@@ -27,11 +27,33 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
 
   late Future<Map<String, dynamic>> _profileFuture;
   int _profileImageVersion = 0;
+  final ChatService _chatService = ChatService();
+  int _unreadCount = 0;
 
   @override
   void initState() {
     super.initState();
     _profileFuture = _fetchProfile();
+    _loadUnreadCount();
+  }
+
+  Future<void> _loadUnreadCount() async {
+    try {
+      final conversations = await _chatService.getConversations(
+        userId: widget.userId,
+        isTherapist: true,
+      );
+      if (!mounted) return;
+      final int totalUnread = conversations.fold<int>(
+        0,
+        (sum, conversation) => sum + conversation.unreadCount,
+      );
+      setState(() {
+        _unreadCount = totalUnread;
+      });
+    } catch (_) {
+      // Badge can remain hidden if count fails.
+    }
   }
 
   Future<Map<String, dynamic>> _fetchProfile() async {
@@ -314,85 +336,10 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
           ),
         ),
       ),
-      bottomNavigationBar: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 375,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    // Home Button
-                    IconButton(
-                      icon: const Icon(Icons.home_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => TherapistDashboardScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
-                    ),
-                    // Chat Button
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        // Navigate to chat
-                      },
-                    ),
-                    // Calendar Button
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ManageScheduleScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
-                    ),
-                    // Profile Button (Active)
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(249, 115, 22, 1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.person),
-                        color: Colors.white,
-                        onPressed: () {
-                          // Already on profile screen
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+      bottomNavigationBar: TherapistBottomNavigation(
+        userId: widget.userId,
+        currentTab: TherapistNavTab.profile,
+        unreadCount: _unreadCount,
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 import 'meditation_player_screen.dart';
@@ -12,11 +14,75 @@ class AppColors {
   static const Color blue = Color(0xFF818CF8);
 }
 
+class MeditationSession {
+  const MeditationSession({
+    required this.title,
+    required this.subtitle,
+    required this.description,
+    required this.assetPath,
+    required this.icon,
+    required this.color,
+  });
+
+  final String title;
+  final String subtitle;
+  final String description;
+  final String assetPath;
+  final IconData icon;
+  final Color color;
+}
+
+const List<MeditationSession> _sessions = [
+  MeditationSession(
+    title: 'Mindfulness',
+    subtitle: 'Focus on the now',
+    description: 'A breath-led reset to anchor your attention in the present.',
+    assetPath: 'assets/audio/Mindfulness.mp3',
+    icon: Icons.eco,
+    color: AppColors.green,
+  ),
+  MeditationSession(
+    title: 'For Sleep',
+    subtitle: 'Drift off peacefully',
+    description: 'Ease into restful sleep with a gentle body-scan journey.',
+    assetPath: 'assets/audio/Sleep.mp3',
+    icon: Icons.nightlight_round,
+    color: AppColors.blue,
+  ),
+  MeditationSession(
+    title: 'Gratitude',
+    subtitle: 'Appreciate the good',
+    description: 'Cultivate appreciation with mindful reflections on the day.',
+    assetPath: 'assets/audio/Gratitude.mp3',
+    icon: Icons.favorite,
+    color: AppColors.orange,
+  ),
+  MeditationSession(
+    title: 'For Stress',
+    subtitle: 'Find your inner peace',
+    description: 'Release tension and soften the nervous system through breath.',
+    assetPath: 'assets/audio/Stress.mp3',
+    icon: Icons.self_improvement,
+    color: AppColors.orange,
+  ),
+  MeditationSession(
+    title: 'For Focus',
+    subtitle: 'Sharpen your mind',
+    description: 'Re-center your attention with crisp, focused breathing cues.',
+    assetPath: 'assets/audio/Focus.mp3',
+    icon: Icons.bolt,
+    color: AppColors.orange,
+  ),
+];
+
 class MeditationScreen extends StatelessWidget {
   const MeditationScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final MeditationSession recommendedSession =
+        _sessions[Random().nextInt(_sessions.length)];
+
     return Scaffold(
       backgroundColor: AppColors.beige,
       appBar: AppBar(
@@ -71,9 +137,19 @@ class MeditationScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      'A 10-minute session on finding calm in the present moment.',
-                      style: TextStyle(
+                    Text(
+                      recommendedSession.title,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontFamily: 'Nunito',
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.darkBrown,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      recommendedSession.description,
+                      style: const TextStyle(
                         fontSize: 15,
                         fontFamily: 'Nunito',
                         color: AppColors.darkBrown,
@@ -92,12 +168,7 @@ class MeditationScreen extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                           ),
                           onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MeditationPlayerScreen(),
-                              ),
-                            );
+                            _openSession(context, recommendedSession);
                           },
                           child: Row(
                             children: const [
@@ -133,43 +204,31 @@ class MeditationScreen extends StatelessWidget {
               const SizedBox(height: 12),
               Expanded(
                 child: ListView(
-                  children: const [
-                    MeditationLibraryTile(
-                      icon: Icons.eco,
-                      color: AppColors.green,
-                      title: 'Mindfulness',
-                      subtitle: 'Focus on the now',
-                    ),
-                    MeditationLibraryTile(
-                      icon: Icons.nightlight_round,
-                      color: AppColors.blue,
-                      title: 'For Sleep',
-                      subtitle: 'Drift off peacefully',
-                    ),
-                    MeditationLibraryTile(
-                      icon: Icons.favorite,
-                      color: AppColors.orange,
-                      title: 'Gratitude',
-                      subtitle: 'Appreciate the good',
-                    ),
-                    MeditationLibraryTile(
-                      icon: Icons.self_improvement,
-                      color: AppColors.orange,
-                      title: 'For Stress',
-                      subtitle: 'Find your inner peace',
-                    ),
-                    MeditationLibraryTile(
-                      icon: Icons.bolt,
-                      color: AppColors.orange,
-                      title: 'For Focus',
-                      subtitle: 'Sharpen your mind',
-                    ),
-                  ],
+                  children: _sessions
+                      .map(
+                        (session) => MeditationLibraryTile(
+                          icon: session.icon,
+                          color: session.color,
+                          title: session.title,
+                          subtitle: session.subtitle,
+                          onTap: () => _openSession(context, session),
+                        ),
+                      )
+                      .toList(),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _openSession(BuildContext context, MeditationSession session) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MeditationPlayerScreen(session: session),
       ),
     );
   }
@@ -180,6 +239,7 @@ class MeditationLibraryTile extends StatelessWidget {
   final Color color;
   final String title;
   final String subtitle;
+  final VoidCallback onTap;
 
   const MeditationLibraryTile({
     Key? key,
@@ -187,6 +247,7 @@ class MeditationLibraryTile extends StatelessWidget {
     required this.color,
     required this.title,
     required this.subtitle,
+    required this.onTap,
   }) : super(key: key);
 
   @override
@@ -226,9 +287,7 @@ class MeditationLibraryTile extends StatelessWidget {
             fontSize: 13,
           ),
         ),
-        onTap: () {
-          // TODO: Implement navigation to specific meditation session
-        },
+        onTap: onTap,
       ),
     );
   }

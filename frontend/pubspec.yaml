@@ -38,6 +38,7 @@ dependencies:
   intl: ^0.18.0
   shared_preferences: ^2.3.2
   pinput: ^5.0.0
+  just_audio: ^0.9.38
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -98,3 +99,4 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - assets/audio/

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/chat_conversation.dart';
 import '../../services/chat_service.dart';
+import '../../widgets/therapist_bottom_navigation.dart';
 import 'chat_screen.dart';
 
 // --- Theme Constants ---
@@ -116,6 +117,11 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final int totalUnread = _conversations.fold<int>(
+      0,
+      (sum, conversation) => sum + conversation.unreadCount,
+    );
+
     return Scaffold(
       backgroundColor: _bgCream,
       appBar: AppBar(
@@ -166,6 +172,13 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
                       },
                     ),
             ),
+      bottomNavigationBar: widget.isTherapist
+          ? TherapistBottomNavigation(
+              userId: widget.currentUserId,
+              currentTab: TherapistNavTab.chat,
+              unreadCount: totalUnread,
+            )
+          : null,
     );
   }
 
