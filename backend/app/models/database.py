@@ -9,6 +9,8 @@ therapists_collection = db.therapist_profile
 therapy_sessions_collection = db.therapy_sessions
 chat_conversations_collection = db.chat_conversations
 chat_messages_collection = db.chat_messages
+breathing_exercises_collection = db.breathing_exercises
+user_breathing_sessions_collection = db.user_breathing_sessions
 
 # Ensure indexes (idempotent)
 db.users.create_index("email", unique=True)
@@ -52,3 +54,13 @@ db.chat_messages.create_index([("conversation_id", ASCENDING), ("created_at", AS
 db.otp_codes.create_index("email")
 db.otp_codes.create_index("expires_at")
 db.otp_codes.create_index([("email", ASCENDING), ("used", ASCENDING)])
+
+# Breathing collections indexes
+db.breathing_exercises.create_index("exercise_id", unique=True)
+db.breathing_exercises.create_index("slug", unique=True, sparse=True)
+db.breathing_exercises.create_index("is_active")
+
+db.user_breathing_sessions.create_index("session_id", unique=True)
+db.user_breathing_sessions.create_index("user_id")
+db.user_breathing_sessions.create_index("exercise_id")
+db.user_breathing_sessions.create_index("completed_at")

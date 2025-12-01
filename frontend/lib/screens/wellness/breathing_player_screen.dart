@@ -3,8 +3,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import 'meditation_screen.dart'; // Ensure correct import path
-
 // --- Theme Constants ---
 const Color _bgCream = Color(0xFFF7F4F2);
 const Color _surfaceWhite = Colors.white;
@@ -159,9 +157,69 @@ class _BreathingPlayerScreenState extends State<BreathingPlayerScreen>
       _currentCycle = widget.pattern.cycles;
       _remainingInStep = 0;
     });
-    // Show completion dialog or effect
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Session Completed. Well done!")),
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Well Done!',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: _textDark,
+          ),
+        ),
+        content: const Text(
+          'You have completed your breathing session.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            color: _textGrey,
+            fontSize: 16,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              Navigator.of(context).popUntil((route) => route.isFirst); // Go to Home
+            },
+            child: const Text(
+              'Home',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: _textGrey,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Close dialog
+              _resetStep();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accentOrange,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: const Text(
+              'One More Set',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

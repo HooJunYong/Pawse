@@ -28,7 +28,7 @@ const _breathingExercises = [
         BreathStep(label: 'Exhale', seconds: 4),
         BreathStep(label: 'Hold', seconds: 4),
       ],
-      cycles: 4,
+      cycles: 15,
     ),
   ),
   (
@@ -36,14 +36,14 @@ const _breathingExercises = [
     color: _blueAccent,
     title: '4-7-8 Breathing',
     subtitle: 'Helps reduce anxiety and can aid in falling asleep.',
-    durationLabel: '5 min',
+    durationLabel: '2.5 min',
     pattern: BreathPattern(
       steps: [
         BreathStep(label: 'Inhale', seconds: 4),
         BreathStep(label: 'Hold', seconds: 7),
         BreathStep(label: 'Exhale', seconds: 8),
       ],
-      cycles: 4,
+      cycles: 8,
     ),
   ),
   (
@@ -51,13 +51,13 @@ const _breathingExercises = [
     color: _greenAccent,
     title: 'Diaphragmatic',
     subtitle: 'Strengthens your diaphragm and increases lung efficiency.',
-    durationLabel: '3 min',
+    durationLabel: '6 min',
     pattern: BreathPattern(
       steps: [
         BreathStep(label: 'Inhale', seconds: 4),
         BreathStep(label: 'Exhale', seconds: 6),
       ],
-      cycles: 6,
+      cycles: 36,
     ),
   ),
 ];
