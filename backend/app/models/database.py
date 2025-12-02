@@ -11,6 +11,9 @@ chat_conversations_collection = db.chat_conversations
 chat_messages_collection = db.chat_messages
 breathing_exercises_collection = db.breathing_exercises
 user_breathing_sessions_collection = db.user_breathing_sessions
+music_tracks_collection = db.music_tracks
+user_playlists_collection = db.user_playlists
+music_listening_sessions_collection = db.music_listening_sessions
 
 # Ensure indexes (idempotent)
 db.users.create_index("email", unique=True)
@@ -64,3 +67,21 @@ db.user_breathing_sessions.create_index("session_id", unique=True)
 db.user_breathing_sessions.create_index("user_id")
 db.user_breathing_sessions.create_index("exercise_id")
 db.user_breathing_sessions.create_index("completed_at")
+
+# Music collections indexes
+db.music_tracks.create_index("music_id", unique=True)
+db.music_tracks.create_index("title")
+db.music_tracks.create_index("artist")
+db.music_tracks.create_index("mood_category")
+db.music_tracks.create_index("added_at")
+
+db.user_playlists.create_index("user_playlist_id", unique=True)
+db.user_playlists.create_index("user_id")
+db.user_playlists.create_index("playlist_name")
+db.user_playlists.create_index("is_public")
+
+db.music_listening_sessions.create_index("music_session_id", unique=True)
+db.music_listening_sessions.create_index("user_id")
+db.music_listening_sessions.create_index("playlist_id")
+db.music_listening_sessions.create_index("user_playlist_id")
+db.music_listening_sessions.create_index("started_at")

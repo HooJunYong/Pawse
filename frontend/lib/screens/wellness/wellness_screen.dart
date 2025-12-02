@@ -211,7 +211,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MusicHomeScreen(),
+                                builder: (context) => MusicHomeScreen(userId: widget.userId),
                               ),
                             );
                           },
@@ -524,7 +524,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const MusicHomeScreen(),
+              builder: (context) => MusicHomeScreen(userId: widget.userId),
             ),
           );
         },

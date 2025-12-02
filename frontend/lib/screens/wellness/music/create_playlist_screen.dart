@@ -1,9 +1,30 @@
 import 'package:flutter/material.dart';
 
+import '../../../models/music_models.dart';
+import '../../../services/music_api_service.dart';
 import 'add_music_screen.dart';
 
-class CreatePlaylistScreen extends StatelessWidget {
-  const CreatePlaylistScreen({super.key});
+class CreatePlaylistScreen extends StatefulWidget {
+  final String userId;
+
+  const CreatePlaylistScreen({super.key, required this.userId});
+
+  @override
+  State<CreatePlaylistScreen> createState() => _CreatePlaylistScreenState();
+}
+
+class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
+  final MusicApiService _musicApi = const MusicApiService();
+  final TextEditingController _nameController = TextEditingController();
+
+  bool _isSubmitting = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +40,7 @@ class CreatePlaylistScreen extends StatelessWidget {
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 20),
                       Container(
@@ -38,19 +60,18 @@ class CreatePlaylistScreen extends StatelessWidget {
                         child: const Icon(Icons.music_note, size: 80, color: Colors.white),
                       ),
                       const SizedBox(height: 40),
-                      const Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Playlist Name',
-                          style: TextStyle(
-                            fontFamily: 'Nunito',
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF422006),
-                          ),
+                      const Text(
+                        'Playlist Name',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF422006),
                         ),
                       ),
                       const SizedBox(height: 8),
                       TextField(
+                        controller: _nameController,
+                        textInputAction: TextInputAction.done,
                         decoration: InputDecoration(
                           hintText: 'e.g., Study Flow',
                           filled: true,
@@ -62,16 +83,21 @@ class CreatePlaylistScreen extends StatelessWidget {
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                         ),
                       ),
-                      const SizedBox(height: 32),
+                      if (_error != null) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          _error!,
+                          style: const TextStyle(
+                            fontFamily: 'Nunito',
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                      const Spacer(),
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (context) => const AddMusicScreen()),
-                            );
-                          },
+                          onPressed: _isSubmitting ? null : _createPlaylist,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF5D4037),
                             foregroundColor: Colors.white,
@@ -85,7 +111,13 @@ class CreatePlaylistScreen extends StatelessWidget {
                               fontSize: 16,
                             ),
                           ),
-                          child: const Text('Create & Add Songs'),
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Text('Create & Add Songs'),
                         ),
                       ),
                     ],
@@ -121,10 +153,61 @@ class CreatePlaylistScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 48), // Balance the back button
+            const SizedBox(width: 48),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _createPlaylist() async {
+    FocusScope.of(context).unfocus();
+    final String name = _nameController.text.trim();
+    if (name.isEmpty) {
+      setState(() {
+        _error = 'Please give your playlist a name.';
+      });
+      return;
+    }
+    setState(() {
+      _isSubmitting = true;
+      _error = null;
+    });
+    try {
+      final UserPlaylist playlist = await _musicApi.createPlaylist(
+        userId: widget.userId,
+        name: name,
+      );
+      if (!mounted) {
+        return;
+      }
+      final UserPlaylist? updated = await Navigator.push<UserPlaylist?>(
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddMusicScreen(
+            playlist: playlist,
+            userId: widget.userId,
+          ),
+        ),
+      );
+      if (!mounted) {
+        return;
+      }
+      Navigator.pop(context, updated ?? playlist);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = error.toString();
+      });
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSubmitting = false;
+      });
+    }
   }
 }

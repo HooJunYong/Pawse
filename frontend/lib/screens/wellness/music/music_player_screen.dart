@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../../../models/music_models.dart';
+
 class MusicPlayerScreen extends StatelessWidget {
-  const MusicPlayerScreen({super.key});
+  final MusicTrack? track;
+
+  const MusicPlayerScreen({super.key, this.track});
 
   @override
   Widget build(BuildContext context) {
+    final MusicTrack? selectedTrack = track;
+    final String title = selectedTrack?.title ?? 'Take a mindful pause';
+    final String artist = selectedTrack?.artist ?? 'Press play to begin';
+    final String totalDuration = selectedTrack?.durationLabel ?? '0:00';
     return Scaffold(
       backgroundColor: const Color(0xFFF7F4F2),
       appBar: AppBar(
@@ -37,42 +45,27 @@ class MusicPlayerScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFCC80),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.music_note, size: 120, color: Colors.white),
-              ),
+              _AlbumArt(selectedTrack: selectedTrack),
               const SizedBox(height: 40),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Someone Like You',
-                        style: TextStyle(
+                        title,
+                        style: const TextStyle(
                           fontFamily: 'Nunito',
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF422006),
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Adele',
-                        style: TextStyle(
+                        artist,
+                        style: const TextStyle(
                           fontFamily: 'Nunito',
                           fontSize: 16,
                           color: Colors.grey,
@@ -103,13 +96,13 @@ class MusicPlayerScreen extends StatelessWidget {
                       onChanged: (value) {},
                     ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text('1:24', style: TextStyle(fontFamily: 'Nunito', fontSize: 12)),
-                        Text('4:45', style: TextStyle(fontFamily: 'Nunito', fontSize: 12)),
+                        const Text('0:00', style: TextStyle(fontFamily: 'Nunito', fontSize: 12)),
+                        Text(totalDuration, style: const TextStyle(fontFamily: 'Nunito', fontSize: 12)),
                       ],
                     ),
                   ),
@@ -158,6 +151,58 @@ class MusicPlayerScreen extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AlbumArt extends StatelessWidget {
+  final MusicTrack? selectedTrack;
+
+  const _AlbumArt({required this.selectedTrack});
+
+  @override
+  Widget build(BuildContext context) {
+    final String? albumImage = selectedTrack?.albumImageUrl ?? selectedTrack?.thumbnailUrl;
+    final Widget fallback = Container(
+      width: 300,
+      height: 300,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFCC80),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      child: const Icon(Icons.music_note, size: 120, color: Colors.white),
+    );
+
+    if (albumImage == null || albumImage.isEmpty) {
+      return fallback;
+    }
+
+    return Container(
+      width: 300,
+      height: 300,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 30,
+            offset: const Offset(0, 15),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Image.network(
+        albumImage,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
       ),
     );
   }
