@@ -10,7 +10,7 @@ import '../../widgets/bottom_nav.dart';
 import 'breathing_list_screen.dart';
 import 'journaling_screen.dart';
 import 'meditation_screen.dart';
-import 'music_screen.dart';
+import 'music/music_home_screen.dart';
 
 class WellnessScreen extends StatefulWidget {
   const WellnessScreen({super.key, required this.userId});
@@ -211,7 +211,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (context) => const MusicScreen(),
+                                builder: (context) => const MusicHomeScreen(),
                               ),
                             );
                           },
@@ -524,7 +524,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const MusicScreen(),
+              builder: (context) => const MusicHomeScreen(),
             ),
           );
         },
