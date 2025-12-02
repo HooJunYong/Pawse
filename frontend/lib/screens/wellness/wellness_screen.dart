@@ -1,21 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
+import '../../models/breathing_models.dart';
+import '../../models/journal_model.dart';
+import '../../services/breathing_service.dart';
+import '../../services/journal_service.dart';
+import '../../services/meditation_progress_service.dart';
 import '../../widgets/bottom_nav.dart';
 import 'breathing_list_screen.dart';
 import 'journaling_screen.dart';
 import 'meditation_screen.dart';
 import 'music_screen.dart';
 
-
 class WellnessScreen extends StatefulWidget {
-  final String userId;
   const WellnessScreen({super.key, required this.userId});
+
+  final String userId;
 
   @override
   State<WellnessScreen> createState() => _WellnessScreenState();
 }
 
 class _WellnessScreenState extends State<WellnessScreen> {
+  bool _isProgressLoading = false;
+  String? _progressError;
+  List<_ProgressStatus> _dailyProgress = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDailyProgress();
+  }
+
   @override
   Widget build(BuildContext context) {
     final _DailyRecommendation recommendation = _getDailyRecommendation(context);
@@ -43,7 +59,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Today's Recommendation Card
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(20),
@@ -144,8 +159,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Explore Activities Section
                   const Text(
                     'Explore Activities',
                     style: TextStyle(
@@ -156,8 +169,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Activities Grid
                   Row(
                     children: [
                       Expanded(
@@ -165,14 +176,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           'Journaling',
                           Icons.menu_book,
                           const Color.fromRGBO(251, 146, 60, 1),
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => JournalingScreen(userId: widget.userId),
-                              ),
-                            );
-                          },
+                          () => _openJournaling(context),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -181,16 +185,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           'Breathing',
                           Icons.air,
                           const Color.fromRGBO(251, 146, 60, 1),
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => BreathingListScreen(
-                                  userId: widget.userId,
-                                ),
-                              ),
-                            );
-                          },
+                          () => _openBreathing(context),
                         ),
                       ),
                     ],
@@ -203,14 +198,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                           'Meditation',
                           Icons.self_improvement,
                           const Color.fromRGBO(251, 191, 36, 1),
-                          () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const MeditationScreen(),
-                              ),
-                            );
-                          },
+                          () => _openMeditation(context),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -232,8 +220,6 @@ class _WellnessScreenState extends State<WellnessScreen> {
                     ],
                   ),
                   const SizedBox(height: 24),
-                  
-                  // Your Progress Section
                   const Text(
                     'Your Progress',
                     style: TextStyle(
@@ -244,19 +230,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
-                  // Progress Items
-                  _buildProgressItem(
-                    'Meditation',
-                    'Yesterday, 8:15 AM',
-                    true,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildProgressItem(
-                    'Box Breathing',
-                    'Today, 9:00 AM',
-                    true,
-                  ),
+                  _buildProgressSection(),
                   const SizedBox(height: 24),
                 ],
               ),
@@ -266,12 +240,252 @@ class _WellnessScreenState extends State<WellnessScreen> {
       ),
       bottomNavigationBar: BottomNavBar(
         userId: widget.userId,
-        selectedIndex: 4, // Wellness/Flower icon is at index 4
-        onTap: (index) {
-          // Handle navigation for other tabs if needed
-        },
+        selectedIndex: 4,
+        onTap: (index) {},
       ),
     );
+  }
+
+  void _openJournaling(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => JournalingScreen(userId: widget.userId),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      _loadDailyProgress();
+    });
+  }
+
+  void _openBreathing(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => BreathingListScreen(userId: widget.userId),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      _loadDailyProgress();
+    });
+  }
+
+  void _openMeditation(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MeditationScreen(userId: widget.userId),
+      ),
+    ).then((_) {
+      if (!mounted) return;
+      _loadDailyProgress();
+    });
+  }
+
+  Widget _buildProgressSection() {
+    if (_isProgressLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 12),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    final List<Widget> items = [];
+
+    if (_progressError != null) {
+      items.add(
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF7ED),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFFFB74D).withOpacity(0.5)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, size: 16, color: Color(0xFFF97316)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _progressError!,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'Nunito',
+                    color: Color(0xFF92400E),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+      items.add(const SizedBox(height: 12));
+    }
+
+    if (_dailyProgress.isEmpty) {
+      items.add(
+        _buildProgressItem(
+          'No activity yet',
+          'Complete an activity to see it here.',
+          false,
+        ),
+      );
+    } else {
+      for (var i = 0; i < _dailyProgress.length; i++) {
+        final status = _dailyProgress[i];
+        items.add(
+          _buildProgressItem(
+            status.title,
+            _progressStatusLabel(status),
+            status.completed,
+          ),
+        );
+        if (i != _dailyProgress.length - 1) {
+          items.add(const SizedBox(height: 12));
+        }
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: items,
+    );
+  }
+
+  String _progressStatusLabel(_ProgressStatus status) {
+    if (!status.completed) {
+      return 'Not completed yet';
+    }
+    return _formatCompletedLabel(status.completedAt);
+  }
+
+  String _formatCompletedLabel(DateTime? timestamp) {
+    if (timestamp == null) {
+      return 'Completed';
+    }
+    final DateTime now = DateTime.now();
+    final DateTime local = timestamp.toLocal();
+    final DateTime startOfToday = DateTime(now.year, now.month, now.day);
+    final DateTime startOfTimestampDay = DateTime(local.year, local.month, local.day);
+    final DateFormat timeFormat = DateFormat('h:mm a');
+
+    if (startOfTimestampDay == startOfToday) {
+      return 'Today, ${timeFormat.format(local)}';
+    }
+    final DateTime startOfYesterday = startOfToday.subtract(const Duration(days: 1));
+    if (startOfTimestampDay == startOfYesterday) {
+      return 'Yesterday, ${timeFormat.format(local)}';
+    }
+    return DateFormat('MMM d, h:mm a').format(local);
+  }
+
+  Future<void> _loadDailyProgress() async {
+    setState(() {
+      _isProgressLoading = true;
+      _progressError = null;
+    });
+
+    final DateTime now = DateTime.now();
+    final DateTime startOfDay = DateTime(now.year, now.month, now.day);
+    final DateTime endOfDay = startOfDay.add(const Duration(days: 1));
+
+    bool journalingCompleted = false;
+    DateTime? journalingTime;
+
+    bool breathingCompleted = false;
+    DateTime? breathingTime;
+
+    bool meditationCompleted = false;
+    DateTime? meditationTime;
+
+    String? error;
+
+    try {
+      final journalService = JournalService();
+      final List<JournalEntry> entries = await journalService.getUserEntries(
+        widget.userId,
+        limit: 50,
+      );
+      for (final entry in entries) {
+        final DateTime created = entry.createdAt.toLocal();
+        if (_isWithinDay(created, startOfDay, endOfDay)) {
+          journalingCompleted = true;
+          if (journalingTime == null || created.isAfter(journalingTime!)) {
+            journalingTime = created;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load journal progress: $e');
+      error ??= 'Unable to retrieve complete progress data.';
+    }
+
+    try {
+      final breathingService = BreathingApiService();
+      final List<BreathingSession> sessions = await breathingService.getSessions(
+        widget.userId,
+        limit: 50,
+      );
+      for (final session in sessions) {
+        final DateTime completed = session.completedAt.toLocal();
+        if (_isWithinDay(completed, startOfDay, endOfDay) && session.cyclesCompleted > 0) {
+          breathingCompleted = true;
+          if (breathingTime == null || completed.isAfter(breathingTime!)) {
+            breathingTime = completed;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load breathing progress: $e');
+      error ??= 'Unable to retrieve complete progress data.';
+    }
+
+    try {
+      meditationTime = await MeditationProgressService.getCompletionForDay(
+        userId: widget.userId,
+        date: now,
+      );
+      meditationCompleted = meditationTime != null;
+    } catch (e) {
+      debugPrint('Failed to load meditation progress: $e');
+      error ??= 'Unable to retrieve complete progress data.';
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _isProgressLoading = false;
+      _progressError = error;
+      _dailyProgress = [
+        _ProgressStatus(
+          id: 'journaling',
+          title: 'Journaling',
+          completed: journalingCompleted,
+          completedAt: journalingTime,
+        ),
+        _ProgressStatus(
+          id: 'breathing',
+          title: 'Breathing',
+          completed: breathingCompleted,
+          completedAt: breathingTime,
+        ),
+        _ProgressStatus(
+          id: 'meditation',
+          title: 'Meditation',
+          completed: meditationCompleted,
+          completedAt: meditationTime,
+        ),
+      ];
+    });
+  }
+
+  bool _isWithinDay(DateTime timestamp, DateTime startOfDay, DateTime endOfDay) {
+    final DateTime local = timestamp.toLocal();
+    return !local.isBefore(startOfDay) && local.isBefore(endOfDay);
   }
 
   _DailyRecommendation _getDailyRecommendation(BuildContext context) {
@@ -282,14 +496,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
         gradientColors: const [Color(0xFFFED7AA), Color(0xFFFEE6D4)],
         buttonColor: const Color.fromRGBO(66, 32, 6, 1),
         icon: Icons.menu_book_rounded,
-        onStart: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => JournalingScreen(userId: widget.userId),
-            ),
-          );
-        },
+        onStart: () => _openJournaling(context),
       ),
       _DailyRecommendation(
         activityLabel: 'Deep Breathing',
@@ -297,16 +504,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
         gradientColors: const [Color(0xFFBBF7D0), Color(0xFFD1FAE5)],
         buttonColor: const Color(0xFF047857),
         icon: Icons.air,
-        onStart: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => BreathingListScreen(
-                userId: widget.userId,
-              ),
-            ),
-          );
-        },
+        onStart: () => _openBreathing(context),
       ),
       _DailyRecommendation(
         activityLabel: 'Guided Meditation',
@@ -314,14 +512,7 @@ class _WellnessScreenState extends State<WellnessScreen> {
         gradientColors: const [Color(0xFFC7D2FE), Color(0xFFE0E7FF)],
         buttonColor: const Color(0xFF4338CA),
         icon: Icons.self_improvement,
-        onStart: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MeditationScreen(),
-            ),
-          );
-        },
+        onStart: () => _openMeditation(context),
       ),
       _DailyRecommendation(
         activityLabel: 'Mindful Music Break',
@@ -479,4 +670,18 @@ class _DailyRecommendation {
   final Color buttonColor;
   final IconData icon;
   final VoidCallback onStart;
+}
+
+class _ProgressStatus {
+  const _ProgressStatus({
+    required this.id,
+    required this.title,
+    required this.completed,
+    this.completedAt,
+  });
+
+  final String id;
+  final String title;
+  final bool completed;
+  final DateTime? completedAt;
 }

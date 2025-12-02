@@ -76,7 +76,9 @@ const List<MeditationSession> _sessions = [
 ];
 
 class MeditationScreen extends StatelessWidget {
-  const MeditationScreen({Key? key}) : super(key: key);
+  const MeditationScreen({Key? key, required this.userId}) : super(key: key);
+
+  final String userId;
 
   @override
   Widget build(BuildContext context) {
@@ -228,7 +230,10 @@ class MeditationScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => MeditationPlayerScreen(session: session),
+        builder: (context) => MeditationPlayerScreen(
+          session: session,
+          userId: userId,
+        ),
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../../services/meditation_progress_service.dart';
 import 'meditation_screen.dart'; // Ensure this path is correct
 
 // --- Theme Constants ---
@@ -16,10 +17,11 @@ const Color _errorRed = Color(0xFFEF4444);
 
 
 class MeditationPlayerScreen extends StatefulWidget {
-  const MeditationPlayerScreen({Key? key, required this.session})
+  const MeditationPlayerScreen({Key? key, required this.session, required this.userId})
       : super(key: key);
 
   final MeditationSession session;
+  final String userId;
 
   @override
   State<MeditationPlayerScreen> createState() => _MeditationPlayerScreenState();
@@ -65,6 +67,10 @@ class _MeditationPlayerScreenState extends State<MeditationPlayerScreen> {
       if (completed) {
         _player.seek(Duration.zero);
         _player.pause(); // Pause after completion
+        MeditationProgressService.markCompleted(
+          userId: widget.userId,
+          timestamp: DateTime.now(),
+        );
       }
     });
   }
