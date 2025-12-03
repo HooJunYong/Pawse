@@ -25,6 +25,39 @@ class MusicApiService {
         .toList(growable: false);
   }
 
+  Future<List<MusicAlbum>> getAlbumRecommendations({
+    required MoodType mood,
+    int albumLimit = 3,
+    int minTracks = 5,
+    int maxTracks = 8,
+    String? market,
+  }) async {
+    final queryParameters = <String, String>{
+      'mood': mood.apiValue,
+      'album_limit': albumLimit.toString(),
+      'min_tracks': minTracks.toString(),
+      'max_tracks': maxTracks.toString(),
+      if (market != null && market.isNotEmpty) 'market': market,
+    };
+    final endpoint =
+        _buildEndpoint('/music/recommendations/albums', queryParameters);
+    final response = await ApiService.get(endpoint);
+    _throwIfFailed(response.statusCode, response.body);
+    final List<dynamic> payload = jsonDecode(response.body) as List<dynamic>;
+    return payload
+        .map((dynamic item) => MusicAlbum.fromJson(_normalizeMap(item)))
+        .toList(growable: false);
+  }
+
+  Future<List<MoodOption>> getMoodOptions() async {
+    final response = await ApiService.get('/music/moods');
+    _throwIfFailed(response.statusCode, response.body);
+    final List<dynamic> payload = jsonDecode(response.body) as List<dynamic>;
+    return payload
+        .map((dynamic item) => MoodOption.fromJson(_normalizeMap(item)))
+        .toList(growable: false);
+  }
+
   Future<List<MusicTrack>> searchTracks({
     required String query,
     int limit = 10,

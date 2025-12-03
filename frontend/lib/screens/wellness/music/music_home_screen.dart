@@ -17,14 +17,12 @@ class MusicHomeScreen extends StatefulWidget {
 
 class _MusicHomeScreenState extends State<MusicHomeScreen> {
   final MusicApiService _musicApi = const MusicApiService();
-  final List<MoodUiOption> _moodOptions = const [
-    MoodUiOption(title: 'Calm', icon: Icons.cloud, color: Color(0xFFFFE082), mood: MoodType.happy),
-    MoodUiOption(title: 'Focus', icon: Icons.book, color: Color(0xFFFFAB91), mood: MoodType.neutral),
-    MoodUiOption(title: 'Empower', icon: Icons.bolt, color: Color(0xFFFFCC80), mood: MoodType.veryHappy),
-  ];
-
-  late MoodUiOption _selectedMood;
-  late Future<List<MusicTrack>> _recommendationsFuture;
+  List<MoodOption> _moodOptions = const <MoodOption>[];
+  bool _isLoadingMoods = true;
+  String? _moodError;
+  MoodOption? _selectedMood;
+  Future<List<MusicAlbum>> _albumRecommendationsFuture =
+      Future<List<MusicAlbum>>.value(const <MusicAlbum>[]);
   List<UserPlaylist> _playlists = const <UserPlaylist>[];
   bool _isLoadingPlaylists = true;
   String? _playlistError;
@@ -33,8 +31,7 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedMood = _moodOptions.first;
-    _recommendationsFuture = _musicApi.getRecommendations(mood: _selectedMood.mood, limit: 12);
+    _fetchMoodOptions();
     _fetchPlaylists();
   }
 
@@ -123,6 +120,84 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   }
 
   Widget _buildMoodSection() {
+    Widget content;
+    if (_isLoadingMoods) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (_moodError != null) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            _moodError!,
+            style: TextStyle(
+              fontFamily: 'Nunito',
+              color: const Color(0xFF422006).withOpacity(0.7),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _fetchMoodOptions(showLoader: true),
+            child: const Text('Retry'),
+          ),
+        ],
+      );
+    } else if (_moodOptions.isEmpty) {
+      content = Center(
+        child: Text(
+          'No moods available right now.',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            color: const Color(0xFF422006).withOpacity(0.7),
+          ),
+        ),
+      );
+    } else {
+      content = ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: _moodOptions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final option = _moodOptions[index];
+          final bool isSelected = option.mood == _selectedMood?.mood;
+          return GestureDetector(
+            onTap: () => _selectMood(option),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 110,
+              decoration: BoxDecoration(
+                color: option.color,
+                borderRadius: BorderRadius.circular(16),
+                border: isSelected ? Border.all(color: Colors.white, width: 2) : null,
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: option.color.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(option.iconData, color: Colors.white, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    option.title,
+                    style: const TextStyle(
+                      fontFamily: 'Nunito',
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,66 +211,20 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        SizedBox(
-          height: 110,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            itemCount: _moodOptions.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemBuilder: (context, index) {
-              final option = _moodOptions[index];
-              final bool isSelected = option.mood == _selectedMood.mood;
-              return GestureDetector(
-                onTap: () => _selectMood(option),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 110,
-                  decoration: BoxDecoration(
-                    color: option.color,
-                    borderRadius: BorderRadius.circular(16),
-                    border: isSelected
-                        ? Border.all(color: Colors.white, width: 2)
-                        : null,
-                    boxShadow: isSelected
-                        ? [
-                            BoxShadow(
-                              color: option.color.withOpacity(0.4),
-                              blurRadius: 12,
-                              offset: const Offset(0, 6),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(option.icon, color: Colors.white, size: 32),
-                      const SizedBox(height: 8),
-                      Text(
-                        option.title,
-                        style: const TextStyle(
-                          fontFamily: 'Nunito',
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+        SizedBox(height: 110, child: content),
       ],
     );
   }
 
   Widget _buildRecommendationsSection() {
+    final String? moodTitle = _selectedMood?.title;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Recommended tracks (${_selectedMood.title.toLowerCase()})',
+            moodTitle != null
+              ? 'Recommended albums (${moodTitle.toLowerCase()})'
+              : 'Recommended albums',
           style: const TextStyle(
             fontFamily: 'Nunito',
             fontSize: 16,
@@ -204,9 +233,42 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        FutureBuilder<List<MusicTrack>>(
-          future: _recommendationsFuture,
+        FutureBuilder<List<MusicAlbum>>(
+          future: _albumRecommendationsFuture,
           builder: (context, snapshot) {
+            if (_selectedMood == null) {
+              if (_isLoadingMoods) {
+                return const SizedBox(
+                  height: 160,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              }
+              if (_moodError != null) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Choose a mood to see recommendations.',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        color: const Color(0xFF422006).withOpacity(0.7),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _fetchMoodOptions(showLoader: true),
+                      child: const Text('Reload moods'),
+                    ),
+                  ],
+                );
+              }
+              return Text(
+                'No moods found. Try refreshing.',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  color: const Color(0xFF422006).withOpacity(0.7),
+                ),
+              );
+            }
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const SizedBox(
                 height: 160,
@@ -231,30 +293,28 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
                 ],
               );
             }
-            final List<MusicTrack> tracks = snapshot.data ?? const <MusicTrack>[];
-            if (tracks.isEmpty) {
+            final List<MusicAlbum> albums = snapshot.data ?? const <MusicAlbum>[];
+            if (albums.isEmpty) {
               return Text(
-                'No tracks found. Try another mood.',
+                'No albums found. Try another mood.',
                 style: TextStyle(
                   fontFamily: 'Nunito',
                   color: const Color(0xFF422006).withOpacity(0.7),
                 ),
               );
             }
-            return SizedBox(
-              height: 180,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: tracks.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 12),
-                itemBuilder: (context, index) {
-                  final track = tracks[index];
-                  return _RecommendationCard(
-                    track: track,
-                    onPlay: () => _openTrack(track),
-                  );
-                },
-              ),
+            return Column(
+              children: albums
+                  .map(
+                    (album) => Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: _AlbumCard(
+                        album: album,
+                        onTrackSelected: (track) => _openTrack(track),
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
             );
           },
         ),
@@ -391,6 +451,58 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
     );
   }
 
+  Future<void> _fetchMoodOptions({bool showLoader = true}) async {
+    if (showLoader) {
+      setState(() {
+        _isLoadingMoods = true;
+        _moodError = null;
+      });
+    } else {
+      setState(() {
+        _moodError = null;
+      });
+    }
+    try {
+      final moods = await _musicApi.getMoodOptions();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _moodOptions = moods;
+        _isLoadingMoods = false;
+        if (moods.isEmpty) {
+          _selectedMood = null;
+          _albumRecommendationsFuture =
+              Future<List<MusicAlbum>>.value(const <MusicAlbum>[]);
+          return;
+        }
+        final MoodOption? previous = _selectedMood;
+        MoodOption active = moods.first;
+        if (previous != null) {
+          try {
+            active = moods.firstWhere((option) => option.mood == previous.mood);
+          } catch (_) {
+            active = moods.first;
+          }
+        }
+        _selectedMood = active;
+        _albumRecommendationsFuture =
+          _musicApi.getAlbumRecommendations(mood: active.mood, albumLimit: 3);
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _moodError = error.toString();
+        _isLoadingMoods = false;
+        _selectedMood = null;
+        _albumRecommendationsFuture =
+            Future<List<MusicAlbum>>.value(const <MusicAlbum>[]);
+      });
+    }
+  }
+
   Future<void> _fetchPlaylists({bool showLoader = true}) async {
     if (showLoader) {
       setState(() {
@@ -423,36 +535,48 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   }
 
   Future<void> _handleRefresh() async {
-    final Future<List<MusicTrack>> refreshedRecommendations =
-        _musicApi.getRecommendations(mood: _selectedMood.mood, limit: 12);
+    final Future<List<MusicAlbum>>? refreshedAlbums = _selectedMood == null
+        ? null
+        : _musicApi.getAlbumRecommendations(mood: _selectedMood!.mood, albumLimit: 3);
     await Future.wait<dynamic>([
-      refreshedRecommendations.then((tracks) {
-        if (mounted) {
-          setState(() {
-            _recommendationsFuture = Future.value(tracks);
-          });
-        }
-      }).catchError((error) {
-        if (mounted) {
-          setState(() {
-            _recommendationsFuture = Future.error(error);
-          });
-        }
-      }),
+      if (refreshedAlbums != null)
+        refreshedAlbums.then((albums) {
+          if (mounted) {
+            setState(() {
+              _albumRecommendationsFuture =
+                  Future<List<MusicAlbum>>.value(albums);
+            });
+          }
+        }).catchError((error) {
+          if (mounted) {
+            setState(() {
+              _albumRecommendationsFuture =
+                  Future<List<MusicAlbum>>.error(error);
+            });
+          }
+        }),
+      _fetchMoodOptions(showLoader: false),
       _fetchPlaylists(showLoader: false),
     ]);
   }
 
-  void _selectMood(MoodUiOption option) {
+  void _selectMood(MoodOption option) {
     setState(() {
       _selectedMood = option;
-      _recommendationsFuture = _musicApi.getRecommendations(mood: option.mood, limit: 12);
+      _albumRecommendationsFuture =
+          _musicApi.getAlbumRecommendations(mood: option.mood, albumLimit: 3);
     });
   }
 
   void _retryRecommendations() {
+    final mood = _selectedMood;
+    if (mood == null) {
+      _fetchMoodOptions(showLoader: true);
+      return;
+    }
     setState(() {
-      _recommendationsFuture = _musicApi.getRecommendations(mood: _selectedMood.mood, limit: 12);
+      _albumRecommendationsFuture =
+          _musicApi.getAlbumRecommendations(mood: mood.mood, albumLimit: 3);
     });
   }
 
@@ -517,83 +641,155 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   }
 }
 
-class _RecommendationCard extends StatelessWidget {
-  final MusicTrack track;
-  final VoidCallback onPlay;
+class _AlbumCard extends StatelessWidget {
+  final MusicAlbum album;
+  final ValueChanged<MusicTrack> onTrackSelected;
 
-  const _RecommendationCard({required this.track, required this.onPlay});
+  const _AlbumCard({required this.album, required this.onTrackSelected});
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onPlay,
-      child: Container(
-        width: 150,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    final List<Widget> trackWidgets = <Widget>[];
+    for (final entry in album.tracks.asMap().entries) {
+      final int index = entry.key;
+      final MusicTrack track = entry.value;
+      trackWidgets.add(
+        InkWell(
+          onTap: () => onTrackSelected(track),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+            child: Row(
+              children: [
+                Text(
+                  '${index + 1}.',
+                  style: const TextStyle(
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF422006),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        track.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF422006),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        track.artist,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 12,
+                          color: const Color(0xFF422006).withOpacity(0.6),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  track.durationLabel,
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 12,
+                    color: const Color(0xFF422006).withOpacity(0.6),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(Icons.play_arrow, color: Color(0xFF422006)),
+              ],
             ),
-          ],
+          ),
         ),
+      );
+      if (index < album.tracks.length - 1) {
+        trackWidgets.add(
+          Divider(color: const Color(0xFF422006).withOpacity(0.1), height: 1),
+        );
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              child: AspectRatio(
-                aspectRatio: 1,
-                child: (track.albumImageUrl ?? track.thumbnailUrl) != null
-                    ? Image.network(
-                        track.albumImageUrl ?? track.thumbnailUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: const Color(0xFFFFE0B2),
-                          child: const Icon(Icons.music_note, color: Color(0xFF5D4037)),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: AspectRatio(
+                    aspectRatio: 1,
+                    child: album.albumImageUrl != null && album.albumImageUrl!.isNotEmpty
+                        ? Image.network(
+                            album.albumImageUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: const Color(0xFFFFE0B2),
+                              child: const Icon(Icons.album, color: Color(0xFF5D4037)),
+                            ),
+                          )
+                        : Container(
+                            color: const Color(0xFFFFE0B2),
+                            child: const Icon(Icons.album, color: Color(0xFF5D4037)),
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        album.albumTitle.isNotEmpty ? album.albumTitle : 'Mood Mix',
+                        style: const TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Color(0xFF422006),
                         ),
-                      )
-                    : Container(
-                        color: const Color(0xFFFFE0B2),
-                        child: const Icon(Icons.music_note, color: Color(0xFF5D4037)),
                       ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'Nunito',
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF422006),
-                    ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${album.tracks.length} song${album.tracks.length == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 12,
+                          color: const Color(0xFF422006).withOpacity(0.6),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    track.artist,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'Nunito',
-                      fontSize: 12,
-                      color: const Color(0xFF422006).withOpacity(0.6),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
+            const SizedBox(height: 12),
+            ...trackWidgets,
           ],
         ),
       ),
@@ -685,7 +881,7 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
   _MusicSearchDelegate(this.musicApi);
 
   @override
-  String get searchFieldLabel => 'Search Spotify tracks';
+  String get searchFieldLabel => 'Search Jamendo tracks';
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -745,11 +941,17 @@ class _SearchResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (query.isEmpty) {
+    final String normalizedQuery = query.trim();
+    if (normalizedQuery.isEmpty) {
       return const SizedBox.shrink();
     }
+    if (normalizedQuery.length < 2) {
+      return const Center(
+        child: Text('Type at least 2 characters to search.'),
+      );
+    }
     return FutureBuilder<List<MusicTrack>>(
-      future: musicApi.searchTracks(query: query, limit: 25),
+      future: musicApi.searchTracks(query: normalizedQuery, limit: 25),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

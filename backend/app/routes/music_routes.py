@@ -4,8 +4,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..config.settings import SPOTIFY_DEFAULT_MARKET
+from ..config.settings import (
+    JAMENDO_DEFAULT_LANGUAGE,
+    JAMENDO_DEFAULT_ORDER,
+)
+from ..models.database import db
 from ..models.music_schemas import (
+    MusicAlbumResponse,
+    MoodOptionResponse,
     MoodType,
     MusicListeningSessionCreate,
     MusicListeningSessionResponse,
@@ -15,9 +21,8 @@ from ..models.music_schemas import (
     UserPlaylistResponse,
     UserPlaylistUpdate,
 )
-from ..models.database import db
+from ..services.jamendo_client import JamendoError
 from ..services.music_service import MusicService
-from ..services.spotify_client import SpotifyAuthError
 from ..services.user_playlist_service import (
     MusicListeningSessionService,
     UserPlaylistService,
@@ -29,29 +34,119 @@ music_service = MusicService(db)
 playlist_service = UserPlaylistService(db)
 session_service = MusicListeningSessionService(db)
 
+MOOD_OPTIONS: List[MoodOptionResponse] = [
+    MoodOptionResponse(
+        mood=MoodType.happy,
+        title="Calm",
+        icon="cloud",
+        color="#FFE082",
+    ),
+    MoodOptionResponse(
+        mood=MoodType.neutral,
+        title="Focus",
+        icon="book",
+        color="#FFAB91",
+    ),
+    MoodOptionResponse(
+        mood=MoodType.very_happy,
+        title="Empower",
+        icon="bolt",
+        color="#FFCC80",
+    ),
+    MoodOptionResponse(
+        mood=MoodType.sad,
+        title="Comfort",
+        icon="spa",
+        color="#B39DDB",
+    ),
+    MoodOptionResponse(
+        mood=MoodType.awful,
+        title="Support",
+        icon="self_improvement",
+        color="#90CAF9",
+    ),
+]
+
+
+@router.get("/moods", response_model=List[MoodOptionResponse])
+def list_moods() -> List[MoodOptionResponse]:
+    return MOOD_OPTIONS
+
 
 @router.get("/recommendations", response_model=List[MusicTrackResponse])
 def get_recommendations(
     mood: MoodType = Query(..., description="User mood to tailor recommendations"),
     limit: int = Query(10, ge=1, le=50),
-    market: Optional[str] = Query(None, description="Spotify market code, e.g. US"),
-):
+    language: Optional[str] = Query(
+        None,
+        description="Jamendo language code (defaults to configured language)",
+    ),
+    order: Optional[str] = Query(
+        None,
+        description="Jamendo ordering value, e.g. popularity_total",
+    ),
+) -> List[MusicTrackResponse]:
     try:
-        return music_service.recommend_by_mood(mood, limit=limit, market=market or SPOTIFY_DEFAULT_MARKET)
-    except SpotifyAuthError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return music_service.recommend_by_mood(
+            mood,
+            limit=limit,
+            language=language or JAMENDO_DEFAULT_LANGUAGE,
+            order=order or JAMENDO_DEFAULT_ORDER,
+        )
+    except JamendoError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/recommendations/albums", response_model=List[MusicAlbumResponse])
+def get_album_recommendations(
+    mood: MoodType = Query(..., description="User mood to tailor album recommendations"),
+    album_limit: int = Query(3, ge=1, le=5),
+    min_tracks: int = Query(5, ge=1, le=12),
+    max_tracks: int = Query(8, ge=1, le=12),
+    language: Optional[str] = Query(
+        None,
+        description="Jamendo language code (defaults to configured language)",
+    ),
+    order: Optional[str] = Query(
+        None,
+        description="Jamendo ordering value, e.g. popularity_total",
+    ),
+) -> List[MusicAlbumResponse]:
+    try:
+        return music_service.recommend_albums_by_mood(
+            mood,
+            album_limit=album_limit,
+            min_tracks_per_album=min_tracks,
+            max_tracks_per_album=max_tracks,
+            language=language or JAMENDO_DEFAULT_LANGUAGE,
+            order=order or JAMENDO_DEFAULT_ORDER,
+        )
+    except JamendoError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/search", response_model=List[MusicTrackResponse])
 def search_music(
-    query: str = Query(..., min_length=2, description="Search term sent to Spotify"),
+    query: str = Query(..., min_length=2, description="Search term for Jamendo"),
     limit: int = Query(10, ge=1, le=50),
-    market: Optional[str] = Query(None, description="Spotify market code, e.g. US"),
-):
+    language: Optional[str] = Query(
+        None,
+        description="Jamendo language code (defaults to configured language)",
+    ),
+    order: Optional[str] = Query(
+        None,
+        description="Jamendo ordering value, e.g. popularity_total",
+    ),
+) -> List[MusicTrackResponse]:
     try:
-        return music_service.search_tracks(query, limit=limit, market=market or SPOTIFY_DEFAULT_MARKET)
-    except SpotifyAuthError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        return music_service.search_tracks(
+            query,
+            limit=limit,
+            language=language or JAMENDO_DEFAULT_LANGUAGE,
+            order=order or JAMENDO_DEFAULT_ORDER,
+        )
+    except JamendoError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/playlists", response_model=UserPlaylistResponse, status_code=201)
@@ -96,8 +191,7 @@ def delete_playlist(playlist_id: str) -> None:
 
 @router.post("/playlists/{playlist_id}/songs", response_model=UserPlaylistResponse)
 def add_song_to_playlist(playlist_id: str, payload: PlaylistSongRequest) -> UserPlaylistResponse:
-    # Ensure the track exists in the central music catalog.
-    music_service.ensure_track(payload)
+    music_service.ensure_track(payload, default_mood=payload.mood_category)
     updated = playlist_service.add_song(playlist_id, payload)
     if not updated:
         raise HTTPException(status_code=404, detail="Playlist not found")

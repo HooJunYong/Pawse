@@ -43,18 +43,30 @@ extension MoodTypeX on MoodType {
 }
 
 /// UI helper used by the home screen to render mood cards.
-class MoodUiOption {
-  final String title;
-  final IconData icon;
-  final Color color;
+class MoodOption {
   final MoodType mood;
+  final String title;
+  final String icon;
+  final Color color;
 
-  const MoodUiOption({
+  const MoodOption({
+    required this.mood,
     required this.title,
     required this.icon,
     required this.color,
-    required this.mood,
   });
+
+  factory MoodOption.fromJson(Map<String, dynamic> json) {
+    final String rawColor = (json['color'] as String? ?? '').trim();
+    return MoodOption(
+      mood: _moodFromValue(json['mood'] as String? ?? ''),
+      title: json['title'] as String? ?? '',
+      icon: json['icon'] as String? ?? 'music_note',
+      color: _colorFromHex(rawColor.isEmpty ? '#FFE082' : rawColor),
+    );
+  }
+
+  IconData get iconData => _iconLookup[icon] ?? Icons.music_note;
 }
 
 class MusicTrack {
@@ -115,6 +127,38 @@ class MusicTrack {
   }
 
   String get durationLabel => _formatDuration(durationSeconds);
+}
+
+class MusicAlbum {
+  final String albumId;
+  final String albumTitle;
+  final String? albumImageUrl;
+  final List<MusicTrack> tracks;
+
+  const MusicAlbum({
+    required this.albumId,
+    required this.albumTitle,
+    required this.albumImageUrl,
+    required this.tracks,
+  });
+
+  factory MusicAlbum.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> rawTracks = json['tracks'] as List<dynamic>? ?? const [];
+    return MusicAlbum(
+      albumId: json['album_id'] as String? ?? '',
+      albumTitle: json['album_title'] as String? ?? '',
+      albumImageUrl: json['album_image_url'] as String?,
+      tracks: rawTracks
+          .map((dynamic item) => MusicTrack.fromJson(
+                (item is Map<String, dynamic>)
+                    ? item
+                    : Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false),
+    );
+  }
+
+  int get trackCount => tracks.length;
 }
 
 class PlaylistSong {
@@ -273,3 +317,28 @@ String _formatDuration(int totalSeconds) {
   final int seconds = totalSeconds % 60;
   return '${minutes.toString()}:${seconds.toString().padLeft(2, '0')}';
 }
+
+MoodType _moodFromValue(String value) {
+  return MoodType.values.firstWhere(
+    (mood) => mood.apiValue == value || mood.name == value,
+    orElse: () => MoodType.happy,
+  );
+}
+
+Color _colorFromHex(String hex) {
+  var cleaned = hex.replaceAll('#', '').toUpperCase();
+  if (cleaned.length == 6) {
+    cleaned = 'FF$cleaned';
+  }
+  final int colorInt = int.tryParse(cleaned, radix: 16) ?? 0xFFFFE082;
+  return Color(colorInt);
+}
+
+const Map<String, IconData> _iconLookup = <String, IconData>{
+  'cloud': Icons.cloud,
+  'book': Icons.book,
+  'bolt': Icons.bolt,
+  'spa': Icons.spa,
+  'self_improvement': Icons.self_improvement,
+  'music_note': Icons.music_note,
+};

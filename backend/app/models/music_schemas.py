@@ -60,6 +60,20 @@ class MusicTrackResponse(MusicTrackBase):
         from_attributes = True
 
 
+class MoodOptionResponse(BaseModel):
+    mood: MoodType
+    title: str
+    icon: str
+    color: str
+
+
+class MusicAlbumResponse(BaseModel):
+    album_id: str
+    album_title: str
+    album_image_url: Optional[str] = None
+    tracks: List[MusicTrackResponse]
+
+
 class PlaylistSong(BaseModel):
     music_id: str = Field(..., max_length=64)
     title: str = Field(..., max_length=150)
