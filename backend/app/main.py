@@ -18,6 +18,7 @@ from .routes.schedule_routes import router as schedule_router
 from .routes.mood_routes import router as mood_router
 from .routes.personality_routes import router as personality_router
 from .routes.drift_bottle_routes import router as drift_bottle_router
+from .routes.activity_routes import router as activity_router
 from app.config.settings import get_settings
 
 # Load environment variables
@@ -74,6 +75,7 @@ app.include_router(message_router)
 app.include_router(companion_router)
 app.include_router(personality_router, tags=["Personalities"])
 app.include_router(drift_bottle_router, tags=["Drift Bottles"])
+app.include_router(activity_router, tags=["Activities"])
 app.include_router(auth_router, tags=["Authentication"])
 app.include_router(profile_router, tags=["Profile"])
 app.include_router(password_router, tags=["Password"])

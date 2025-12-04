@@ -3,6 +3,7 @@ import '../screens/homepage_screen.dart';
 import '../screens/chat/chat_session_screen.dart';
 import '../screens/mood/mood_tracking_screen.dart';
 import '../screens/profile/profile_screen.dart';
+import '../screens/gamification_and_reward/activity_screen.dart'; 
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -81,7 +82,7 @@ class BottomNavBar extends StatelessWidget {
           if (index == 3) {
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (context) => MoodTrackingScreen(userId: userId),
+                builder: (context) => ActivityScreen(userId: userId),
               ),
             );
           } else {
