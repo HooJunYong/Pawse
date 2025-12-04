@@ -1,17 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence, Set, cast
+from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+import re
 
+import httpx
 from pymongo import ReturnDocument
 from pymongo.collection import Collection
 from pymongo.database import Database
 
-from ..config.settings import (
-    JAMENDO_CLIENT_ID,
-    JAMENDO_DEFAULT_LANGUAGE,
-    JAMENDO_DEFAULT_ORDER,
-)
 from ..models.music_schemas import (
     MoodCategory,
     MoodType,
@@ -22,20 +19,21 @@ from ..models.music_schemas import (
     PlaylistSong,
     PlaylistSongRequest,
 )
-from .jamendo_client import JamendoClient, JamendoError
+
+
+ITUNES_SEARCH_URL = "https://itunes.apple.com/search"
+DEFAULT_COUNTRY = "US"
+MAX_ITUNES_LIMIT = 200
+
+
+class ITunesAPIError(RuntimeError):
+    """Raised when the iTunes Search API returns an error or unreadable payload."""
 
 
 class MusicService:
-    """Serve Jamendo powered music recommendations with MongoDB caching."""
+    """Serve iTunes-powered music recommendations with MongoDB caching."""
 
-    TAGS_BY_MOOD: Dict[MoodType, Sequence[str]] = {
-        MoodType.very_happy: ("upbeat", "dance", "electro"),
-        MoodType.happy: ("pop", "feelgood", "sunny"),
-        MoodType.neutral: ("ambient", "chill", "instrumental"),
-        MoodType.sad: ("acoustic", "piano", "soft"),
-        MoodType.awful: ("calm", "soothing", "relax"),
-    }
-
+    # Mood → local cache category (used for fallbacks and playlist ops)
     CATEGORY_BY_MOOD: Dict[MoodType, MoodCategory] = {
         MoodType.very_happy: MoodCategory.empowered,
         MoodType.happy: MoodCategory.hopeful,
@@ -44,16 +42,49 @@ class MusicService:
         MoodType.awful: MoodCategory.anxious,
     }
 
-    def __init__(self, db: Database, *, jamendo_client: Optional[JamendoClient] = None) -> None:
-        self.collection: Collection = db["music_tracks"]
-        self.jamendo = jamendo_client or JamendoClient(
-            JAMENDO_CLIENT_ID,
-            default_lang=JAMENDO_DEFAULT_LANGUAGE,
-            default_order=JAMENDO_DEFAULT_ORDER,
-        )
+    # Mood repair search terms (case-insensitive keys)
+    MOOD_REPAIR_TERMS: Dict[str, str] = {
+        "sad": "happy upbeat uplifting",
+        "angry": "calm relaxing piano",
+        "stressed": "healing ambient meditation",
+        "tired": "high energy workout rock",
+        "happy": "party dance hits",
+    }
 
-    def upsert_track(self, payload: MusicTrackCreate) -> MusicTrackResponse:
+    # Map existing MoodType enum values onto the new mood repair labels
+    MOODTYPE_ALIASES: Dict[MoodType, str] = {
+        MoodType.sad: "sad",
+        MoodType.awful: "stressed",
+        MoodType.neutral: "tired",
+        MoodType.happy: "happy",
+        MoodType.very_happy: "happy",
+    }
+
+    def __init__(
+        self,
+        db: Database,
+        *,
+        http_client: Optional[httpx.Client] = None,
+        country: str = DEFAULT_COUNTRY,
+    ) -> None:
+        self.collection: Collection = db["music_tracks"]
+        self._http = http_client
+        self._country = country
+
+    # ------------------------------------------------------------------ #
+    # CRUD helpers                                                       #
+    # ------------------------------------------------------------------ #
+
+    def upsert_track(
+        self,
+        payload: MusicTrackCreate,
+        extra: Optional[Dict[str, object]] = None,
+    ) -> MusicTrackResponse:
+        """Persist or update a track document, merging any auxiliary fields."""
         data = payload.model_dump()
+        if extra:
+            data.update(extra)
+
         added_at = data.pop("added_at", None) or datetime.utcnow()
         update_doc = {
             "$set": data,
@@ -86,6 +117,7 @@ class MusicService:
                 "duration_seconds": song.duration_seconds,
                 "thumbnail_url": song.thumbnail_url,
                 "album_image_url": song.album_image_url,
+                "audio_url": song.audio_url,
                 "mood_category": song.mood_category or default_mood,
                 "is_liked": song.is_liked,
                 "play_count": 0,
@@ -146,37 +178,34 @@ class MusicService:
         )
         return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
 
+    # ------------------------------------------------------------------ #
+    # Recommendation entry points                                       #
+    # ------------------------------------------------------------------ #
+
     def recommend_by_mood(
         self,
-        mood: MoodType,
+        mood: Union[MoodType, str],
         *,
         limit: int = 10,
-        language: Optional[str] = None,
-        order: Optional[str] = None,
     ) -> List[MusicTrackResponse]:
-        tags = list(self.TAGS_BY_MOOD.get(mood, (mood.value,)))
-        mood_category = self.CATEGORY_BY_MOOD.get(mood)
+        search_term = self._search_term_for_mood(mood)
+        mood_category = self._category_for_mood(mood)
         try:
-            jamendo_tracks = self.jamendo.get_tracks_by_tags(
-                tags,
-                limit=max(limit * 2, limit),
-                language=language or JAMENDO_DEFAULT_LANGUAGE,
-                order=order or JAMENDO_DEFAULT_ORDER,
-            )
-        except JamendoError as exc:
+            raw_tracks = self._fetch_itunes_tracks(search_term, limit * 2)
+        except ITunesAPIError:
             fallback = self._fallback_from_cache(mood_category, limit)
             if fallback:
                 return fallback
-            raise exc
+            raise
 
         results: List[MusicTrackResponse] = []
         seen: Set[str] = set()
-        for track in jamendo_tracks:
+        for raw in raw_tracks:
             try:
-                create_payload = self._map_jamendo_track(track, mood_category)
+                payload, extra = self._map_itunes_track(raw, mood_category)
             except ValueError:
                 continue
-            stored = self._persist_and_response(create_payload)
+            stored = self._persist_and_response(payload, extra)
             if stored.music_id in seen:
                 continue
             seen.add(stored.music_id)
@@ -190,28 +219,25 @@ class MusicService:
 
     def recommend_albums_by_mood(
         self,
-        mood: MoodType,
+        mood: Union[MoodType, str],
         *,
         album_limit: int = 3,
         min_tracks_per_album: int = 5,
         max_tracks_per_album: int = 8,
-        language: Optional[str] = None,
-        order: Optional[str] = None,
     ) -> List[MusicAlbumResponse]:
         album_limit = max(1, min(album_limit, 5))
         min_tracks_per_album = max(1, min(min_tracks_per_album, max_tracks_per_album))
         max_tracks_per_album = max(min_tracks_per_album, min(max_tracks_per_album, 12))
 
-        tags = list(self.TAGS_BY_MOOD.get(mood, (mood.value,)))
-        mood_category = self.CATEGORY_BY_MOOD.get(mood)
+        search_term = self._search_term_for_mood(mood)
+        mood_category = self._category_for_mood(mood)
+
         try:
-            jamendo_tracks = self.jamendo.get_tracks_by_tags(
-                tags,
-                limit=max(album_limit * max_tracks_per_album * 4, 40),
-                language=language or JAMENDO_DEFAULT_LANGUAGE,
-                order=order or JAMENDO_DEFAULT_ORDER,
+            raw_tracks = self._fetch_itunes_tracks(
+                search_term,
+                album_limit * max_tracks_per_album * 4,
             )
-        except JamendoError as exc:
+        except ITunesAPIError:
             fallback = self._fallback_albums_from_cache(
                 mood_category,
                 album_limit,
@@ -220,46 +246,36 @@ class MusicService:
             )
             if fallback:
                 return fallback
-            raise exc
+            raise
 
         albums_map: Dict[str, Dict[str, object]] = {}
         track_seen: Set[str] = set()
 
-        for raw_track in jamendo_tracks:
-            track_id_raw = raw_track.get("id") or raw_track.get("track_id")
-            track_id = str(track_id_raw).strip() if track_id_raw is not None else ""
-            if not track_id or track_id in track_seen:
-                continue
-
-            album_id_raw = (
-                raw_track.get("album_id")
-                or raw_track.get("albumid")
-                or raw_track.get("album")
-            )
-            album_id = str(album_id_raw).strip() if album_id_raw else f"mix-{track_id}"
-
-            album_name_raw = raw_track.get("album_name") or raw_track.get("album")
-            album_title = str(album_name_raw).strip() if album_name_raw else "Mood Mix"
-            album_image_value = raw_track.get("album_image") or raw_track.get("image")
-            album_image_url = str(album_image_value) if album_image_value else None
-
+        for raw in raw_tracks:
             try:
-                create_payload = self._map_jamendo_track(raw_track, mood_category)
+                payload, extra = self._map_itunes_track(raw, mood_category)
             except ValueError:
                 continue
+            if payload.music_id in track_seen:
+                continue
 
-            stored = self._persist_and_response(create_payload)
+            stored = self._persist_and_response(payload, extra)
             track_seen.add(stored.music_id)
 
+            album_id = raw.get("collectionId")
+            album_id_str = str(album_id) if album_id is not None else f"mix-{stored.music_id}"
+            album_title = raw.get("collectionName") or stored.title
+            album_image_raw = raw.get("artworkUrl100") or stored.album_image_url or stored.thumbnail_url
+            album_image_url = self._normalize_artwork_url(album_image_raw)
+
             album_entry = albums_map.setdefault(
-                album_id,
+                album_id_str,
                 {
-                    "title": album_title or stored.title,
-                    "image": album_image_url or stored.album_image_url or stored.thumbnail_url,
+                    "title": album_title,
+                    "image": album_image_url,
                     "tracks": [],
                 },
             )
-
             tracks_list = cast(List[MusicTrackResponse], album_entry["tracks"])
             if len(tracks_list) >= max_tracks_per_album:
                 continue
@@ -303,24 +319,23 @@ class MusicService:
         query: str,
         *,
         limit: int = 10,
-        language: Optional[str] = None,
-        order: Optional[str] = None,
     ) -> List[MusicTrackResponse]:
-        jamendo_tracks = self.jamendo.search_tracks(
-            query,
-            limit=limit,
-            language=language or JAMENDO_DEFAULT_LANGUAGE,
-            order=order or JAMENDO_DEFAULT_ORDER,
-        )
-
+        query = query.strip()
+        if not query:
+            return []
+        try:
+            raw_tracks = self._fetch_itunes_tracks(query, limit * 2, entity="song")
+        except ITunesAPIError:
+            fallback = self._search_cache(query, limit)
+            return fallback if fallback else []
         results: List[MusicTrackResponse] = []
         seen: Set[str] = set()
-        for track in jamendo_tracks:
+        for raw in raw_tracks:
             try:
-                create_payload = self._map_jamendo_track(track, None)
+                payload, extra = self._map_itunes_track(raw, None)
             except ValueError:
                 continue
-            stored = self._persist_and_response(create_payload)
+            stored = self._persist_and_response(payload, extra)
             if stored.music_id in seen:
                 continue
             seen.add(stored.music_id)
@@ -329,8 +344,33 @@ class MusicService:
                 break
         return results
 
-    def _persist_and_response(self, payload: MusicTrackCreate) -> MusicTrackResponse:
-        return self.upsert_track(payload)
+    def _search_cache(
+        self,
+        query: str,
+        limit: int,
+    ) -> List[MusicTrackResponse]:
+        if not query:
+            return []
+        pattern = {"$regex": re.escape(query), "$options": "i"}
+        cursor = (
+            self.collection.find(
+                {"$or": [{"title": pattern}, {"artist": pattern}]}
+            )
+            .sort("added_at", -1)
+            .limit(max(limit, 1))
+        )
+        return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
+
+    # ------------------------------------------------------------------ #
+    # Internal helpers                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _persist_and_response(
+        self,
+        payload: MusicTrackCreate,
+        extra: Optional[Dict[str, object]],
+    ) -> MusicTrackResponse:
+        return self.upsert_track(payload, extra)
 
     def _fallback_from_cache(
         self,
@@ -377,62 +417,70 @@ class MusicService:
                 break
         return albums
 
-    def _map_jamendo_track(
+    def _map_itunes_track(
         self,
         track: Dict[str, object],
         mood: Optional[MoodCategory],
-    ) -> MusicTrackCreate:
-        track_id_raw = track.get("id") or track.get("track_id")
+    ) -> Tuple[MusicTrackCreate, Dict[str, object]]:
+        track_id_raw = track.get("trackId") or track.get("collectionId")
         track_id = str(track_id_raw).strip() if track_id_raw is not None else ""
         if not track_id:
-            raise ValueError("Jamendo track missing id")
+            raise ValueError("iTunes track missing identifier")
 
-        name_raw = track.get("name") or track.get("title")
-        name = str(name_raw).strip() if name_raw else ""
-        if not name:
-            raise ValueError("Jamendo track missing name")
+        title_raw = track.get("trackName") or track.get("collectionName")
+        title = str(title_raw).strip() if title_raw else ""
+        if not title:
+            raise ValueError("iTunes track missing title")
 
-        artist_raw = track.get("artist_name") or track.get("artist")
+        artist_raw = track.get("artistName")
         artist = str(artist_raw).strip() if artist_raw else "Unknown Artist"
 
-        duration_raw = track.get("duration") or 0
+        duration_ms = track.get("trackTimeMillis")
         duration_seconds = 0
-        if isinstance(duration_raw, (int, float)):
-            duration_seconds = int(duration_raw)
-        elif isinstance(duration_raw, str):
+        if isinstance(duration_ms, (int, float)):
+            duration_seconds = int(duration_ms / 1000)
+        elif isinstance(duration_ms, str):
             try:
-                duration_seconds = int(float(duration_raw))
+                duration_seconds = int(float(duration_ms) / 1000)
             except ValueError:
                 duration_seconds = 0
+        duration_seconds = max(duration_seconds, 0)
 
-        album_image = track.get("album_image") or track.get("image")
-        thumbnail = track.get("image") or album_image
+        artwork_raw = track.get("artworkUrl100") or track.get("artworkUrl60")
+        artwork_url = self._normalize_artwork_url(artwork_raw)
 
-        return MusicTrackCreate.model_validate(
+        preview_url = track.get("previewUrl")
+
+        payload = MusicTrackCreate.model_validate(
             {
                 "music_id": track_id,
-                "title": name,
+                "title": title,
                 "artist": artist,
-                "duration_seconds": max(duration_seconds, 0),
-                "thumbnail_url": str(thumbnail) if thumbnail else None,
-                "album_image_url": str(album_image) if album_image else None,
+                "duration_seconds": duration_seconds,
+                "thumbnail_url": artwork_url,
+                "album_image_url": artwork_url,
+                "audio_url": preview_url,
                 "mood_category": mood,
                 "added_at": datetime.utcnow(),
                 "play_count": 0,
             }
         )
+        extra = {"audio_url": preview_url} if preview_url else {}
+        return payload, extra
 
     def _map_doc(self, doc: Optional[dict]) -> dict:
         if not doc:
             raise ValueError("Music track not found")
         data = dict(doc)
         data.pop("_id", None)
+
         mood_value = data.get("mood_category")
         if isinstance(mood_value, str):
             try:
                 data["mood_category"] = MoodCategory(mood_value)
             except ValueError:
                 data["mood_category"] = None
+
         added_at = data.get("added_at")
         if isinstance(added_at, str):
             try:
@@ -441,4 +489,74 @@ class MusicService:
                 data["added_at"] = datetime.utcnow()
         elif not isinstance(added_at, datetime):
             data["added_at"] = datetime.utcnow()
+
+        # Normalize artwork if previously stored with other sizes
+        for key in ("thumbnail_url", "album_image_url"):
+            if isinstance(data.get(key), str):
+                data[key] = self._normalize_artwork_url(data[key])
+
         return data
+
+    def _fetch_itunes_tracks(
+        self,
+        term: str,
+        limit: int,
+        *,
+        entity: str = "song",
+    ) -> List[Dict[str, object]]:
+        params = {
+            "term": term,
+            "media": "music",
+            "entity": entity,
+            "limit": min(max(limit, 1), MAX_ITUNES_LIMIT),
+            "country": self._country,
+        }
+
+        close_client = False
+        client: httpx.Client
+        if self._http is None:
+            client = httpx.Client(timeout=10.0)
+            close_client = True
+        else:
+            client = self._http
+
+        try:
+            response = client.get(ITUNES_SEARCH_URL, params=params)
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.HTTPError as exc:
+            raise ITunesAPIError(f"iTunes API request failed: {exc}") from exc
+        except ValueError as exc:
+            raise ITunesAPIError(f"Unable to decode iTunes response: {exc}") from exc
+        finally:
+            if close_client:
+                client.close()
+
+        results = payload.get("results")
+        if not isinstance(results, list):
+            raise ITunesAPIError("Unexpected iTunes response structure")
+        return cast(List[Dict[str, object]], results)
+
+    def _search_term_for_mood(self, mood: Union[MoodType, str]) -> str:
+        key = ""
+        if isinstance(mood, MoodType):
+            key = self.MOODTYPE_ALIASES.get(mood, mood.value).lower()
+        else:
+            key = str(mood).strip().lower()
+
+        return self.MOOD_REPAIR_TERMS.get(key, "feel good happy uplifting")
+
+    def _category_for_mood(self, mood: Union[MoodType, str]) -> Optional[MoodCategory]:
+        if isinstance(mood, MoodType):
+            return self.CATEGORY_BY_MOOD.get(mood)
+        try:
+            mood_type = MoodType(str(mood).lower())
+            return self.CATEGORY_BY_MOOD.get(mood_type)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _normalize_artwork_url(value: Optional[object]) -> Optional[str]:
+        if not isinstance(value, str) or not value:
+            return None
+        return value.replace("100x100", "600x600")

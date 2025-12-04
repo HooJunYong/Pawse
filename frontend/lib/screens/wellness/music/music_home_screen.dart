@@ -743,21 +743,24 @@ class _AlbumCard extends StatelessWidget {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: album.albumImageUrl != null && album.albumImageUrl!.isNotEmpty
-                        ? Image.network(
-                            album.albumImageUrl!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Container(
+                  child: SizedBox(
+                    width: 96,
+                    child: AspectRatio(
+                      aspectRatio: 1,
+                      child: album.albumImageUrl != null && album.albumImageUrl!.isNotEmpty
+                          ? Image.network(
+                              album.albumImageUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                color: const Color(0xFFFFE0B2),
+                                child: const Icon(Icons.album, color: Color(0xFF5D4037)),
+                              ),
+                            )
+                          : Container(
                               color: const Color(0xFFFFE0B2),
                               child: const Icon(Icons.album, color: Color(0xFF5D4037)),
                             ),
-                          )
-                        : Container(
-                            color: const Color(0xFFFFE0B2),
-                            child: const Icon(Icons.album, color: Color(0xFF5D4037)),
-                          ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),

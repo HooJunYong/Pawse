@@ -4,10 +4,6 @@ from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ..config.settings import (
-    JAMENDO_DEFAULT_LANGUAGE,
-    JAMENDO_DEFAULT_ORDER,
-)
 from ..models.database import db
 from ..models.music_schemas import (
     MusicAlbumResponse,
@@ -21,8 +17,7 @@ from ..models.music_schemas import (
     UserPlaylistResponse,
     UserPlaylistUpdate,
 )
-from ..services.jamendo_client import JamendoError
-from ..services.music_service import MusicService
+from ..services.music_service import ITunesAPIError, MusicService
 from ..services.user_playlist_service import (
     MusicListeningSessionService,
     UserPlaylistService,
@@ -77,23 +72,13 @@ def list_moods() -> List[MoodOptionResponse]:
 def get_recommendations(
     mood: MoodType = Query(..., description="User mood to tailor recommendations"),
     limit: int = Query(10, ge=1, le=50),
-    language: Optional[str] = Query(
-        None,
-        description="Jamendo language code (defaults to configured language)",
-    ),
-    order: Optional[str] = Query(
-        None,
-        description="Jamendo ordering value, e.g. popularity_total",
-    ),
 ) -> List[MusicTrackResponse]:
     try:
         return music_service.recommend_by_mood(
             mood,
             limit=limit,
-            language=language or JAMENDO_DEFAULT_LANGUAGE,
-            order=order or JAMENDO_DEFAULT_ORDER,
         )
-    except JamendoError as exc:
+    except ITunesAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
@@ -103,14 +88,6 @@ def get_album_recommendations(
     album_limit: int = Query(3, ge=1, le=5),
     min_tracks: int = Query(5, ge=1, le=12),
     max_tracks: int = Query(8, ge=1, le=12),
-    language: Optional[str] = Query(
-        None,
-        description="Jamendo language code (defaults to configured language)",
-    ),
-    order: Optional[str] = Query(
-        None,
-        description="Jamendo ordering value, e.g. popularity_total",
-    ),
 ) -> List[MusicAlbumResponse]:
     try:
         return music_service.recommend_albums_by_mood(
@@ -118,34 +95,22 @@ def get_album_recommendations(
             album_limit=album_limit,
             min_tracks_per_album=min_tracks,
             max_tracks_per_album=max_tracks,
-            language=language or JAMENDO_DEFAULT_LANGUAGE,
-            order=order or JAMENDO_DEFAULT_ORDER,
         )
-    except JamendoError as exc:
+    except ITunesAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/search", response_model=List[MusicTrackResponse])
 def search_music(
-    query: str = Query(..., min_length=2, description="Search term for Jamendo"),
+    query: str = Query(..., min_length=2, description="Search term for iTunes"),
     limit: int = Query(10, ge=1, le=50),
-    language: Optional[str] = Query(
-        None,
-        description="Jamendo language code (defaults to configured language)",
-    ),
-    order: Optional[str] = Query(
-        None,
-        description="Jamendo ordering value, e.g. popularity_total",
-    ),
 ) -> List[MusicTrackResponse]:
     try:
         return music_service.search_tracks(
             query,
             limit=limit,
-            language=language or JAMENDO_DEFAULT_LANGUAGE,
-            order=order or JAMENDO_DEFAULT_ORDER,
         )
-    except JamendoError as exc:
+    except ITunesAPIError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 

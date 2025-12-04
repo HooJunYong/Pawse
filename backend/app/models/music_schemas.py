@@ -31,6 +31,7 @@ class MusicTrackBase(BaseModel):
     duration_seconds: int = Field(..., ge=0)
     thumbnail_url: Optional[str] = Field(None, max_length=255)
     album_image_url: Optional[str] = Field(None, max_length=255)
+    audio_url: Optional[str] = Field(None, max_length=255)
     mood_category: Optional[MoodCategory] = None
     is_liked: bool = False
     play_count: int = Field(0, ge=0)
@@ -81,6 +82,7 @@ class PlaylistSong(BaseModel):
     duration_seconds: int = Field(..., ge=0)
     thumbnail_url: Optional[str] = Field(None, max_length=255)
     album_image_url: Optional[str] = Field(None, max_length=255)
+    audio_url: Optional[str] = Field(None, max_length=255)
     mood_category: Optional[MoodCategory] = None
     is_liked: bool = False
 

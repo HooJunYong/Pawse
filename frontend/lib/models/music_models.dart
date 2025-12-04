@@ -76,6 +76,7 @@ class MusicTrack {
   final int durationSeconds;
   final String? thumbnailUrl;
   final String? albumImageUrl;
+  final String? audioUrl;
   final String? moodCategory;
   final bool isLiked;
   final int playCount;
@@ -89,6 +90,7 @@ class MusicTrack {
     required this.addedAt,
     this.thumbnailUrl,
     this.albumImageUrl,
+    this.audioUrl,
     this.moodCategory,
     this.isLiked = false,
     this.playCount = 0,
@@ -105,6 +107,7 @@ class MusicTrack {
       addedAt: DateTime.tryParse(json['added_at'] as String? ?? '') ?? DateTime.now().toUtc(),
       thumbnailUrl: json['thumbnail_url'] as String?,
       albumImageUrl: json['album_image_url'] as String?,
+        audioUrl: json['audio_url'] as String?,
       moodCategory: json['mood_category'] as String?,
       isLiked: json['is_liked'] as bool? ?? false,
       playCount: json['play_count'] is int
@@ -121,6 +124,7 @@ class MusicTrack {
       'duration_seconds': durationSeconds,
       if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
       if (albumImageUrl != null) 'album_image_url': albumImageUrl,
+      if (audioUrl != null) 'audio_url': audioUrl,
       if (moodCategory != null) 'mood_category': moodCategory,
       'is_liked': isLiked,
     };
@@ -168,6 +172,7 @@ class PlaylistSong {
   final int durationSeconds;
   final String? thumbnailUrl;
   final String? albumImageUrl;
+  final String? audioUrl;
   final String? moodCategory;
   final bool isLiked;
 
@@ -178,6 +183,7 @@ class PlaylistSong {
     required this.durationSeconds,
     this.thumbnailUrl,
     this.albumImageUrl,
+    this.audioUrl,
     this.moodCategory,
     this.isLiked = false,
   });
@@ -192,6 +198,7 @@ class PlaylistSong {
           : int.tryParse('${json['duration_seconds']}') ?? 0,
       thumbnailUrl: json['thumbnail_url'] as String?,
       albumImageUrl: json['album_image_url'] as String?,
+      audioUrl: json['audio_url'] as String?,
       moodCategory: json['mood_category'] as String?,
       isLiked: json['is_liked'] as bool? ?? false,
     );
@@ -205,6 +212,7 @@ class PlaylistSong {
       'duration_seconds': durationSeconds,
       if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
       if (albumImageUrl != null) 'album_image_url': albumImageUrl,
+      if (audioUrl != null) 'audio_url': audioUrl,
       if (moodCategory != null) 'mood_category': moodCategory,
       'is_liked': isLiked,
     };
@@ -222,6 +230,7 @@ class PlaylistSong {
       durationSeconds: durationSeconds,
       thumbnailUrl: thumbnailUrl,
       albumImageUrl: albumImageUrl,
+      audioUrl: audioUrl,
       moodCategory: moodCategory,
       isLiked: isLiked ?? this.isLiked,
     );
