@@ -187,6 +187,16 @@ class MusicApiService {
     _throwIfFailed(response.statusCode, response.body);
   }
 
+  Future<List<MusicTrack>> getTopTracks({int limit = 10}) async {
+    final endpoint = _buildEndpoint('/music/top', {'limit': limit.toString()});
+    final response = await ApiService.get(endpoint);
+    _throwIfFailed(response.statusCode, response.body);
+    final List<dynamic> payload = jsonDecode(response.body) as List<dynamic>;
+    return payload
+        .map((dynamic item) => MusicTrack.fromJson(_normalizeMap(item)))
+        .toList(growable: false);
+  }
+
   String _buildEndpoint(String base, Map<String, String> queryParameters) {
     if (queryParameters.isEmpty) {
       return base;

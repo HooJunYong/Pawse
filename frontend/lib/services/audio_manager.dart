@@ -55,6 +55,10 @@ class AudioManager {
 
   Stream<PlayerState> get playerStateStream => _player.playerStateStream;
 
+  Stream<bool> get shuffleModeEnabledStream => _player.shuffleModeEnabledStream;
+
+  Stream<LoopMode> get loopModeStream => _player.loopModeStream;
+
   MusicTrack? get currentTrack {
     final dynamic tag = _player.sequenceState?.currentSource?.tag;
     return tag is MusicTrack ? tag : null;
@@ -65,6 +69,10 @@ class AudioManager {
   Duration get position => _player.position;
 
   Duration? get duration => _player.duration;
+
+  bool get isShuffleModeEnabled => _player.shuffleModeEnabled;
+
+  LoopMode get loopMode => _player.loopMode;
 
   List<MusicTrack> get queue => List<MusicTrack>.unmodifiable(_playlist);
 
@@ -133,6 +141,11 @@ class AudioManager {
     await _player.seek(Duration.zero, index: index);
   }
 
+  Future<void> setShuffleMode(bool enabled) =>
+      _player.setShuffleModeEnabled(enabled);
+
+  Future<void> setLoopMode(LoopMode mode) => _player.setLoopMode(mode);
+
   Future<void> skipToNext() async {
     if (_player.hasNext) {
       await _player.seekToNext();
@@ -140,7 +153,9 @@ class AudioManager {
   }
 
   Future<void> skipToPrevious() async {
-    if (_player.hasPrevious) {
+    if (_player.position.inSeconds > 3) {
+      await _player.seek(Duration.zero);
+    } else if (_player.hasPrevious) {
       await _player.seekToPrevious();
     } else {
       await _player.seek(Duration.zero);

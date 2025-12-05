@@ -488,6 +488,14 @@ class MusicService:
                 break
         return results
 
+    def get_top_tracks(self, limit: int = 10) -> List[MusicTrackResponse]:
+        cursor = (
+            self.collection.find({})
+            .sort("play_count", -1)
+            .limit(max(limit, 1))
+        )
+        return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
+
     def _search_cache(
         self,
         query: str,
@@ -590,6 +598,9 @@ class MusicService:
             return "generic", "Balanced"
 
         raw_mood = self._extract_mood_value(doc)
+        if raw_mood is None:
+            return "generic", "Balanced"
+
         mood_key = self._normalize_mood_key(raw_mood)
         mood_label = self._display_mood_label(mood_key, raw_mood)
         return mood_key, mood_label

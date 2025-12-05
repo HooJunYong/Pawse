@@ -898,14 +898,81 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
   @override
   Widget buildSuggestions(BuildContext context) {
     if (query.trim().isEmpty) {
-      return const Center(
-        child: Text('Search for songs or artists to get started.'),
+      return _TopTracks(
+        musicApi: musicApi,
+        onSelected: (track) => close(context, track),
       );
     }
     return _SearchResults(
       query: query.trim(),
       musicApi: musicApi,
       onSelected: (track) => close(context, track),
+    );
+  }
+}
+
+class _TopTracks extends StatelessWidget {
+  final MusicApiService musicApi;
+  final ValueChanged<MusicTrack> onSelected;
+
+  const _TopTracks({
+    required this.musicApi,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<MusicTrack>>(
+      future: musicApi.getTopTracks(limit: 10),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          // Fail silently or show a simple message
+          return const Center(
+            child: Text('Search for songs or artists to get started.'),
+          );
+        }
+        final List<MusicTrack> results = snapshot.data ?? const <MusicTrack>[];
+        if (results.isEmpty) {
+          return const Center(
+            child: Text('Search for songs or artists to get started.'),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                'Top Songs',
+                style: TextStyle(
+                  fontFamily: 'Nunito',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF422006),
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView.separated(
+                itemCount: results.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, index) {
+                  final track = results[index];
+                  return ListTile(
+                    leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
+                    title: Text(track.title),
+                    subtitle: Text(track.artist),
+                    onTap: () => onSelected(track),
+                  );
+                },
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

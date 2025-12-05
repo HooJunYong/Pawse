@@ -108,6 +108,11 @@ def search_music(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@router.get("/top", response_model=List[MusicTrackResponse])
+def get_top_tracks(limit: int = Query(10, ge=1, le=50)) -> List[MusicTrackResponse]:
+    return music_service.get_top_tracks(limit=limit)
+
+
 @router.post("/playlists", response_model=UserPlaylistResponse, status_code=201)
 def create_playlist(payload: UserPlaylistCreate) -> UserPlaylistResponse:
     return playlist_service.create_playlist(payload)
