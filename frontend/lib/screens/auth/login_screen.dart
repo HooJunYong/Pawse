@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import '../../services/mood_service.dart';
 import '../admin/admin_therapist_management.dart';
 import '../homepage_screen.dart';
 import '../mood/mood_check_in_screen.dart';
@@ -84,8 +83,26 @@ class _LoginWidgetState extends State<LoginWidget> {
               ),
             );
           } else {
-            // Check mood log status before navigating regular users
-            await _checkMoodAndNavigate(userId);
+            // Check mood log status from login response
+            final hasLoggedMoodToday = data['has_logged_mood_today'] as bool? ?? false;
+            
+            if (hasLoggedMoodToday) {
+              // User already logged mood, go to homepage
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(userId: userId),
+                ),
+              );
+            } else {
+              // User hasn't logged mood, go to mood check-in screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MoodCheckInScreen(userId: userId),
+                ),
+              );
+            }
           }
         } else if (response.statusCode == 401) {
           snackBarController.close(); // Ensure SnackBar is closed on error
@@ -162,57 +179,6 @@ class _LoginWidgetState extends State<LoginWidget> {
           },
         );
       }
-    }
-  }
-
-  /// Check mood log status and navigate accordingly
-  Future<void> _checkMoodAndNavigate(String userId) async {
-    try {
-      // Call the mood service to check today's status
-      final response = await MoodService.checkMoodStatus(userId);
-      
-      if (!mounted) return;
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final hasLoggedToday = data['has_logged_today'] as bool? ?? false;
-
-        // Navigate based on mood check-in status
-        if (hasLoggedToday) {
-          // User already logged mood, go to homepage
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(userId: userId),
-            ),
-          );
-        } else {
-          // User hasn't logged mood, go to mood check-in screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MoodCheckInScreen(userId: userId),
-            ),
-          );
-        }
-      } else {
-        // If mood check fails, default to homepage
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(userId: userId),
-          ),
-        );
-      }
-    } catch (e) {
-      // If error occurs, default to homepage
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(userId: userId),
-        ),
-      );
     }
   }
 

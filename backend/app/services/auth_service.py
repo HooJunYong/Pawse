@@ -6,6 +6,8 @@ from ..models.schemas import SignupRequest, SignupResponse, LoginRequest, LoginR
 from ..config.settings import PASSWORD_MIN_LENGTH, VALID_USER_TYPES
 from ..config.timezone import now_my
 from .password_service import hash_password, verify_password
+from .mood_service import check_today_log
+from .activity_service import ActivityService
 
 logger = logging.getLogger(__name__)
 
@@ -89,11 +91,34 @@ def authenticate_user(payload: LoginRequest) -> LoginResponse:
         "user_id": user["user_id"],
         "login_at": now,
     })
+    
+    # Check mood log and assign activities for non-admin users
+    has_logged_mood_today = False
+    activities_assigned = False
+    user_type = user.get("user_type", "user")
+    
+    if user_type != "admin":
+        try:
+            # Check if user has logged mood today
+            has_logged_mood_today = check_today_log(user["user_id"])
+            logger.info(f"User {user['user_id']} mood log status: {has_logged_mood_today}")
+        except Exception as e:
+            logger.warning(f"Failed to check mood log for user {user['user_id']}: {e}")
+        
+        try:
+            # Check and assign daily activities
+            activities_assigned = ActivityService.has_activities_assigned_today(user["user_id"])
+            logger.info(f"User {user['user_id']} activities assigned: {activities_assigned}")
+        except Exception as e:
+            logger.warning(f"Failed to assign activities for user {user['user_id']}: {e}")
+    
     return LoginResponse(
         user_id=user["user_id"], 
         email=user["email"], 
-        user_type=user.get("user_type", "user"),
-        last_login=now
+        user_type=user_type,
+        last_login=now,
+        has_logged_mood_today=has_logged_mood_today,
+        activities_assigned=activities_assigned
     )
 
 def get_login_history(user_id: str, limit: int = 20) -> LoginHistoryResponse:

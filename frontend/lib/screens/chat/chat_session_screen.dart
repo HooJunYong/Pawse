@@ -181,95 +181,104 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
           // Main Content Area
           SafeArea(
             bottom: false, // Let content go behind the nav bar
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(24, 10, 24, 120), // Bottom padding for nav bar
-              child: Column(
-                children: [
-                  
-                  // 1. Cat Image - Load from companion data
-                  Transform.translate(
-                    offset: const Offset(0, -50),
-                    child: Center(
-                      child: _companionData?.image != null
-                          ? Image.asset(
-                              'assets/images/${_companionData!.image}',
-                              height: 200,
-                              width: 200,
-                              fit: BoxFit.contain,
-                            )
-                          : Image.asset('assets/images/americonsh1.png'),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 10, 24, 120), // Bottom padding for nav bar
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 10, // Ensure minimum height fills screen
                     ),
-                  ),
-                  
-                  const SizedBox(height: 2),
+                    child: Column(
+                      children: [
+                        
+                        // 1. Cat Image - Load from companion data
+                        Transform.translate(
+                          offset: const Offset(0, -50),
+                          child: Center(
+                            child: _companionData?.image != null
+                                ? Image.asset(
+                                    'assets/images/${_companionData!.image}',
+                                    height: 200,
+                                    width: 200,
+                                    fit: BoxFit.contain,
+                                  )
+                                : Image.asset('assets/images/americonsh1.png'),
+                          ),
+                        ),
+                        
+                        const SizedBox(height: 2),
 
-                  // 2. Action Buttons (New Chat & Change A Cat)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildBrownButton("New Chat", _navigateToNewChat),
-                      const SizedBox(width: 16),
-                      _buildBrownButton("Change A Cat", _navigateToChangeCompanion),
-                    ],
-                  ),
-
-                  const SizedBox(height: 40),
-
-                  // 3. History List or Loading/Error/Empty State
-                  if (_isLoading)
-                    const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    )
-                  else if (_errorMessage != null)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
+                        // 2. Action Buttons (New Chat & Change A Cat)
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.red),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 10),
-                            ElevatedButton(
-                              onPressed: _loadChatHistoryAndCompanion,
-                              child: const Text('Retry'),
-                            ),
+                            _buildBrownButton("New Chat", _navigateToNewChat),
+                            const SizedBox(width: 16),
+                            _buildBrownButton("Change A Cat", _navigateToChangeCompanion),
                           ],
                         ),
-                      ),
-                    )
-                  else if (_chatHistory.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Text(
-                          'No chat history found, start chatting with your companion by clicking the "New Chat" button!!!',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: _textBlack,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                  else
-                    // Map the chat history to widgets
-                    ..._chatHistory.map((chat) {
-                      return _buildHistoryCard(
-                        chat.lastMessage,
-                        chat.getFormattedDate(),
-                        chat.sessionId,
-                        chat.companionId,
-                      );
-                    }).toList(),
-                ],
-              ),
+
+                        const SizedBox(height: 40),
+
+                        // 3. History List or Loading/Error/Empty State
+                        if (_isLoading)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: CircularProgressIndicator(),
+                            ),
+                          )
+                        else if (_errorMessage != null)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    _errorMessage!,
+                                    style: const TextStyle(color: Colors.red),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ElevatedButton(
+                                    onPressed: _loadChatHistoryAndCompanion,
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else if (_chatHistory.isEmpty)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(20.0),
+                              child: Text(
+                                'No chat history found, start chatting with your companion by clicking the "New Chat" button!!!',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w500,
+                                  color: _textBlack,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        else
+                          // Map the chat history to widgets
+                          ..._chatHistory.map((chat) {
+                            return _buildHistoryCard(
+                              chat.lastMessage,
+                              chat.getFormattedDate(),
+                              chat.sessionId,
+                              chat.companionId,
+                            );
+                          }),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 

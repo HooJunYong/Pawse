@@ -80,6 +80,8 @@ class LoginResponse(BaseModel):
     email: EmailStr
     user_type: str
     last_login: datetime
+    has_logged_mood_today: bool = False
+    activities_assigned: bool = False
 
 class SignupResponse(BaseModel):
     user_id: str

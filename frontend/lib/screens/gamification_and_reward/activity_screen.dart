@@ -11,7 +11,7 @@ class ActivityScreen extends StatefulWidget {
 }
 
 class _ActivityScreenState extends State<ActivityScreen> {
-  int _currentIndex = 0;
+  int _currentIndex = 3; // Set to 3 for activity/medal icon
 
   // Define Colors from design
   final Color kBackgroundColor = const Color(0xFFF7F4F2);
@@ -26,22 +26,35 @@ class _ActivityScreenState extends State<ActivityScreen> {
       body: Stack(
         children: [
           // Main Scrollable Content
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 60, 20, 100), // Bottom padding for Nav Bar
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(),
-                const SizedBox(height: 30),
-                _buildProgressCard(),
-                const SizedBox(height: 20),
-                _buildActivitiesCard(),
-                const SizedBox(height: 30),
-                _buildRewardsSection(),
-              ],
+          SafeArea(
+            bottom: false, // Let content go behind the nav bar
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 120), // Bottom padding for Nav Bar
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 30),
+                        _buildProgressCard(),
+                        const SizedBox(height: 20),
+                        _buildActivitiesCard(),
+                        const SizedBox(height: 30),
+                        _buildRewardsSection(),
+                      ],
+                    ),
+                  ),
+                );
+              },
             ),
           ),
 
+          // Floating Bottom Navigation Bar
           Positioned(
             bottom: 0,
             left: 0,
@@ -278,12 +291,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
       children: [
         // Speech Bubble
         Padding(
-          padding: const EdgeInsets.only(left: 80.0),
+          padding: const EdgeInsets.only(left: 60.0),
           child: CustomPaint(
             painter: BubblePainter(),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              margin: const EdgeInsets.only(bottom: 10), // Space for the tail
+              margin: const EdgeInsets.only(bottom: 5), // Space for the tail
               child: const Text(
                 "Click me to get\nrewards!",
                 style: TextStyle(
@@ -296,6 +309,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
         ),
+
+        const SizedBox(height: 20),
         
         // Cat and Button Stack
         Stack(
