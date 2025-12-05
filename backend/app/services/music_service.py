@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import random
 from datetime import datetime
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, Union, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 import re
-
-import httpx
+import requests
 from pymongo import ReturnDocument
 from pymongo.collection import Collection
 from pymongo.database import Database
@@ -12,12 +12,12 @@ from pymongo.database import Database
 from ..models.music_schemas import (
     MoodCategory,
     MoodType,
-    MusicAlbumResponse,
     MusicTrackCreate,
     MusicTrackResponse,
     MusicTrackUpdate,
     PlaylistSong,
     PlaylistSongRequest,
+    MoodTherapyPlaylist,
 )
 
 
@@ -42,16 +42,6 @@ class MusicService:
         MoodType.awful: MoodCategory.anxious,
     }
 
-    # Mood repair search terms (case-insensitive keys)
-    MOOD_REPAIR_TERMS: Dict[str, str] = {
-        "sad": "happy upbeat uplifting",
-        "angry": "calm relaxing piano",
-        "stressed": "healing ambient meditation",
-        "tired": "high energy workout rock",
-        "happy": "party dance hits",
-    }
-
-    # Map existing MoodType enum values onto the new mood repair labels
     MOODTYPE_ALIASES: Dict[MoodType, str] = {
         MoodType.sad: "sad",
         MoodType.awful: "stressed",
@@ -60,15 +50,263 @@ class MusicService:
         MoodType.very_happy: "happy",
     }
 
+    PASTEL_COLORS: List[str] = [
+        "#FFCDD2", "#F8BBD0", "#E1BEE7", "#D1C4E9", "#C5CAE9", "#B2DFDB", "#FFCCBC", "#FFF9C4", "#FFE082"
+    ]
+
+    # Curated blueprints for each mood bracket used when assembling playlists.
+    THERAPY_BLUEPRINTS: Dict[str, List[Dict[str, Any]]] = {
+        "sad": [
+            {
+                "playlist_type": "catharsis",
+                "title": "Catharsis",
+                "icon": "water_drop",
+                "strategy": "Match the mood to process emotions safely.",
+                "search_terms": [
+                    "Blues",
+                    "Sentimental Ballad",
+                    "Acoustic Folk",
+                    "Sad Piano",
+                ],
+            },
+            {
+                "playlist_type": "mood_boost",
+                "title": "Mood Boost",
+                "icon": "wb_sunny",
+                "strategy": "Offer uplifting energy without feeling forced.",
+                "search_terms": [
+                    "Upbeat Pop",
+                    "Funk Soul",
+                    "Reggae",
+                    "Motivating Rock",
+                ],
+            },
+            {
+                "playlist_type": "deep_focus",
+                "title": "Deep Focus",
+                "icon": "book",
+                "strategy": "Provide calm, neutral ambience for gentle distraction.",
+                "search_terms": [
+                    "Dark Classical",
+                    "Instrumental",
+                    "Ambient",
+                    "Cinematic Piano",
+                ],
+            },
+        ],
+        "happy": [
+            {
+                "playlist_type": "celebrate",
+                "title": "Celebrate",
+                "icon": "celebration",
+                "strategy": "Lean into the upbeat mood with vibrant anthems.",
+                "search_terms": [
+                    "Feel Good Pop",
+                    "Dance Hits",
+                    "Nu Disco",
+                    "Sunshine Indie",
+                ],
+            },
+            {
+                "playlist_type": "balanced",
+                "title": "Keep Glowing",
+                "icon": "spa",
+                "strategy": "Sustain positivity with relaxed grooves.",
+                "search_terms": [
+                    "Chill Pop",
+                    "Tropical House",
+                    "Bright Acoustic",
+                    "Warm Indie",
+                ],
+            },
+            {
+                "playlist_type": "share",
+                "title": "Throwbacks",
+                "icon": "star",
+                "strategy": "Invite nostalgia and sing-along moments.",
+                "search_terms": [
+                    "Sing Along Classics",
+                    "Throwback Pop",
+                    "Feelgood Rock",
+                    "Family Favorites",
+                ],
+            },
+        ],
+        "angry": [
+            {
+                "playlist_type": "release",
+                "title": "Release Fire",
+                "icon": "local_fire_department",
+                "strategy": "Channel intensity through powerful sounds.",
+                "search_terms": [
+                    "Heavy Metal",
+                    "Hard Rock",
+                    "Rap Rock",
+                    "Industrial",
+                ],
+            },
+            {
+                "playlist_type": "calm",
+                "title": "Calm Down",
+                "icon": "spa",
+                "strategy": "Lower the pulse with gentle textures.",
+                "search_terms": [
+                    "Lo-Fi Beats",
+                    "Chillhop",
+                    "Neo Classical",
+                    "Ambient Guitar",
+                ],
+            },
+            {
+                "playlist_type": "channel",
+                "title": "Channel Energy",
+                "icon": "bolt",
+                "strategy": "Transform energy into forward motion.",
+                "search_terms": [
+                    "Workout Motivation",
+                    "Power EDM",
+                    "Trap Workout",
+                    "High Energy Pop",
+                ],
+            },
+        ],
+        "anxious": [
+            {
+                "playlist_type": "steady",
+                "title": "Steady Breath",
+                "icon": "air",
+                "strategy": "Regulate breathing with guided calm.",
+                "search_terms": [
+                    "Guided Meditation",
+                    "Calming Piano",
+                    "Breathwork Ambient",
+                    "Soothing Drone",
+                ],
+            },
+            {
+                "playlist_type": "lift",
+                "title": "Gentle Lift",
+                "icon": "spa",
+                "strategy": "Introduce hopeful tones without overwhelm.",
+                "search_terms": [
+                    "Soft Pop",
+                    "Positive Acoustic",
+                    "Comfort Folk",
+                    "Warm Indie",
+                ],
+            },
+            {
+                "playlist_type": "focus",
+                "title": "Restful Focus",
+                "icon": "headphones",
+                "strategy": "Offer steady background for mindful tasks.",
+                "search_terms": [
+                    "Lo-Fi Study",
+                    "Instrumental Study",
+                    "Binaural Beats",
+                    "Ambient Concentration",
+                ],
+            },
+        ],
+        "generic": [
+            {
+                "playlist_type": "reset",
+                "title": "Daily Reset",
+                "icon": "refresh",
+                "strategy": "Balanced mix for any starting point.",
+                "search_terms": [
+                    "Feel Good Pop",
+                    "Indie Chill",
+                    "Morning Acoustic",
+                    "Lofi Sunshine",
+                ],
+            },
+            {
+                "playlist_type": "motivate",
+                "title": "Momentum",
+                "icon": "trending_up",
+                "strategy": "Spark momentum with bright rhythms.",
+                "search_terms": [
+                    "Confidence Pop",
+                    "Workout Pop",
+                    "Electro Motivation",
+                    "Feelgood EDM",
+                ],
+            },
+            {
+                "playlist_type": "unwind",
+                "title": "Unwind",
+                "icon": "nightlight_round",
+                "strategy": "Ease tension with tranquil instrumentals.",
+                "search_terms": [
+                    "Chillhop",
+                    "Peaceful Piano",
+                    "Dream Ambient",
+                    "Downtempo",
+                ],
+            },
+        ],
+    }
+
+    THERAPY_CATEGORY_BY_KEY: Dict[str, Optional[MoodCategory]] = {
+        "sad": MoodCategory.comfort,
+        "happy": MoodCategory.hopeful,
+        "angry": MoodCategory.empowered,
+        "anxious": MoodCategory.anxious,
+        "generic": MoodCategory.calm,
+    }
+
+    MOOD_NORMALIZATION: Dict[str, str] = {
+        "sad": "sad",
+        "depressed": "sad",
+        "down": "sad",
+        "low": "sad",
+        "blue": "sad",
+        "awful": "sad",
+        "upset": "sad",
+        "crying": "sad",
+        "tearful": "sad",
+        "happy": "happy",
+        "joy": "happy",
+        "joyful": "happy",
+        "excited": "happy",
+        "very happy": "happy",
+        "positive": "happy",
+        "angry": "angry",
+        "mad": "angry",
+        "furious": "angry",
+        "frustrated": "angry",
+        "irritated": "angry",
+        "anxious": "anxious",
+        "worried": "anxious",
+        "nervous": "anxious",
+        "stressed": "anxious",
+        "overwhelmed": "anxious",
+        "neutral": "generic",
+        "tired": "generic",
+        "calm": "generic",
+        "fine": "generic",
+    }
+
+    MOOD_TIMESTAMP_FIELDS: Tuple[str, ...] = (
+        "recorded_at",
+        "created_at",
+        "updated_at",
+        "timestamp",
+        "logged_at",
+    )
+
+    DEFAULT_PLAYLIST_SIZE = 10
+    REQUEST_TIMEOUT = 10.0
+
     def __init__(
         self,
         db: Database,
         *,
-        http_client: Optional[httpx.Client] = None,
         country: str = DEFAULT_COUNTRY,
     ) -> None:
+        self._db = db
         self.collection: Collection = db["music_tracks"]
-        self._http = http_client
         self._country = country
 
     # ------------------------------------------------------------------ #
@@ -178,141 +416,44 @@ class MusicService:
         )
         return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
 
-    # ------------------------------------------------------------------ #
-    # Recommendation entry points                                       #
-    # ------------------------------------------------------------------ #
+    def get_mood_playlists(self, user_id: str) -> List[MoodTherapyPlaylist]:
+        mood_key, mood_label = self._resolve_user_mood(user_id)
+        blueprints = self.THERAPY_BLUEPRINTS.get(mood_key) or self.THERAPY_BLUEPRINTS["generic"]
+        category = self.THERAPY_CATEGORY_BY_KEY.get(mood_key) or MoodCategory.calm
 
-    def recommend_by_mood(
-        self,
-        mood: Union[MoodType, str],
-        *,
-        limit: int = 10,
-    ) -> List[MusicTrackResponse]:
-        search_term = self._search_term_for_mood(mood)
-        mood_category = self._category_for_mood(mood)
-        try:
-            raw_tracks = self._fetch_itunes_tracks(search_term, limit * 2)
-        except ITunesAPIError:
-            fallback = self._fallback_from_cache(mood_category, limit)
-            if fallback:
-                return fallback
-            raise
+        playlists: List[MoodTherapyPlaylist] = []
+        global_seen: Set[str] = set()
 
-        results: List[MusicTrackResponse] = []
-        seen: Set[str] = set()
-        for raw in raw_tracks:
-            try:
-                payload, extra = self._map_itunes_track(raw, mood_category)
-            except ValueError:
-                continue
-            stored = self._persist_and_response(payload, extra)
-            if stored.music_id in seen:
-                continue
-            seen.add(stored.music_id)
-            results.append(stored)
-            if len(results) >= limit:
-                break
+        for blueprint in blueprints:
+            search_terms = [str(term) for term in blueprint.get("search_terms", []) if str(term).strip()]
+            playlist_tracks = self._build_playlist_from_terms(search_terms, category, global_seen)
 
-        if results:
-            return results
-        return self._fallback_from_cache(mood_category, limit)
+            if len(playlist_tracks) < self.DEFAULT_PLAYLIST_SIZE and category:
+                needed = self.DEFAULT_PLAYLIST_SIZE - len(playlist_tracks)
+                fallback_tracks = self._fallback_from_cache(category, needed * 3)
+                for cached in fallback_tracks:
+                    if cached.music_id in global_seen:
+                        continue
+                    playlist_tracks.append(self._as_playlist_song(cached))
+                    global_seen.add(cached.music_id)
+                    if len(playlist_tracks) >= self.DEFAULT_PLAYLIST_SIZE:
+                        break
 
-    def recommend_albums_by_mood(
-        self,
-        mood: Union[MoodType, str],
-        *,
-        album_limit: int = 3,
-        min_tracks_per_album: int = 5,
-        max_tracks_per_album: int = 8,
-    ) -> List[MusicAlbumResponse]:
-        album_limit = max(1, min(album_limit, 5))
-        min_tracks_per_album = max(1, min(min_tracks_per_album, max_tracks_per_album))
-        max_tracks_per_album = max(min_tracks_per_album, min(max_tracks_per_album, 12))
-
-        search_term = self._search_term_for_mood(mood)
-        mood_category = self._category_for_mood(mood)
-
-        try:
-            raw_tracks = self._fetch_itunes_tracks(
-                search_term,
-                album_limit * max_tracks_per_album * 4,
-            )
-        except ITunesAPIError:
-            fallback = self._fallback_albums_from_cache(
-                mood_category,
-                album_limit,
-                min_tracks_per_album,
-                max_tracks_per_album,
-            )
-            if fallback:
-                return fallback
-            raise
-
-        albums_map: Dict[str, Dict[str, object]] = {}
-        track_seen: Set[str] = set()
-
-        for raw in raw_tracks:
-            try:
-                payload, extra = self._map_itunes_track(raw, mood_category)
-            except ValueError:
-                continue
-            if payload.music_id in track_seen:
-                continue
-
-            stored = self._persist_and_response(payload, extra)
-            track_seen.add(stored.music_id)
-
-            album_id = raw.get("collectionId")
-            album_id_str = str(album_id) if album_id is not None else f"mix-{stored.music_id}"
-            album_title = raw.get("collectionName") or stored.title
-            album_image_raw = raw.get("artworkUrl100") or stored.album_image_url or stored.thumbnail_url
-            album_image_url = self._normalize_artwork_url(album_image_raw)
-
-            album_entry = albums_map.setdefault(
-                album_id_str,
-                {
-                    "title": album_title,
-                    "image": album_image_url,
-                    "tracks": [],
-                },
-            )
-            tracks_list = cast(List[MusicTrackResponse], album_entry["tracks"])
-            if len(tracks_list) >= max_tracks_per_album:
-                continue
-            tracks_list.append(stored)
-
-        albums: List[MusicAlbumResponse] = []
-        for album_id, data in albums_map.items():
-            tracks_list = cast(List[MusicTrackResponse], data["tracks"])
-            if len(tracks_list) < min_tracks_per_album:
-                continue
-            albums.append(
-                MusicAlbumResponse(
-                    album_id=album_id,
-                    album_title=str(data["title"]) if data.get("title") else "Mood Mix",
-                    album_image_url=str(data["image"]) if data.get("image") else None,
-                    tracks=tracks_list[:max_tracks_per_album],
+            playlists.append(
+                MoodTherapyPlaylist(
+                    mood_key=mood_key,
+                    mood_label=mood_label,
+                    playlist_type=str(blueprint.get("playlist_type", "custom")),
+                    title=str(blueprint.get("title", "Mood Therapy Mix")),
+                    strategy=str(blueprint.get("strategy", "")),
+                    search_terms=search_terms,
+                    tracks=playlist_tracks[: self.DEFAULT_PLAYLIST_SIZE],
+                    icon=str(blueprint.get("icon", "music_note")),
+                    color=random.choice(self.PASTEL_COLORS),
                 )
             )
-            if len(albums) >= album_limit:
-                break
 
-        if len(albums) < album_limit:
-            fallback = self._fallback_albums_from_cache(
-                mood_category,
-                album_limit,
-                min_tracks_per_album,
-                max_tracks_per_album,
-            )
-            seen_albums = {album.album_id for album in albums}
-            for album in fallback:
-                if album.album_id in seen_albums:
-                    continue
-                albums.append(album)
-                if len(albums) >= album_limit:
-                    break
-
-        return albums
+        return playlists
 
     def search_tracks(
         self,
@@ -324,7 +465,10 @@ class MusicService:
         if not query:
             return []
         try:
-            raw_tracks = self._fetch_itunes_tracks(query, limit * 2, entity="song")
+            raw_tracks = self._search_itunes_via_requests(
+                query,
+                limit=limit * 2,
+            )
         except ITunesAPIError:
             fallback = self._search_cache(query, limit)
             return fallback if fallback else []
@@ -365,6 +509,211 @@ class MusicService:
     # Internal helpers                                                   #
     # ------------------------------------------------------------------ #
 
+    def _build_playlist_from_terms(
+        self,
+        search_terms: List[str],
+        category: Optional[MoodCategory],
+        global_seen: Set[str],
+    ) -> List[PlaylistSong]:
+        if not search_terms:
+            return []
+
+        tracks: List[PlaylistSong] = []
+        local_seen: Set[str] = set()
+
+        for term in search_terms:
+            cleaned_term = term.strip()
+            if not cleaned_term:
+                continue
+            try:
+                raw_tracks = self._search_itunes_via_requests(
+                    cleaned_term,
+                    limit=self.DEFAULT_PLAYLIST_SIZE * 4,
+                )
+            except ITunesAPIError:
+                continue
+
+            for raw in raw_tracks:
+                try:
+                    payload, extra = self._map_itunes_track(raw, category)
+                except ValueError:
+                    continue
+
+                stored = self._persist_and_response(payload, extra)
+                if stored.music_id in global_seen or stored.music_id in local_seen:
+                    continue
+
+                tracks.append(self._as_playlist_song(stored))
+                local_seen.add(stored.music_id)
+                global_seen.add(stored.music_id)
+
+                if len(tracks) >= self.DEFAULT_PLAYLIST_SIZE:
+                    return tracks
+
+        return tracks
+
+    def _as_playlist_song(self, track: MusicTrackResponse) -> PlaylistSong:
+        return PlaylistSong(
+            music_id=track.music_id,
+            title=track.title,
+            artist=track.artist,
+            duration_seconds=track.duration_seconds,
+            thumbnail_url=track.thumbnail_url,
+            album_image_url=track.album_image_url,
+            audio_url=track.audio_url,
+            mood_category=track.mood_category,
+            is_liked=track.is_liked,
+        )
+
+    def _resolve_user_mood(self, user_id: str) -> Tuple[str, str]:
+        try:
+            mood_collection = self._db["mood_tracking"]
+        except Exception:
+            return "generic", "Balanced"
+
+        base_query = {"user_id": user_id}
+        doc: Optional[dict] = None
+        try:
+            for field in self.MOOD_TIMESTAMP_FIELDS:
+                doc = mood_collection.find_one(
+                    {**base_query, field: {"$exists": True}},
+                    sort=[(field, -1)],
+                )
+                if doc:
+                    break
+
+            if not doc:
+                doc = mood_collection.find_one(base_query, sort=[("created_at", -1)])
+            if not doc:
+                doc = mood_collection.find_one(base_query, sort=[("_id", -1)])
+        except Exception:
+            return "generic", "Balanced"
+
+        raw_mood = self._extract_mood_value(doc)
+        mood_key = self._normalize_mood_key(raw_mood)
+        mood_label = self._display_mood_label(mood_key, raw_mood)
+        return mood_key, mood_label
+
+    def _extract_mood_value(self, doc: Optional[dict]) -> Optional[object]:
+        if not doc:
+            return None
+
+        string_fields = (
+            "mood",
+            "mood_level",
+            "mood_value",
+            "mood_label",
+            "mood_type",
+            "emotion",
+            "feeling",
+            "state",
+            "selected_mood",
+            "mood_text",
+        )
+        numeric_fields = (
+            "mood_score",
+            "score",
+            "rating",
+            "value",
+        )
+
+        for field in string_fields:
+            value = doc.get(field)
+            if isinstance(value, str) and value.strip():
+                return value
+            if isinstance(value, MoodType):
+                return value
+
+        for field in numeric_fields:
+            value = doc.get(field)
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str) and value.strip():
+                try:
+                    return float(value)
+                except ValueError:
+                    continue
+
+        fallback = doc.get("mood")
+        if isinstance(fallback, (int, float)):
+            return float(fallback)
+
+        return None
+
+    def _normalize_mood_key(self, raw: Optional[object]) -> str:
+        if raw is None:
+            return "generic"
+        if isinstance(raw, MoodType):
+            alias = self.MOODTYPE_ALIASES.get(raw)
+            if alias:
+                return self.MOOD_NORMALIZATION.get(alias, "generic")
+            return self.MOOD_NORMALIZATION.get(raw.value.lower(), "generic")
+        if isinstance(raw, str):
+            cleaned = raw.strip().lower()
+            if not cleaned:
+                return "generic"
+            if cleaned in self.MOOD_NORMALIZATION:
+                return self.MOOD_NORMALIZATION[cleaned]
+            base = cleaned.split()[0]
+            return self.MOOD_NORMALIZATION.get(base, "generic")
+        if isinstance(raw, (int, float)):
+            return self._mood_from_score(float(raw))
+        return "generic"
+
+    def _display_mood_label(self, mood_key: str, raw: Optional[object]) -> str:
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip().title()[:64]
+
+        fallback_labels = {
+            "sad": "Sad",
+            "happy": "Happy",
+            "angry": "Angry",
+            "anxious": "Anxious",
+            "generic": "Balanced",
+        }
+        return fallback_labels.get(mood_key, "Balanced")
+
+    def _mood_from_score(self, score: float) -> str:
+        if score >= 4.0:
+            return "happy"
+        if score >= 3.0:
+            return "generic"
+        if score >= 2.0:
+            return "sad"
+        return "anxious"
+
+    def _search_itunes_via_requests(
+        self,
+        term: str,
+        *,
+        limit: int,
+    ) -> List[Dict[str, object]]:
+        params = {
+            "term": term,
+            "media": "music",
+            "entity": "song",
+            "limit": min(max(limit, 1), MAX_ITUNES_LIMIT),
+            "country": self._country,
+        }
+
+        try:
+            response = requests.get(
+                ITUNES_SEARCH_URL,
+                params=params,
+                timeout=self.REQUEST_TIMEOUT,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except requests.RequestException as exc:
+            raise ITunesAPIError(f"iTunes API request failed: {exc}") from exc
+        except ValueError as exc:
+            raise ITunesAPIError(f"Unable to decode iTunes response: {exc}") from exc
+
+        results = payload.get("results") if isinstance(payload, dict) else None
+        if not isinstance(results, list):
+            raise ITunesAPIError("Unexpected iTunes response structure")
+        return cast(List[Dict[str, object]], results)
+
     def _persist_and_response(
         self,
         payload: MusicTrackCreate,
@@ -385,37 +734,6 @@ class MusicService:
             .limit(max(limit, 1))
         )
         return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
-
-    def _fallback_albums_from_cache(
-        self,
-        mood: Optional[MoodCategory],
-        album_limit: int,
-        min_tracks_per_album: int,
-        max_tracks_per_album: int,
-    ) -> List[MusicAlbumResponse]:
-        if not mood:
-            return []
-        cached_tracks = self._fallback_from_cache(mood, album_limit * max_tracks_per_album)
-        if not cached_tracks:
-            return []
-
-        albums: List[MusicAlbumResponse] = []
-        for index in range(0, len(cached_tracks), max_tracks_per_album):
-            chunk = cached_tracks[index : index + max_tracks_per_album]
-            if len(chunk) < min_tracks_per_album:
-                break
-            album_number = len(albums) + 1
-            albums.append(
-                MusicAlbumResponse(
-                    album_id=f"cached-{mood.value}-{album_number}",
-                    album_title=f"{mood.value.title()} Mix {album_number}",
-                    album_image_url=chunk[0].album_image_url or chunk[0].thumbnail_url,
-                    tracks=chunk,
-                )
-            )
-            if len(albums) >= album_limit:
-                break
-        return albums
 
     def _map_itunes_track(
         self,
@@ -496,64 +814,6 @@ class MusicService:
                 data[key] = self._normalize_artwork_url(data[key])
 
         return data
-
-    def _fetch_itunes_tracks(
-        self,
-        term: str,
-        limit: int,
-        *,
-        entity: str = "song",
-    ) -> List[Dict[str, object]]:
-        params = {
-            "term": term,
-            "media": "music",
-            "entity": entity,
-            "limit": min(max(limit, 1), MAX_ITUNES_LIMIT),
-            "country": self._country,
-        }
-
-        close_client = False
-        client: httpx.Client
-        if self._http is None:
-            client = httpx.Client(timeout=10.0)
-            close_client = True
-        else:
-            client = self._http
-
-        try:
-            response = client.get(ITUNES_SEARCH_URL, params=params)
-            response.raise_for_status()
-            payload = response.json()
-        except httpx.HTTPError as exc:
-            raise ITunesAPIError(f"iTunes API request failed: {exc}") from exc
-        except ValueError as exc:
-            raise ITunesAPIError(f"Unable to decode iTunes response: {exc}") from exc
-        finally:
-            if close_client:
-                client.close()
-
-        results = payload.get("results")
-        if not isinstance(results, list):
-            raise ITunesAPIError("Unexpected iTunes response structure")
-        return cast(List[Dict[str, object]], results)
-
-    def _search_term_for_mood(self, mood: Union[MoodType, str]) -> str:
-        key = ""
-        if isinstance(mood, MoodType):
-            key = self.MOODTYPE_ALIASES.get(mood, mood.value).lower()
-        else:
-            key = str(mood).strip().lower()
-
-        return self.MOOD_REPAIR_TERMS.get(key, "feel good happy uplifting")
-
-    def _category_for_mood(self, mood: Union[MoodType, str]) -> Optional[MoodCategory]:
-        if isinstance(mood, MoodType):
-            return self.CATEGORY_BY_MOOD.get(mood)
-        try:
-            mood_type = MoodType(str(mood).lower())
-            return self.CATEGORY_BY_MOOD.get(mood_type)
-        except ValueError:
-            return None
 
     @staticmethod
     def _normalize_artwork_url(value: Optional[object]) -> Optional[str]:

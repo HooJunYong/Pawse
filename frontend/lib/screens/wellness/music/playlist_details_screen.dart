@@ -8,8 +8,16 @@ import 'music_player_screen.dart';
 class PlaylistDetailsScreen extends StatefulWidget {
   final UserPlaylist playlist;
   final String userId;
+  final bool isReadOnly;
+  final String? coverImageUrl;
 
-  const PlaylistDetailsScreen({super.key, required this.playlist, required this.userId});
+  const PlaylistDetailsScreen({
+    super.key,
+    required this.playlist,
+    required this.userId,
+    this.isReadOnly = false,
+    this.coverImageUrl,
+  });
 
   @override
   State<PlaylistDetailsScreen> createState() => _PlaylistDetailsScreenState();
@@ -65,6 +73,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
                                 onPlay: () => _openPlayer(song),
                                 onRemove: () => _removeSong(song),
                                 isRemoving: _pendingRemoval.contains(song.musicId),
+                                showRemove: !widget.isReadOnly,
                               )),
                         const SizedBox(height: 24),
                       ],
@@ -105,20 +114,23 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
                 ),
               ),
             ),
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz, color: Color(0xFF422006)),
-              onSelected: (value) {
-                if (value == 'delete') {
-                  _confirmDelete(context, playlist);
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Text('Delete playlist'),
-                ),
-              ],
-            ),
+            if (!widget.isReadOnly)
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_horiz, color: Color(0xFF422006)),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _confirmDelete(context, playlist);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Text('Delete playlist'),
+                  ),
+                ],
+              )
+            else
+              const SizedBox(width: 48), // Placeholder to balance the back button
           ],
         ),
       ),
@@ -126,13 +138,51 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
   }
 
   Widget _buildHeader(UserPlaylist playlist) {
+    final PlaylistSong? firstSong = playlist.songs.isNotEmpty ? playlist.songs.first : null;
+    final String? coverUrl = () {
+      final String? explicit = widget.coverImageUrl;
+      if (explicit != null && explicit.isNotEmpty) {
+        return explicit;
+      }
+      if (firstSong?.albumImageUrl != null && firstSong!.albumImageUrl!.isNotEmpty) {
+        return firstSong.albumImageUrl;
+      }
+      if (firstSong?.thumbnailUrl != null && firstSong!.thumbnailUrl!.isNotEmpty) {
+        return firstSong.thumbnailUrl;
+      }
+      return null;
+    }();
+
+    Widget _buildArtwork() {
+      if (coverUrl != null && coverUrl.isNotEmpty) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Image.network(
+            coverUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => Container(
+              color: const Color(0xFF80CBC4),
+              alignment: Alignment.center,
+              child: const Icon(Icons.spa, size: 80, color: Colors.white),
+            ),
+          ),
+        );
+      }
+      return Container(
+        decoration: BoxDecoration(
+          color: const Color(0xFF80CBC4),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Icon(Icons.spa, size: 80, color: Colors.white),
+      );
+    }
+
     return Column(
       children: [
         Container(
           width: 180,
           height: 180,
           decoration: BoxDecoration(
-            color: const Color(0xFF80CBC4),
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
@@ -142,7 +192,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
               ),
             ],
           ),
-          child: const Icon(Icons.spa, size: 80, color: Colors.white),
+          child: _buildArtwork(),
         ),
         const SizedBox(height: 20),
         Text(
@@ -156,7 +206,9 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Created by you • ${playlist.songCount} song${playlist.songCount == 1 ? '' : 's'}',
+          widget.isReadOnly
+              ? '${playlist.songCount} song${playlist.songCount == 1 ? '' : 's'}'
+              : 'Created by you • ${playlist.songCount} song${playlist.songCount == 1 ? '' : 's'}',
           style: TextStyle(
             fontFamily: 'Nunito',
             fontSize: 14,
@@ -190,11 +242,13 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
             ),
           ),
         ),
-        const SizedBox(width: 12),
-        IconButton(
-          icon: const Icon(Icons.add_circle, color: Color(0xFFFF8A65)),
-          onPressed: () => _openAddMusic(context, playlist),
-        ),
+        if (!widget.isReadOnly) ...[
+          const SizedBox(width: 12),
+          IconButton(
+            icon: const Icon(Icons.add_circle, color: Color(0xFFFF8A65)),
+            onPressed: () => _openAddMusic(context, playlist),
+          ),
+        ],
       ],
     );
   }
@@ -249,21 +303,29 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
   }
 
   Future<void> _openPlayer(PlaylistSong song) async {
+    final UserPlaylist currentPlaylist = _playlist ?? widget.playlist;
+    final List<MusicTrack> tracks = currentPlaylist.songs.map((s) => MusicTrack(
+      musicId: s.musicId,
+      title: s.title,
+      artist: s.artist,
+      durationSeconds: s.durationSeconds,
+      addedAt: DateTime.now().toUtc(),
+      thumbnailUrl: s.thumbnailUrl,
+      albumImageUrl: s.albumImageUrl,
+      audioUrl: s.audioUrl,
+      moodCategory: s.moodCategory,
+      isLiked: s.isLiked,
+    )).toList();
+
+    final int index = tracks.indexWhere((t) => t.musicId == song.musicId);
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => MusicPlayerScreen(
-          track: MusicTrack(
-            musicId: song.musicId,
-            title: song.title,
-            artist: song.artist,
-            durationSeconds: song.durationSeconds,
-            addedAt: DateTime.now().toUtc(),
-            thumbnailUrl: song.thumbnailUrl,
-            albumImageUrl: song.albumImageUrl,
-            moodCategory: song.moodCategory,
-            isLiked: song.isLiked,
-          ),
+          track: index != -1 ? tracks[index] : null,
+          playlist: tracks,
+          initialIndex: index != -1 ? index : 0,
         ),
       ),
     );
@@ -310,6 +372,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
   }
 
   Future<void> _refreshPlaylist() async {
+    if (widget.isReadOnly) return;
     if (_isRefreshing) {
       return;
     }
@@ -346,18 +409,20 @@ class _SongTile extends StatelessWidget {
   final VoidCallback onPlay;
   final VoidCallback onRemove;
   final bool isRemoving;
+  final bool showRemove;
 
   const _SongTile({
     required this.song,
     required this.onPlay,
     required this.onRemove,
     required this.isRemoving,
+    this.showRemove = true,
   });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: onPlay,
         child: Container(
@@ -401,21 +466,21 @@ class _SongTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isRemoving)
-                const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
-              else
-                IconButton(
-                  icon: const Icon(Icons.remove_circle, color: Color(0xFFEF5350)),
-                  onPressed: onRemove,
-                ),
+              if (showRemove)
+                if (isRemoving)
+                  const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  IconButton(
+                    icon: const Icon(Icons.remove_circle, color: Color(0xFFEF5350)),
+                    onPressed: onRemove,
+                  ),
             ],
           ),
         ),
       ),
     );
   }
-}
-
+}    
 class _ArtworkPreview extends StatelessWidget {
   final String? url;
 
@@ -479,6 +544,7 @@ class _MiniPlayer extends StatelessWidget {
                       addedAt: DateTime.now().toUtc(),
                       thumbnailUrl: song.thumbnailUrl,
                       albumImageUrl: song.albumImageUrl,
+                      audioUrl: song.audioUrl,
                       moodCategory: song.moodCategory,
                       isLiked: song.isLiked,
                     ),

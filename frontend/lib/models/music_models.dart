@@ -318,6 +318,81 @@ class UserPlaylist {
   int get songCount => songs.length;
 }
 
+class MoodTherapyRecommendation {
+  final String id;
+  final String title;
+  final String description;
+  final UserPlaylist playlist;
+  final String icon;
+  final Color color;
+
+  const MoodTherapyRecommendation({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.playlist,
+    required this.icon,
+    required this.color,
+  });
+
+  factory MoodTherapyRecommendation.fromJson(
+    Map<String, dynamic> json, {
+    required String userId,
+  }) {
+    final String rawId = (json['id'] as String? ?? '').trim();
+    final String title = (json['title'] as String? ?? 'Mood Therapy Mix').trim();
+    final String description = (json['description'] as String? ?? '').trim();
+    final String icon = (json['icon'] as String? ?? 'music_note').trim();
+    final String rawColor = (json['color'] as String? ?? '').trim();
+    final List<dynamic> rawTracks = json['tracks'] as List<dynamic>? ?? const [];
+    Map<String, dynamic> castTrack(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return value.map(
+          (dynamic key, dynamic v) => MapEntry('$key', v),
+        );
+      }
+      throw ArgumentError('Invalid track payload for mood therapy playlist');
+    }
+
+    final List<PlaylistSong> songs = <PlaylistSong>[];
+    for (final dynamic song in rawTracks) {
+      try {
+        songs.add(PlaylistSong.fromJson(castTrack(song)));
+      } catch (_) {
+        continue;
+      }
+    }
+
+    final DateTime now = DateTime.now().toUtc();
+    final String generatedId = rawId.isEmpty
+        ? 'mood-${title.isEmpty ? 'therapy' : title.toLowerCase().replaceAll(RegExp(r"[^a-z0-9]+"), '-')}-${now.microsecondsSinceEpoch}'
+        : rawId;
+
+    final UserPlaylist playlist = UserPlaylist(
+      id: generatedId,
+      playlistName: title.isEmpty ? 'Mood Therapy Mix' : title,
+      userId: userId,
+      customTags: const <String>['mood-therapy'],
+      isPublic: false,
+      createdAt: now,
+      updatedAt: now,
+      songs: songs,
+    );
+
+    return MoodTherapyRecommendation(
+      id: generatedId,
+      title: playlist.playlistName,
+      description: description,
+      playlist: playlist,
+      icon: icon,
+      color: _colorFromHex(rawColor.isEmpty ? '#FFE082' : rawColor),
+    );
+  }
+}
+
 String _formatDuration(int totalSeconds) {
   if (totalSeconds <= 0) {
     return '0:00';
@@ -343,6 +418,10 @@ Color _colorFromHex(String hex) {
   return Color(colorInt);
 }
 
+IconData iconDataFromString(String iconName) {
+  return _iconLookup[iconName] ?? Icons.music_note;
+}
+
 const Map<String, IconData> _iconLookup = <String, IconData>{
   'cloud': Icons.cloud,
   'book': Icons.book,
@@ -350,4 +429,17 @@ const Map<String, IconData> _iconLookup = <String, IconData>{
   'spa': Icons.spa,
   'self_improvement': Icons.self_improvement,
   'music_note': Icons.music_note,
+  'water_drop': Icons.water_drop,
+  'opacity': Icons.opacity,
+  'wb_sunny': Icons.wb_sunny,
+  'air': Icons.air,
+  'celebration': Icons.celebration,
+  'star': Icons.star,
+  'refresh': Icons.refresh,
+  'local_fire_department': Icons.local_fire_department,
+  'filter_center_focus': Icons.filter_center_focus,
+  'trending_up': Icons.trending_up,
+  'nightlight_round': Icons.nightlight_round,
+  'light_mode': Icons.light_mode,
+  'feather': Icons.eco,
 };

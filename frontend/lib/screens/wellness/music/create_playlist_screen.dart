@@ -43,21 +43,24 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       const SizedBox(height: 20),
-                      Container(
-                        width: 160,
-                        height: 160,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFCC80),
-                          borderRadius: BorderRadius.circular(24),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
+                      Align(
+                        child: SizedBox.square(
+                          dimension: 160,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFCC80),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.1),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
                             ),
-                          ],
+                            child: const Icon(Icons.music_note, size: 80, color: Colors.white),
+                          ),
                         ),
-                        child: const Icon(Icons.music_note, size: 80, color: Colors.white),
                       ),
                       const SizedBox(height: 40),
                       const Text(

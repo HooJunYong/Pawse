@@ -58,6 +58,24 @@ class MusicApiService {
         .toList(growable: false);
   }
 
+  Future<List<MoodTherapyRecommendation>> getMoodPlaylists(String userId) async {
+    final endpoint = _buildEndpoint('/music/mood-playlists', {
+      'user_id': userId,
+    });
+    final response = await ApiService.get(endpoint);
+    _throwIfFailed(response.statusCode, response.body);
+    if (response.body.isEmpty) {
+      return const [];
+    }
+    final List<dynamic> payload = jsonDecode(response.body) as List<dynamic>;
+    return payload
+        .map((dynamic item) => MoodTherapyRecommendation.fromJson(
+              _normalizeMap(item),
+              userId: userId,
+            ))
+        .toList(growable: false);
+  }
+
   Future<List<MusicTrack>> searchTracks({
     required String query,
     int limit = 10,

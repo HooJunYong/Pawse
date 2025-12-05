@@ -75,6 +75,18 @@ class MusicAlbumResponse(BaseModel):
     tracks: List[MusicTrackResponse]
 
 
+class MoodTherapyPlaylist(BaseModel):
+    mood_key: str = Field(..., max_length=32)
+    mood_label: str = Field(..., max_length=64)
+    playlist_type: str = Field(..., max_length=64)
+    title: str = Field(..., max_length=100)
+    strategy: str = Field(..., max_length=255)
+    search_terms: List[str] = Field(default_factory=list)
+    tracks: List["PlaylistSong"] = Field(default_factory=list)
+    icon: str = Field(..., max_length=64)
+    color: str = Field(..., max_length=32)
+
+
 class PlaylistSong(BaseModel):
     music_id: str = Field(..., max_length=64)
     title: str = Field(..., max_length=150)

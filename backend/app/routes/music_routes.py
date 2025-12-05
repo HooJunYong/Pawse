@@ -68,36 +68,30 @@ def list_moods() -> List[MoodOptionResponse]:
     return MOOD_OPTIONS
 
 
-@router.get("/recommendations", response_model=List[MusicTrackResponse])
+@router.get("/recommendations", deprecated=True)
 def get_recommendations(
     mood: MoodType = Query(..., description="User mood to tailor recommendations"),
     limit: int = Query(10, ge=1, le=50),
-) -> List[MusicTrackResponse]:
-    try:
-        return music_service.recommend_by_mood(
-            mood,
-            limit=limit,
-        )
-    except ITunesAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+):
+    """Deprecated: Use /mood-playlists instead for therapy-based recommendations."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /music/mood-playlists?user_id=<user_id> instead."
+    )
 
 
-@router.get("/recommendations/albums", response_model=List[MusicAlbumResponse])
+@router.get("/recommendations/albums", deprecated=True)
 def get_album_recommendations(
     mood: MoodType = Query(..., description="User mood to tailor album recommendations"),
     album_limit: int = Query(3, ge=1, le=5),
     min_tracks: int = Query(5, ge=1, le=12),
     max_tracks: int = Query(8, ge=1, le=12),
-) -> List[MusicAlbumResponse]:
-    try:
-        return music_service.recommend_albums_by_mood(
-            mood,
-            album_limit=album_limit,
-            min_tracks_per_album=min_tracks,
-            max_tracks_per_album=max_tracks,
-        )
-    except ITunesAPIError as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+):
+    """Deprecated: Use /mood-playlists instead for therapy-based recommendations."""
+    raise HTTPException(
+        status_code=410,
+        detail="This endpoint is deprecated. Use /music/mood-playlists?user_id=<user_id> instead."
+    )
 
 
 @router.get("/search", response_model=List[MusicTrackResponse])
@@ -147,7 +141,7 @@ def update_playlist(playlist_id: str, payload: UserPlaylistUpdate) -> UserPlayli
     return updated
 
 
-@router.delete("/playlists/{playlist_id}", status_code=204)
+@router.delete("/playlists/{playlist_id}", status_code=204, response_model=None)
 def delete_playlist(playlist_id: str) -> None:
     removed = playlist_service.delete_playlist(playlist_id)
     if not removed:
@@ -185,3 +179,10 @@ def list_listening_sessions(
     limit: int = Query(50, ge=1, le=200),
 ) -> List[MusicListeningSessionResponse]:
     return session_service.list_sessions(user_id, limit=limit)
+
+@router.get("/mood-playlists")
+def get_mood_based_playlists(user_id: str = Query(..., description="User ID to check mood")):
+    """
+    Returns 3 therapeutic playlists based on the user's latest recorded mood.
+    """
+    return music_service.get_mood_playlists(user_id)
