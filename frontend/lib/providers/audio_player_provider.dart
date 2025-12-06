@@ -5,9 +5,11 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/music_models.dart';
 import '../services/audio_manager.dart';
+import '../services/music_api_service.dart';
 
 class AudioPlayerProvider extends ChangeNotifier {
   final AudioManager _audioManager = AudioManager.instance;
+  final MusicApiService _musicApi = const MusicApiService();
 
   StreamSubscription<MusicTrack?>? _trackSub;
   StreamSubscription<PlayerState>? _playerStateSub;
@@ -130,5 +132,52 @@ class AudioPlayerProvider extends ChangeNotifier {
   
   Future<void> setPlaylist(List<MusicTrack> tracks, {int initialIndex = 0}) async {
     await _audioManager.setPlaylist(tracks, initialIndex: initialIndex);
+  }
+
+  Future<void> toggleLike(String userId) async {
+    if (_currentTrack == null) return;
+    
+    final String musicId = _currentTrack!.musicId;
+    final bool oldState = _currentTrack!.isLiked;
+    final bool newState = !oldState;
+    
+    // Optimistic update
+    _currentTrack = _currentTrack!.copyWith(isLiked: newState);
+    
+    // Update in playlist as well
+    _playlist = _playlist.map((t) {
+      if (t.musicId == musicId) {
+        return t.copyWith(isLiked: newState);
+      }
+      return t;
+    }).toList();
+    
+    notifyListeners();
+    
+    try {
+      final bool serverState = await _musicApi.toggleLike(musicId, userId);
+      if (serverState != newState) {
+        // Revert if server disagrees
+        _currentTrack = _currentTrack!.copyWith(isLiked: serverState);
+        _playlist = _playlist.map((t) {
+          if (t.musicId == musicId) {
+            return t.copyWith(isLiked: serverState);
+          }
+          return t;
+        }).toList();
+        notifyListeners();
+      }
+    } catch (e) {
+      // Revert on error
+      _currentTrack = _currentTrack!.copyWith(isLiked: oldState);
+      _playlist = _playlist.map((t) {
+        if (t.musicId == musicId) {
+          return t.copyWith(isLiked: oldState);
+        }
+        return t;
+      }).toList();
+      notifyListeners();
+      rethrow;
+    }
   }
 }

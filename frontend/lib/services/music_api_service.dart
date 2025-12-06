@@ -197,6 +197,13 @@ class MusicApiService {
         .toList(growable: false);
   }
 
+  Future<bool> toggleLike(String musicId, String userId) async {
+    final endpoint = _buildEndpoint('/music/$musicId/toggle-like', {'user_id': userId});
+    final response = await ApiService.post(endpoint, {});
+    _throwIfFailed(response.statusCode, response.body);
+    return jsonDecode(response.body) as bool;
+  }
+
   String _buildEndpoint(String base, Map<String, String> queryParameters) {
     if (queryParameters.isEmpty) {
       return base;

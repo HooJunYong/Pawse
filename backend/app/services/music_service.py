@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
+from uuid import uuid4
 import re
 import requests
 from pymongo import ReturnDocument
@@ -50,8 +51,21 @@ class MusicService:
         MoodType.very_happy: "happy",
     }
 
-    PASTEL_COLORS: List[str] = [
-        "#FFCDD2", "#F8BBD0", "#E1BEE7", "#D1C4E9", "#C5CAE9", "#B2DFDB", "#FFCCBC", "#FFF9C4", "#FFE082"
+    THEME_COLORS: List[str] = [
+        "#FFE082",  # Amber (Existing Happy)
+        "#FFAB91",  # Deep Orange (Existing Neutral)
+        "#B39DDB",  # Deep Purple (Existing Sad)
+        "#90CAF9",  # Blue (Existing Awful)
+        "#FFCC80",  # Orange (Existing Very Happy)
+        "#80DEEA",  # Cyan (Fresh addition)
+        "#F48FB1",  # Pink (Fresh addition)
+        "#A5D6A7",  # Green (Fresh addition)
+        "#FFF59D",  # Light Yellow (Fresh addition)
+        "#CE93D8",  # Purple Accent (Fresh addition)
+    ]
+
+    ICONS: List[str] = [
+        "music_note", "album", "headphones", "queue_music", "playlist_play", "radio", "library_music"
     ]
 
     # Curated blueprints for each mood bracket used when assembling playlists.
@@ -396,6 +410,74 @@ class MusicService:
         )
         return MusicTrackResponse(**self._map_doc(doc)) if doc else None
 
+    def toggle_like(self, user_id: str, music_id: str) -> bool:
+        # 1. Toggle is_liked on the track
+        track_doc = self.collection.find_one({"music_id": music_id})
+        if not track_doc:
+            return False
+        
+        current_status = track_doc.get("is_liked", False)
+        new_status = not current_status
+        
+        self.collection.update_one(
+            {"music_id": music_id},
+            {"$set": {"is_liked": new_status}}
+        )
+        
+        # Update the track doc for mapping
+        track_doc["is_liked"] = new_status
+        
+        # 2. Manage Favorites playlist
+        playlists_col = self._db["user_playlists"]
+        favorites = playlists_col.find_one({
+            "user_id": user_id,
+            "playlist_name": "Favorites"
+        })
+        
+        if new_status:
+            # Add to Favorites
+            # We need a full MusicTrackResponse to convert to PlaylistSong
+            track_response = MusicTrackResponse(**self._map_doc(track_doc))
+            song_entry = self._as_playlist_song(track_response)
+            
+            if not favorites:
+                # Create Favorites playlist
+                now = datetime.utcnow()
+                doc = {
+                    "user_playlist_id": str(uuid4()),
+                    "user_id": user_id,
+                    "playlist_name": "Favorites",
+                    "custom_tags": [],
+                    "is_public": False,
+                    "songs": [song_entry.model_dump()],
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                playlists_col.insert_one(doc)
+            else:
+                # Add if not exists
+                exists = any(s["music_id"] == music_id for s in favorites.get("songs", []))
+                if not exists:
+                    playlists_col.update_one(
+                        {"_id": favorites["_id"]},
+                        {
+                            "$push": {"songs": song_entry.model_dump()},
+                            "$set": {"updated_at": datetime.utcnow()}
+                        }
+                    )
+        else:
+            # Remove from Favorites
+            if favorites:
+                playlists_col.update_one(
+                    {"_id": favorites["_id"]},
+                    {
+                        "$pull": {"songs": {"music_id": music_id}},
+                        "$set": {"updated_at": datetime.utcnow()}
+                    }
+                )
+                
+        return new_status
+
     def get_track(self, music_id: str) -> Optional[MusicTrackResponse]:
         doc = self.collection.find_one({"music_id": music_id})
         return MusicTrackResponse(**self._map_doc(doc)) if doc else None
@@ -448,8 +530,8 @@ class MusicService:
                     strategy=str(blueprint.get("strategy", "")),
                     search_terms=search_terms,
                     tracks=playlist_tracks[: self.DEFAULT_PLAYLIST_SIZE],
-                    icon=str(blueprint.get("icon", "music_note")),
-                    color=random.choice(self.PASTEL_COLORS),
+                    icon=random.choice(self.ICONS),
+                    color=random.choice(self.THEME_COLORS),
                 )
             )
 

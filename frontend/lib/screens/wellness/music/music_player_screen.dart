@@ -12,6 +12,7 @@ class MusicPlayerScreen extends StatelessWidget {
   final List<MusicTrack>? playlist;
   final int initialIndex;
   final bool attachToExistingSession;
+  final String? userId;
 
   const MusicPlayerScreen({
     super.key,
@@ -19,6 +20,7 @@ class MusicPlayerScreen extends StatelessWidget {
     this.playlist,
     this.initialIndex = 0,
     this.attachToExistingSession = false,
+    this.userId,
   });
 
   @override
@@ -30,6 +32,7 @@ class MusicPlayerScreen extends StatelessWidget {
         playlist: playlist,
         initialIndex: initialIndex,
         attachToExistingSession: attachToExistingSession,
+        userId: userId,
       ),
     );
   }
@@ -40,12 +43,14 @@ class _MusicPlayerView extends StatefulWidget {
   final List<MusicTrack>? playlist;
   final int initialIndex;
   final bool attachToExistingSession;
+  final String? userId;
 
   const _MusicPlayerView({
     this.track,
     this.playlist,
     this.initialIndex = 0,
     this.attachToExistingSession = false,
+    this.userId,
   });
 
   @override
@@ -264,33 +269,54 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                             const SizedBox(height: 40),
 
                             // Title & Artist
-                            Column(
-                              children: [
-                                Text(
-                                  title,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontFamily: 'Nunito',
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 0),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  // Placeholder to balance the heart icon
+                                  const SizedBox(width: 48),
+                                  Expanded(
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          title,
+                                          textAlign: TextAlign.center,
+                                          style: const TextStyle(
+                                            fontFamily: 'Nunito',
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          artist,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontFamily: 'Nunito',
+                                            fontSize: 18,
+                                            color: Colors.white.withOpacity(0.7),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  artist,
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontFamily: 'Nunito',
-                                    fontSize: 18,
-                                    color: Colors.white.withOpacity(0.7),
+                                  IconButton(
+                                    icon: Icon(
+                                      selectedTrack?.isLiked == true ? Icons.favorite : Icons.favorite_border,
+                                      color: selectedTrack?.isLiked == true ? Colors.greenAccent : Colors.white,
+                                    ),
+                                    onPressed: (widget.userId != null && selectedTrack != null)
+                                        ? () => player.toggleLike(widget.userId!)
+                                        : null,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
 
                             const SizedBox(height: 30),

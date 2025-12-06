@@ -130,6 +130,34 @@ class MusicTrack {
     };
   }
 
+  MusicTrack copyWith({
+    String? musicId,
+    String? title,
+    String? artist,
+    int? durationSeconds,
+    DateTime? addedAt,
+    String? thumbnailUrl,
+    String? albumImageUrl,
+    String? audioUrl,
+    String? moodCategory,
+    bool? isLiked,
+    int? playCount,
+  }) {
+    return MusicTrack(
+      musicId: musicId ?? this.musicId,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      addedAt: addedAt ?? this.addedAt,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      albumImageUrl: albumImageUrl ?? this.albumImageUrl,
+      audioUrl: audioUrl ?? this.audioUrl,
+      moodCategory: moodCategory ?? this.moodCategory,
+      isLiked: isLiked ?? this.isLiked,
+      playCount: playCount ?? this.playCount,
+    );
+  }
+
   String get durationLabel => _formatDuration(durationSeconds);
 }
 
@@ -442,4 +470,10 @@ const Map<String, IconData> _iconLookup = <String, IconData>{
   'nightlight_round': Icons.nightlight_round,
   'light_mode': Icons.light_mode,
   'feather': Icons.eco,
+  'album': Icons.album,
+  'headphones': Icons.headphones,
+  'queue_music': Icons.queue_music,
+  'playlist_play': Icons.playlist_play,
+  'radio': Icons.radio,
+  'library_music': Icons.library_music,
 };

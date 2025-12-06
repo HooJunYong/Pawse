@@ -80,7 +80,10 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
                     ),
                   ),
                 ),
-                _MiniPlayer(track: playlist.songs.isEmpty ? null : playlist.songs.first),
+                _MiniPlayer(
+                  track: playlist.songs.isEmpty ? null : playlist.songs.first,
+                  userId: widget.userId,
+                ),
               ],
             ),
           ),
@@ -326,6 +329,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
           track: index != -1 ? tracks[index] : null,
           playlist: tracks,
           initialIndex: index != -1 ? index : 0,
+          userId: widget.userId,
         ),
       ),
     );
@@ -522,8 +526,9 @@ class _ArtworkPreview extends StatelessWidget {
 
 class _MiniPlayer extends StatelessWidget {
   final PlaylistSong? track;
+  final String userId;
 
-  const _MiniPlayer({this.track});
+  const _MiniPlayer({this.track, required this.userId});
 
   @override
   Widget build(BuildContext context) {
@@ -548,6 +553,7 @@ class _MiniPlayer extends StatelessWidget {
                       moodCategory: song.moodCategory,
                       isLiked: song.isLiked,
                     ),
+              userId: userId,
             ),
           ),
         );

@@ -113,6 +113,14 @@ def get_top_tracks(limit: int = Query(10, ge=1, le=50)) -> List[MusicTrackRespon
     return music_service.get_top_tracks(limit=limit)
 
 
+@router.post("/{music_id}/toggle-like")
+def toggle_like(
+    music_id: str,
+    user_id: str = Query(..., description="User ID performing the action"),
+) -> bool:
+    return music_service.toggle_like(user_id, music_id)
+
+
 @router.post("/playlists", response_model=UserPlaylistResponse, status_code=201)
 def create_playlist(payload: UserPlaylistCreate) -> UserPlaylistResponse:
     return playlist_service.create_playlist(payload)

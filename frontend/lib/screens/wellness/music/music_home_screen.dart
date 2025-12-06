@@ -203,7 +203,10 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: const _MiniPlayer(),
+                  child: _MiniPlayer(
+                    userId: widget.userId,
+                    onReturn: () => _fetchPlaylists(showLoader: false),
+                  ),
                 ),
               ],
             ),
@@ -674,12 +677,18 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
     });
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => MusicPlayerScreen(track: track)),
+      MaterialPageRoute(builder: (context) => MusicPlayerScreen(track: track, userId: widget.userId)),
     );
+    if (mounted) {
+      _fetchPlaylists(showLoader: false);
+    }
   }
 }
 class _MiniPlayer extends StatelessWidget {
-  const _MiniPlayer();
+  final String userId;
+  final VoidCallback? onReturn;
+
+  const _MiniPlayer({required this.userId, this.onReturn});
 
   @override
   Widget build(BuildContext context) {
@@ -731,14 +740,14 @@ class _MiniPlayer extends StatelessWidget {
                       borderRadius: BorderRadius.circular(32),
                       onTap: track == null
                           ? null
-                          : () {
+                          : () async {
                               final List<MusicTrack> queue =
                                   audioManager.queue;
                               final int initialIndex = queue.indexWhere(
                                 (MusicTrack item) =>
                                     item.musicId == track.musicId,
                               );
-                              Navigator.push(
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (BuildContext context) =>
@@ -749,9 +758,11 @@ class _MiniPlayer extends StatelessWidget {
                                     initialIndex:
                                         initialIndex < 0 ? 0 : initialIndex,
                                     attachToExistingSession: true,
+                                    userId: userId,
                                   ),
                                 ),
                               );
+                              onReturn?.call();
                             },
                       child: Padding(
                         padding: const EdgeInsets.all(12),
