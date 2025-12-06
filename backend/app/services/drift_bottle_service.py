@@ -288,6 +288,17 @@ class DriftBottleService:
         )
 
         logger.info(f"User {user_id} replied to bottle {bottle_id}")
+
+        try:
+            track_result = ActivityService.track_activity(
+                user_id=user_id,
+                action_key="reply_bottle"
+            )
+            if track_result:
+                logger.info(f"Tracked reply_bottle activity for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error tracking reply_bottle activity for user {user_id}: {e}")
+            
         return DriftBottleService._reply_to_response(reply_doc)
 
     @staticmethod

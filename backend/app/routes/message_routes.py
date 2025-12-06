@@ -12,6 +12,7 @@ from app.models.chat_message import (
 )
 from app.models.database import get_database
 from app.services.ai_chat_service import AIChatService
+from app.services.activity_service import ActivityService
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,12 +49,6 @@ async def send_message(
             raise HTTPException(
                 status_code=404,
                 detail=f"Session not found: {request.session_id}"
-            )
-        
-        if session.get("end_time"):
-            raise HTTPException(
-                status_code=400,
-                detail="Cannot send message to ended session"
             )
         
         # Get companion personality info
@@ -133,6 +128,16 @@ async def send_message(
         )
         
         logger.info(f"Added messages to session: {request.session_id}")
+
+        try:
+            track_result = ActivityService.track_activity(
+                user_id=session["user_id"],
+                action_key="chat_message"
+            )
+            if track_result:
+                logger.info(f"Tracked activity for user: {session['user_id']}")
+        except Exception as e:
+            logger.error(f"Error tracking activity for user {session['user_id']}: {e}")
         
         # Return response
         return SendMessageResponse(
