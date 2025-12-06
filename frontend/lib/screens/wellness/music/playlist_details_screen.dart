@@ -333,16 +333,60 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete playlist?'),
-        content: Text('"${playlist.playlistName}" will be permanently removed.'),
+        title: const Text(
+          'Delete playlist?',
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF422006),
+          ),
+        ),
+        content: Text(
+          '"${playlist.playlistName}" will be permanently removed.',
+          style: const TextStyle(
+            fontFamily: 'Nunito',
+            color: Color(0xFF422006),
+          ),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF422006),
+              ),
+            ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
+            style: TextButton.styleFrom(
+              backgroundColor: const Color(0xFFF97316),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Delete',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ],
       ),

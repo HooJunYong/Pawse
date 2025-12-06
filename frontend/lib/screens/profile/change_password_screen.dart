@@ -92,15 +92,21 @@ class _ChangePasswordState extends State<ChangePassword> {
       return;
     }
 
-    // Check if new password meets requirements
-    if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#\$&*~]).{8,}$').hasMatch(_newPasswordController.text)) {
-      _showErrorDialog('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
+    // Check if confirm password is empty
+    if (_confirmPasswordController.text.isEmpty) {
+      _showErrorDialog('Please confirm your new password');
       return;
     }
 
     // Check if new password is same as current password
     if (_newPasswordController.text == _currentPasswordController.text) {
       _showErrorDialog('New password must be different from current password');
+      return;
+    }
+
+    // Check if new password meets requirements
+    if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#\$&*~]).{8,}$').hasMatch(_newPasswordController.text)) {
+      _showErrorDialog('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
       return;
     }
 
@@ -119,6 +125,8 @@ class _ChangePasswordState extends State<ChangePassword> {
 
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      
+      // The backend will verify the current password and update to new password
       final response = await http.put(
         Uri.parse('$apiUrl/change-password/${widget.userId}'),
         headers: {'Content-Type': 'application/json'},
@@ -141,17 +149,13 @@ class _ChangePasswordState extends State<ChangePassword> {
           Navigator.pop(context); // Return to profile page
         } else {
           final error = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${error['detail'] ?? 'Unknown error'}')),
-          );
+          _showErrorDialog(error['detail'] ?? 'Unknown error');
         }
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        Navigator.pop(context); // Close loading dialog if still open
+        _showErrorDialog('Error: $e');
       }
     }
   }
