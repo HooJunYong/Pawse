@@ -108,6 +108,17 @@ def search_music(
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
+@router.get("/top-songs", response_model=List[MusicTrackResponse])
+def get_top_songs(
+    limit: int = Query(10, ge=1, le=50),
+) -> List[MusicTrackResponse]:
+    """Fetch top songs from iTunes (simulated via search)."""
+    try:
+        return music_service.get_top_songs(limit=limit)
+    except ITunesAPIError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.get("/top", response_model=List[MusicTrackResponse])
 def get_top_tracks(limit: int = Query(10, ge=1, le=50)) -> List[MusicTrackResponse]:
     return music_service.get_top_tracks(limit=limit)

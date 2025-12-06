@@ -83,8 +83,8 @@ class _ResetPasswordState extends State<ResetPassword> {
       return;
     }
 
-    if (_newPasswordController.text.length < 6) {
-      _showErrorDialog('Password must be at least 6 characters');
+    if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#\$&*~]).{8,}$').hasMatch(_newPasswordController.text)) {
+      _showErrorDialog('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
       return;
     }
 

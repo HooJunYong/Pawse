@@ -309,7 +309,7 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                                   IconButton(
                                     icon: Icon(
                                       selectedTrack?.isLiked == true ? Icons.favorite : Icons.favorite_border,
-                                      color: selectedTrack?.isLiked == true ? Colors.greenAccent : Colors.white,
+                                      color: selectedTrack?.isLiked == true ? Colors.red : Colors.white,
                                     ),
                                     onPressed: (widget.userId != null && selectedTrack != null)
                                         ? () => player.toggleLike(widget.userId!)

@@ -12,6 +12,7 @@ from .routes.otp_routes import router as otp_router
 from .routes.chat_routes import router as chat_router
 from .routes.breathing_routes import router as breathing_router
 from .routes.music_routes import router as music_router
+from .routes.notification_routes import router as notification_router
 from .config.settings import ALLOWED_ORIGINS, BACKEND_HOST, BACKEND_PORT
 
 app = FastAPI(title="AI Mental Health Companion API")
@@ -37,6 +38,7 @@ app.include_router(otp_router, tags=["OTP"])
 app.include_router(chat_router, tags=["Chat"])
 app.include_router(breathing_router, tags=["Breathing"])
 app.include_router(music_router, tags=["Music"])
+app.include_router(notification_router, tags=["Notifications"])
 
 @app.get("/")
 def root():

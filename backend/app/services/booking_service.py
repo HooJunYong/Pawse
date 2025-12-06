@@ -26,6 +26,7 @@ from ..models.booking_schemas import (
 from ..config.timezone import now_my
 from ..models.chat_schemas import SendChatMessageRequest
 from ..services.chat_service import send_message
+from ..services.notification_service import create_notification
 
 logger = logging.getLogger(__name__)
 
@@ -593,6 +594,15 @@ def update_session_status(request: UpdateSessionStatusRequest) -> UpdateSessionS
         update_fields["awaiting_rating"] = awaiting_rating
         if awaiting_rating:
             update_fields["rating_prompted_at"] = now_ts
+            
+            # Notify user to rate session
+            create_notification(
+                user_id=session.get("user_id"),
+                type="rating_reminder",
+                title="Session Completed",
+                body="Your therapy session has ended. Please take a moment to rate your experience.",
+                data={"session_id": request.session_id}
+            )
         else:
             unset_fields["rating_prompted_at"] = ""
     else:  # no_show
@@ -730,12 +740,6 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     if not session:
         raise ValueError("Booking not found")
 
-    status = _coerce_session_status(session.get("session_status") or session.get("status")).value
-    if status == SessionStatus.cancelled.value:
-        return CancelBookingResponse(success=True, message="Booking already cancelled")
-    if status not in {SessionStatus.scheduled.value}:
-        raise ValueError("Only scheduled bookings can be cancelled")
-
     now_ts = now_my()
 
     db.therapy_sessions.update_one(
@@ -749,6 +753,15 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
                 "slot_released": False,
             }
         }
+    )
+    
+    # Notify therapist about cancellation
+    create_notification(
+        user_id=session.get("therapist_user_id"),
+        type="booking_update",
+        title="Booking Cancelled",
+        body=f"A client has cancelled their session scheduled for {session.get('scheduled_at')}.",
+        data={"session_id": request.session_id}
     )
 
     return CancelBookingResponse(

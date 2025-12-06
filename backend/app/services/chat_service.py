@@ -13,6 +13,7 @@ from ..models.chat_schemas import (
     SendChatMessageRequest,
 )
 from ..models.database import db
+from ..services.notification_service import create_notification
 
 
 def _guess_image_mime(image_base64: str) -> str:
@@ -248,12 +249,28 @@ def send_message(payload: SendChatMessageRequest) -> ChatMessageResponse:
         {
             "$set": {
                 "last_message": content,
-                "last_message_at": now_ts,
                 "updated_at": now_ts,
             },
             "$inc": {unread_field: 1},
         },
     )
+
+    # Send notification to recipient
+    recipient_id = client_user_id if payload.sender_role == "therapist" else therapist_user_id
+    if recipient_id:
+        sender_name = "Therapist" if payload.sender_role == "therapist" else "Client"
+        # Try to get better name
+        if payload.sender_role == "therapist":
+             # Get therapist name
+             pass # Simplified for now
+        
+        create_notification(
+            user_id=recipient_id,
+            type="message",
+            title=f"New message from {sender_name}",
+            body=content[:50] + "..." if len(content) > 50 else content,
+            data={"conversation_id": conversation_id, "sender_id": payload.sender_id}
+        )
 
     return ChatMessageResponse(
         message_id=message_id,

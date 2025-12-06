@@ -578,6 +578,43 @@ class MusicService:
         )
         return [MusicTrackResponse(**self._map_doc(doc)) for doc in cursor]
 
+    def get_top_songs(self, limit: int = 10) -> List[MusicTrackResponse]:
+        """
+        Fetch 'top songs' from iTunes by searching for a popular term.
+        Falls back to local DB if iTunes fails.
+        """
+        # Simulate "Global Top Charts" by searching for popular terms
+        search_term = "top hits 2024"
+        try:
+            raw_tracks = self._search_itunes_via_requests(
+                search_term,
+                limit=limit * 2,  # Fetch more to filter duplicates
+            )
+        except ITunesAPIError:
+            # Fallback to local top tracks if API fails
+            return self.get_top_tracks(limit)
+
+        results: List[MusicTrackResponse] = []
+        seen: Set[str] = set()
+
+        for raw in raw_tracks:
+            try:
+                payload, extra = self._map_itunes_track(raw, None)
+            except ValueError:
+                continue
+
+            stored = self._persist_and_response(payload, extra)
+            if stored.music_id in seen:
+                continue
+
+            seen.add(stored.music_id)
+            results.append(stored)
+
+            if len(results) >= limit:
+                break
+
+        return results
+
     def _search_cache(
         self,
         query: str,

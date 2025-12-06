@@ -188,7 +188,7 @@ class MusicApiService {
   }
 
   Future<List<MusicTrack>> getTopTracks({int limit = 10}) async {
-    final endpoint = _buildEndpoint('/music/top', {'limit': limit.toString()});
+    final endpoint = _buildEndpoint('/music/top-songs', {'limit': limit.toString()});
     final response = await ApiService.get(endpoint);
     _throwIfFailed(response.statusCode, response.body);
     final List<dynamic> payload = jsonDecode(response.body) as List<dynamic>;

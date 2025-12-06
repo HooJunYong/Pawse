@@ -1,6 +1,7 @@
 import uuid
 import logging
 from fastapi import HTTPException, status  # type: ignore
+from pymongo.errors import DuplicateKeyError
 from ..models.database import db
 from ..models.schemas import SignupRequest, SignupResponse, LoginRequest, LoginResponse, LoginHistoryItem, LoginHistoryResponse
 from ..config.settings import PASSWORD_MIN_LENGTH, VALID_USER_TYPES
@@ -59,6 +60,11 @@ def create_user(payload: SignupRequest) -> SignupResponse:
         logger.info(f"Inserted user document: {user_id}")
         db.user_profile.insert_one(profile_doc)
         logger.info(f"Inserted profile document: {user_id}")
+    except DuplicateKeyError:
+        logger.warning(f"Signup failed: email {payload.email} already exists (DuplicateKeyError)")
+        # Clean up if user was inserted but profile failed (unlikely for email dup, but good practice)
+        db.users.delete_one({"user_id": user_id}) 
+        raise HTTPException(status_code=409, detail="Email already registered")
     except Exception as e:
         logger.error(f"Insert failed for {user_id}: {e}")
         db.users.delete_one({"user_id": user_id})

@@ -10,6 +10,7 @@ import '../auth/login_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'join_therapist_screen.dart';
+import 'notification_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -225,7 +226,18 @@ class _ProfileState extends State<Profile> {
                           });
                         },
                       ),
-                      _buildMenuItem(icon: Icons.notifications_outlined, title: 'Notifications', onTap: () {}),
+                      _buildMenuItem(
+                        icon: Icons.notifications_outlined,
+                        title: 'Notifications',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NotificationScreen(userId: widget.userId),
+                            ),
+                          );
+                        },
+                      ),
                       _buildMenuItem(icon: Icons.settings_outlined, title: 'Customize Your Companion', onTap: () {}),
                       _buildMenuItem(
                         icon: Icons.lock_outline,
