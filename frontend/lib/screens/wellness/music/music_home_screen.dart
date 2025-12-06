@@ -613,7 +613,7 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   Future<void> _openSearch() async {
     final MusicTrack? track = await showSearch<MusicTrack?>(
       context: context,
-      delegate: _MusicSearchDelegate(_musicApi),
+      delegate: _MusicSearchDelegate(_musicApi, widget.userId),
     );
     if (track == null || !mounted) {
       return;
@@ -741,22 +741,11 @@ class _MiniPlayer extends StatelessWidget {
                       onTap: track == null
                           ? null
                           : () async {
-                              final List<MusicTrack> queue =
-                                  audioManager.queue;
-                              final int initialIndex = queue.indexWhere(
-                                (MusicTrack item) =>
-                                    item.musicId == track.musicId,
-                              );
                               await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (BuildContext context) =>
                                       MusicPlayerScreen(
-                                    track: track,
-                                    playlist:
-                                        queue.isEmpty ? [track] : queue,
-                                    initialIndex:
-                                        initialIndex < 0 ? 0 : initialIndex,
                                     attachToExistingSession: true,
                                     userId: userId,
                                   ),
@@ -771,24 +760,51 @@ class _MiniPlayer extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFCC80),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      track?.title
-                                              .substring(0, 1)
-                                              .toUpperCase() ??
-                                          '♪',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: (track?.albumImageUrl != null && track!.albumImageUrl!.isNotEmpty) ||
+                                         (track?.thumbnailUrl != null && track!.thumbnailUrl!.isNotEmpty)
+                                      ? Image.network(
+                                          track.albumImageUrl ?? track.thumbnailUrl!,
+                                          width: 40,
+                                          height: 40,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            width: 40,
+                                            height: 40,
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFFFCC80),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: const Center(
+                                              child: Icon(
+                                                Icons.music_note,
+                                                color: Color(0xFF422006),
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFCC80),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Center(
+                                            child: Text(
+                                              track?.title
+                                                      .substring(0, 1)
+                                                      .toUpperCase() ??
+                                                  '♪',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: Color(0xFF422006),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -870,8 +886,9 @@ class _MiniPlayer extends StatelessWidget {
 
 class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
   final MusicApiService musicApi;
+  final String userId;
 
-  _MusicSearchDelegate(this.musicApi);
+  _MusicSearchDelegate(this.musicApi, this.userId);
 
   @override
   String get searchFieldLabel => 'Search tracks';
@@ -903,6 +920,7 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
       query: query.trim(),
       musicApi: musicApi,
       onSelected: (track) => close(context, track),
+      userId: userId,
     );
   }
 
@@ -912,12 +930,14 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
       return _TopTracks(
         musicApi: musicApi,
         onSelected: (track) => close(context, track),
+        userId: userId,
       );
     }
     return _SearchResults(
       query: query.trim(),
       musicApi: musicApi,
       onSelected: (track) => close(context, track),
+      userId: userId,
     );
   }
 }
@@ -925,10 +945,12 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
 class _TopTracks extends StatelessWidget {
   final MusicApiService musicApi;
   final ValueChanged<MusicTrack> onSelected;
+  final String userId;
 
   const _TopTracks({
     required this.musicApi,
     required this.onSelected,
+    required this.userId,
   });
 
   @override
@@ -976,7 +998,18 @@ class _TopTracks extends StatelessWidget {
                     leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
                     title: Text(track.title),
                     subtitle: Text(track.artist),
-                    onTap: () => onSelected(track),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MusicPlayerScreen(
+                            playlist: results,
+                            initialIndex: index,
+                            userId: userId,
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               ),
@@ -992,11 +1025,13 @@ class _SearchResults extends StatelessWidget {
   final String query;
   final MusicApiService musicApi;
   final ValueChanged<MusicTrack> onSelected;
+  final String userId;
 
   const _SearchResults({
     required this.query,
     required this.musicApi,
     required this.onSelected,
+    required this.userId,
   });
 
   @override
@@ -1034,7 +1069,18 @@ class _SearchResults extends StatelessWidget {
               leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
               title: Text(track.title),
               subtitle: Text(track.artist),
-              onTap: () => onSelected(track),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MusicPlayerScreen(
+                      playlist: results,
+                      initialIndex: index,
+                      userId: userId,
+                    ),
+                  ),
+                );
+              },
             );
           },
         );

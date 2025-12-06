@@ -146,6 +146,44 @@ class MusicService:
                 ],
             },
         ],
+        "very_happy": [
+            {
+                "playlist_type": "euphoria",
+                "title": "Total Euphoria",
+                "icon": "bolt",
+                "strategy": "High-octane energy for peak moods.",
+                "search_terms": [
+                    "Big Room House",
+                    "Hyperpop",
+                    "Festival Anthems",
+                    "EDM Bangers",
+                ],
+            },
+            {
+                "playlist_type": "hype",
+                "title": "Hype Mode",
+                "icon": "celebration",
+                "strategy": "Unstoppable momentum.",
+                "search_terms": [
+                    "Workout Hype",
+                    "Rap Bangers",
+                    "High Tempo Rock",
+                    "Power Anthems",
+                ],
+            },
+            {
+                "playlist_type": "party",
+                "title": "Party Protocol",
+                "icon": "nightlife",
+                "strategy": "Celebrate with intense vibes.",
+                "search_terms": [
+                    "Party Hits",
+                    "Club Classics",
+                    "Upbeat Dance",
+                    "Festival EDM",
+                ],
+            },
+        ],
         "angry": [
             {
                 "playlist_type": "release",
@@ -265,6 +303,7 @@ class MusicService:
     THERAPY_CATEGORY_BY_KEY: Dict[str, Optional[MoodCategory]] = {
         "sad": MoodCategory.comfort,
         "happy": MoodCategory.hopeful,
+        "very_happy": MoodCategory.empowered,
         "angry": MoodCategory.empowered,
         "anxious": MoodCategory.anxious,
         "generic": MoodCategory.calm,
@@ -283,8 +322,8 @@ class MusicService:
         "happy": "happy",
         "joy": "happy",
         "joyful": "happy",
-        "excited": "happy",
-        "very happy": "happy",
+        "excited": "very_happy",
+        "very happy": "very_happy",
         "positive": "happy",
         "angry": "angry",
         "mad": "angry",

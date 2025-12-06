@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/music_models.dart';
+import '../../../services/audio_manager.dart';
 import '../../../services/music_api_service.dart';
 import 'add_music_screen.dart';
 import 'music_player_screen.dart';
@@ -532,92 +533,127 @@ class _MiniPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final PlaylistSong? song = track;
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => MusicPlayerScreen(
-              track: song == null
-                  ? null
-                  : MusicTrack(
-                      musicId: song.musicId,
-                      title: song.title,
-                      artist: song.artist,
-                      durationSeconds: song.durationSeconds,
-                      addedAt: DateTime.now().toUtc(),
-                      thumbnailUrl: song.thumbnailUrl,
-                      albumImageUrl: song.albumImageUrl,
-                      audioUrl: song.audioUrl,
-                      moodCategory: song.moodCategory,
-                      isLiked: song.isLiked,
+    final AudioManager audioManager = AudioManager.instance;
+    return StreamBuilder<MusicTrack?>(
+      stream: audioManager.currentTrackStream,
+      initialData: audioManager.currentTrack,
+      builder: (BuildContext context, AsyncSnapshot<MusicTrack?> trackSnapshot) {
+        final MusicTrack? track = trackSnapshot.data;
+        return StreamBuilder<bool>(
+          stream: audioManager.playingStream,
+          initialData: audioManager.isPlaying,
+          builder: (BuildContext context, AsyncSnapshot<bool> playingSnapshot) {
+            final bool isPlaying = playingSnapshot.data ?? false;
+            if (track == null) {
+              return const SizedBox.shrink();
+            }
+            return GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MusicPlayerScreen(
+                      track: track,
+                      userId: userId,
                     ),
-              userId: userId,
-            ),
-          ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.all(20),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFCC80),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Center(
-                child: Text(
-                  song?.title.substring(0, 1).toUpperCase() ?? '♪',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(32),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: (track.albumImageUrl != null && track.albumImageUrl!.isNotEmpty)
+                          ? Image.network(
+                              track.albumImageUrl!,
+                              width: 40,
+                              height: 40,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFCC80),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    track.title.isNotEmpty ? track.title[0].toUpperCase() : '?',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFCC80),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  track.title.isNotEmpty ? track.title[0].toUpperCase() : '?',
+                                  style: const TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            track.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF422006),
+                            ),
+                          ),
+                          Text(
+                            track.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 12,
+                              color: const Color(0xFF422006).withOpacity(0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
+                      color: const Color(0xFF422006),
+                      size: 32,
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    song?.title ?? 'Nothing playing yet',
-                    style: const TextStyle(
-                      fontFamily: 'Nunito',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: Color(0xFF422006),
-                    ),
-                  ),
-                  Text(
-                    song?.artist ?? 'Tap to choose a track',
-                    style: const TextStyle(
-                      fontFamily: 'Nunito',
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.play_circle_fill, color: Color(0xFF422006), size: 32),
-          ],
-        ),
-      ),
+            );
+          },
+        );
+      },
     );
   }
 }

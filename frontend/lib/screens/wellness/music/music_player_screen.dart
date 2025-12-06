@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/music_models.dart';
 import '../../../providers/audio_player_provider.dart';
+import '../../../services/music_api_service.dart';
 
 class MusicPlayerScreen extends StatelessWidget {
   final MusicTrack? track;
@@ -203,7 +204,9 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                           ),
                           IconButton(
                             icon: const Icon(Icons.more_horiz, color: Colors.white, size: 30),
-                            onPressed: () {},
+                            onPressed: selectedTrack != null && widget.userId != null
+                                ? () => _showAddToPlaylistMenu(context, selectedTrack)
+                                : null,
                           ),
                         ],
                       ),
@@ -465,6 +468,282 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
       color: const Color(0xFF424242),
       child: const Center(
         child: Icon(Icons.music_note_rounded, size: 80, color: Colors.white24),
+      ),
+    );
+  }
+
+  Future<void> _showAddToPlaylistMenu(BuildContext context, MusicTrack track) async {
+    final musicApi = const MusicApiService();
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => _AddToPlaylistSheet(
+        track: track,
+        userId: widget.userId!,
+        musicApi: musicApi,
+      ),
+    );
+  }
+}
+
+class _AddToPlaylistSheet extends StatefulWidget {
+  final MusicTrack track;
+  final String userId;
+  final MusicApiService musicApi;
+
+  const _AddToPlaylistSheet({
+    required this.track,
+    required this.userId,
+    required this.musicApi,
+  });
+
+  @override
+  State<_AddToPlaylistSheet> createState() => _AddToPlaylistSheetState();
+}
+
+class _AddToPlaylistSheetState extends State<_AddToPlaylistSheet> {
+  List<UserPlaylist> _playlists = [];
+  bool _isLoading = true;
+  String? _error;
+  final Set<String> _addingTo = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlaylists();
+  }
+
+  Future<void> _loadPlaylists() async {
+    try {
+      final playlists = await widget.musicApi.listPlaylists(widget.userId);
+      if (mounted) {
+        setState(() {
+          _playlists = playlists;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _addToPlaylist(UserPlaylist playlist) async {
+    if (_addingTo.contains(playlist.id)) return;
+
+    setState(() {
+      _addingTo.add(playlist.id);
+    });
+
+    try {
+      await widget.musicApi.addSongToPlaylist(
+        playlistId: playlist.id,
+        track: widget.track,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added "${widget.track.title}" to ${playlist.playlistName}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _addingTo.remove(playlist.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add song: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFFF7F4F2),
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                children: [
+                  const Icon(Icons.playlist_add, color: Color(0xFF422006)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Add to Playlist',
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF422006),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.track.title,
+                          style: TextStyle(
+                            fontFamily: 'Nunito',
+                            fontSize: 14,
+                            color: const Color(0xFF422006).withOpacity(0.6),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(40),
+                child: CircularProgressIndicator(),
+              )
+            else if (_error != null)
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Text(
+                  'Failed to load playlists',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    color: const Color(0xFF422006).withOpacity(0.6),
+                  ),
+                ),
+              )
+            else if (_playlists.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(40),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.playlist_add,
+                      size: 48,
+                      color: const Color(0xFF422006).withOpacity(0.3),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No playlists yet',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 16,
+                        color: const Color(0xFF422006).withOpacity(0.6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Create a playlist first to save your favorite songs',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 14,
+                        color: const Color(0xFF422006).withOpacity(0.4),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.5,
+                ),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _playlists.length,
+                  itemBuilder: (context, index) {
+                    final playlist = _playlists[index];
+                    final isAdding = _addingTo.contains(playlist.id);
+                    final alreadyExists = playlist.songs.any(
+                      (song) => song.musicId == widget.track.musicId,
+                    );
+
+                    return ListTile(
+                      leading: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2F1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.music_note,
+                          color: Color(0xFF4DB6AC),
+                        ),
+                      ),
+                      title: Text(
+                        playlist.playlistName,
+                        style: const TextStyle(
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF422006),
+                        ),
+                      ),
+                      subtitle: Text(
+                        '${playlist.songCount} song${playlist.songCount == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 12,
+                          color: const Color(0xFF422006).withOpacity(0.6),
+                        ),
+                      ),
+                      trailing: isAdding
+                          ? const SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : alreadyExists
+                              ? const Icon(Icons.check_circle, color: Colors.green)
+                              : const Icon(Icons.add_circle_outline, color: Color(0xFF422006)),
+                      onTap: alreadyExists || isAdding
+                          ? null
+                          : () => _addToPlaylist(playlist),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
