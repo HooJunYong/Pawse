@@ -53,7 +53,9 @@ def create_user(payload: SignupRequest) -> SignupResponse:
         "zip": payload.zip,
         "profile_picture_url": payload.profile_picture_url,
         "updated_at": now,
-        "total_points": 0,
+        "lifetime_points": 0,
+        "current_points": 0,
+        "current_rank_id": "rank_bronze",
     }
 
     try:

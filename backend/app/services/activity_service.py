@@ -278,7 +278,7 @@ class ActivityService:
         db = get_database()
         
         # Get current user profile
-        user = db.user_profiles.find_one({"user_id": user_id})
+        user = db.user_profile.find_one({"user_id": user_id})
         
         if not user:
             logger.error(f"User {user_id} not found")
@@ -292,7 +292,7 @@ class ActivityService:
         new_available = current_available + points
         
         # Update user profile
-        db.user_profiles.update_one(
+        db.user_profile.update_one(
             {"user_id": user_id},
             {
                 "$set": {
@@ -333,7 +333,7 @@ class ActivityService:
         db = get_database()
         
         # Get user profile
-        user = db.user_profiles.find_one({"user_id": user_id})
+        user = db.user_profile.find_one({"user_id": user_id})
         
         if not user:
             return {"error": "User not found"}
@@ -360,7 +360,7 @@ class ActivityService:
         # Check if user qualifies for next rank
         if next_rank and lifetime_points >= next_rank["min_points"]:
             # Update user's rank
-            db.user_profiles.update_one(
+            db.user_profile.update_one(
                 {"user_id": user_id},
                 {"$set": {"current_rank_id": next_rank["rank_id"]}}
             )
@@ -388,7 +388,7 @@ class ActivityService:
         """
         db = get_database()
         
-        user = db.user_profiles.find_one({"user_id": user_id})
+        user = db.user_profile.find_one({"user_id": user_id})
         if not user:
             return None
         
@@ -417,7 +417,7 @@ class ActivityService:
         """
         db = get_database()
         
-        user = db.user_profiles.find_one({"user_id": user_id})
+        user = db.user_profile.find_one({"user_id": user_id})
         if not user:
             return {"error": "User not found"}
         

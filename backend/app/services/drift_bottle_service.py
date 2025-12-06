@@ -17,6 +17,7 @@ from app.models.bottle_reply import (
     BottleReply, BottleReplyCreate, BottleReplyResponse
 )
 from app.models.database import get_database
+from app.services.activity_service import ActivityService
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -116,6 +117,17 @@ class DriftBottleService:
         db.drift_bottles.insert_one(bottle_doc)
 
         logger.info(f"User {user_id} threw bottle {bottle_id}")
+
+        try:
+            track_result = ActivityService.track_activity(
+                user_id=user_id,
+                action_key="throw_bottle"
+            )
+            if track_result:
+                logger.info(f"Tracked throw_bottle activity for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error tracking throw_bottle activity for user {user_id}: {e}")
+
         return DriftBottleService._bottle_to_response(bottle_doc)
 
     @staticmethod

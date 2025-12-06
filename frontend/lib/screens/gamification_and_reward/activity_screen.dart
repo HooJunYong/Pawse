@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../services/activity_service.dart';
+import '../../services/profile_service.dart';
+import 'dart:convert';
 
 class ActivityScreen extends StatefulWidget {
   final String userId;
@@ -19,6 +22,99 @@ class _ActivityScreenState extends State<ActivityScreen> {
   final Color kRewardsButtonColor = const Color(0xFF5D2D05);
   final Color kTextColor = const Color(0xFF1A1A1A);
 
+  // State variables
+  bool _isLoading = true;
+  String? _errorMessage;
+  String _userName = "User";
+  String _userAvatar = 'assets/images/americonsh1.png';
+  String _rankName = "Bronze";
+  Color _rankColor = const Color(0xFFCD7F32);
+  int _currentPoints = 0;
+  int _nextRankPoints = 0;
+  int _pointsNeeded = 0;
+  double _progressPercentage = 0.0;
+  List<Map<String, dynamic>> _activities = [];
+  int _completedCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadActivityData();
+  }
+
+  Future<void> _loadActivityData() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      // Load user profile
+      await _loadUserProfile();
+
+      // Load rank progress
+      final rankProgress = await ActivityService.getRankProgress(widget.userId);
+      if (rankProgress != null) {
+        setState(() {
+          _rankName = rankProgress['current_rank_name'] ?? 'Bronze';
+          _currentPoints = rankProgress['lifetime_points'] ?? 0;
+          _nextRankPoints = rankProgress['next_rank_min_points'] ?? 0;
+          _pointsNeeded = rankProgress['points_needed'] ?? 0;
+          _progressPercentage = (rankProgress['progress_percentage'] ?? 0).toDouble();
+          
+          // Set rank color based on rank name
+          if (_rankName.toLowerCase().contains('silver')) {
+            _rankColor = const Color(0xFFC0C0C0);
+          } else if (_rankName.toLowerCase().contains('gold')) {
+            _rankColor = const Color(0xFFFFD700);
+          } else {
+            _rankColor = const Color(0xFFCD7F32); // Bronze
+          }
+        });
+      }
+
+      // Load daily activities
+      final activitiesData = await ActivityService.getDailyActivities(widget.userId);
+      if (activitiesData != null) {
+        setState(() {
+          _activities = List<Map<String, dynamic>>.from(activitiesData['activities'] ?? []);
+          _completedCount = activitiesData['completed_count'] ?? 0;
+        });
+      }
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'Failed to load activity data: $e';
+      });
+    }
+  }
+
+  Future<void> _loadUserProfile() async {
+    try {
+      final response = await ProfileService.getProfile(widget.userId);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        setState(() {
+          final firstName = data['first_name'] ?? '';
+          final lastName = data['last_name'] ?? '';
+          _userName = firstName.isNotEmpty ? firstName : 'User';
+          
+          // Check for avatar
+          final avatarUrl = data['avatar_url'] as String?;
+          if (avatarUrl != null && avatarUrl.isNotEmpty) {
+            _userAvatar = avatarUrl;
+          }
+        });
+      }
+    } catch (e) {
+      // Keep default values on error
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,26 +126,46 @@ class _ActivityScreenState extends State<ActivityScreen> {
             bottom: false, // Let content go behind the nav bar
             child: LayoutBuilder(
               builder: (context, constraints) {
-                return SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 120), // Bottom padding for Nav Bar
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: constraints.maxHeight - 20,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildHeader(),
-                        const SizedBox(height: 30),
-                        _buildProgressCard(),
-                        const SizedBox(height: 20),
-                        _buildActivitiesCard(),
-                        const SizedBox(height: 30),
-                        _buildRewardsSection(),
-                      ],
-                    ),
-                  ),
-                );
+                return _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _errorMessage != null
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _errorMessage!,
+                                  style: const TextStyle(color: Colors.red),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: 20),
+                                ElevatedButton(
+                                  onPressed: _loadActivityData,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 120), // Bottom padding for Nav Bar
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: constraints.maxHeight - 20,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildHeader(),
+                                  const SizedBox(height: 30),
+                                  _buildProgressCard(),
+                                  const SizedBox(height: 20),
+                                  _buildActivitiesCard(),
+                                  const SizedBox(height: 30),
+                                  _buildRewardsSection(),
+                                ],
+                              ),
+                            ),
+                          );
               },
             ),
           ),
@@ -87,18 +203,29 @@ class _ActivityScreenState extends State<ActivityScreen> {
             color: Colors.white,
           ),
           child: ClipOval(
-            child: Image.asset(
-              'assets/images/americonsh1.png',
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.pets, color: Colors.grey);
-              },
-            ),
+            child: _userAvatar.startsWith('http')
+                ? Image.network(
+                    _userAvatar,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.asset(
+                        'assets/images/americonsh1.png',
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  )
+                : Image.asset(
+                    _userAvatar,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(Icons.pets, color: Colors.grey);
+                    },
+                  ),
           ),
         ),
         const SizedBox(width: 12),
         Text(
-          "Jerry",
+          _userName,
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
@@ -109,12 +236,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFCD7F32), // Bronze color approximation
+            color: _rankColor,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: const Text(
-            "Bronze",
-            style: TextStyle(
+          child: Text(
+            _rankName,
+            style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 14,
@@ -145,7 +272,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Earn 400 points to unlock next level",
+            _pointsNeeded > 0
+                ? "Earn $_pointsNeeded points to unlock next level"
+                : "You've reached the maximum rank!",
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -165,7 +294,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               children: [
                 // Filled portion
                 FractionallySizedBox(
-                  widthFactor: 240 / 400, // Calculation based on points
+                  widthFactor: _progressPercentage / 100,
                   child: Container(
                     decoration: BoxDecoration(
                       color: kProgressBarColor,
@@ -174,10 +303,12 @@ class _ActivityScreenState extends State<ActivityScreen> {
                   ),
                 ),
                 // Text Overlay
-                const Center(
+                Center(
                   child: Text(
-                    "240/400",
-                    style: TextStyle(
+                    _pointsNeeded > 0
+                        ? "$_currentPoints/$_nextRankPoints"
+                        : "Max Rank",
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                       color: Colors.black87,
@@ -188,7 +319,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          Text(
+          const Text(
             "Earn points by completing activities to level up your badge!",
             style: TextStyle(
               fontSize: 14,
@@ -231,37 +362,66 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          _buildActivityItem(
-            "Complete a guided meditation session.",
-            isCompleted: true,
-          ),
-          const SizedBox(height: 15),
-          _buildActivityItem(
-            "Send 3 messages with your AI companion",
-            isCompleted: true,
-          ),
-          const SizedBox(height: 15),
-          _buildActivityItem(
-            "Listen a music in the playlist",
-            points: "+ 3pts",
-          ),
+          if (_activities.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: Text(
+                  "No activities assigned for today",
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            )
+          else
+            ..._activities.asMap().entries.map((entry) {
+              final index = entry.key;
+              final activity = entry.value;
+              return Column(
+                children: [
+                  if (index > 0) const SizedBox(height: 15),
+                  _buildActivityItem(
+                    activity['activity_description'] ?? 'Activity',
+                    isCompleted: activity['status'] == 'completed',
+                    points: activity['status'] != 'completed' 
+                        ? "+ ${activity['point_award']}pts" 
+                        : null,
+                    progress: activity['progress'] ?? 0,
+                    target: activity['target'] ?? 1,
+                  ),
+                ],
+              );
+            }).toList(),
         ],
       ),
     );
   }
 
-  Widget _buildActivityItem(String text, {bool isCompleted = false, String? points}) {
+  Widget _buildActivityItem(
+    String text, {
+    bool isCompleted = false,
+    String? points,
+    int progress = 0,
+    int target = 1,
+  }) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Colors.black,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black,
+                ),
+              ),
+            ],
           ),
         ),
         const SizedBox(width: 10),

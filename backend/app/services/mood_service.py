@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from ..models.database import db
 from ..models.mood_model import MoodCreate, MoodUpdate, MoodResponse
 from ..config.timezone import now_my
+from .activity_service import ActivityService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,20 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create mood entry")
         
+        today = date_type.today()
+        is_today = (mood_data.date == today)
+
+        if mood_data.note and mood_data.note.strip() and is_today:
+            try:
+                track_result = ActivityService.track_activity(
+                    user_id=mood_data.user_id,
+                    action_key="log_mood_note"
+                )
+                if track_result:
+                    logger.info(f"Activity tracked for mood note logging: {track_result}")
+            except Exception as e:
+                logger.error(f"Error tracking activity for mood note: {str(e)}")
+
         # Return response
         return MoodResponse(
             mood_id=mood_id,
@@ -129,6 +144,15 @@ def update_mood(user_id: str, mood_id: str, mood_data: MoodUpdate) -> MoodRespon
                 detail="Mood entry not found or you don't have permission to update it"
             )
         
+        # Check if this mood entry is for today
+        mood_date = date_type.fromisoformat(existing_mood["date"])
+        today = date_type.today()
+        is_today = (mood_date == today)
+
+        # Check if user is adding a note for the first time
+        had_note_before = existing_mood.get("note") and existing_mood.get("note").strip()
+        adding_note_now = mood_data.note and mood_data.note.strip()
+        
         # Prepare update fields
         update_fields = {"updated_at": now_my()}
         
@@ -147,6 +171,18 @@ def update_mood(user_id: str, mood_id: str, mood_data: MoodUpdate) -> MoodRespon
         if result.modified_count == 0:
             logger.warning(f"No changes made to mood entry {mood_id}")
         
+        if adding_note_now and not had_note_before and is_today:
+            try:
+                track_result = ActivityService.track_activity(
+                    user_id=user_id,
+                    action_key="log_mood_note"
+                )
+                if track_result:
+                    logger.info(f"Activity tracked for mood note update: {track_result}")
+            except Exception as e:
+                # Log error but don't fail mood update
+                logger.warning(f"Failed to track activity for log_mood_note: {str(e)}")
+
         # Fetch updated document
         updated_mood = db.mood_tracking.find_one({
             "mood_id": mood_id,
