@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/journal_model.dart';
 import '../../services/journal_service.dart';
+import '../../services/mood_nudge_service.dart';
 
 class JournalingScreen extends StatefulWidget {
   final String userId;
@@ -15,12 +16,14 @@ class JournalingScreen extends StatefulWidget {
 
 class _JournalingScreenState extends State<JournalingScreen> {
   final JournalService _journalService = JournalService();
+  final MoodNudgeService _moodNudgeService = MoodNudgeService();
   final TextEditingController _contentController = TextEditingController();
   
   JournalPrompt? _todayPrompt;
   List<JournalEntry> _pastEntries = [];
   bool _isLoading = true;
   bool _isSaving = false;
+  MoodType? _selectedMood;
 
   @override
   void initState() {
@@ -274,15 +277,40 @@ class _JournalingScreenState extends State<JournalingScreen> {
       _isSaving = true;
     });
     try {
+      // Prepare emotional tags from selected mood
+      final List<String> emotionalTags = _selectedMood != null 
+          ? [_selectedMood!.displayName.toLowerCase()] 
+          : [];
+      
       final entry = CreateJournalEntry(
         title: _todayPrompt?.prompt ?? 'Journal Entry',
         content: _contentController.text.trim(),
         promptType: _validPromptType(_todayPrompt?.promptType),
-        emotionalTags: [],
+        emotionalTags: emotionalTags,
       );
       
       // Create new entry
       await _journalService.createEntry(widget.userId, entry);
+      
+      // Schedule mood nudge if mood was selected
+      if (_selectedMood != null) {
+        await _moodNudgeService.scheduleMoodNudge(_selectedMood!);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Entry saved! We\'ll check in with you in 10 minutes 💙'),
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Entry saved successfully')),
+          );
+        }
+      }
       
       // After saving, refresh prompt for next entry and update past entries
       final newPrompt = await _journalService.getDailyPrompt();
@@ -291,15 +319,10 @@ class _JournalingScreenState extends State<JournalingScreen> {
       setState(() {
         _todayPrompt = newPrompt;
         _pastEntries = entries;
+        _selectedMood = null; // Reset mood selection
       });
       
       _contentController.clear();
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Entry saved successfully')),
-        );
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -323,6 +346,21 @@ class _JournalingScreenState extends State<JournalingScreen> {
 
   String _formatDateTime(DateTime date) {
     return DateFormat('MMMM dd, yyyy – hh:mm a').format(date);
+  }
+
+  String _getMoodEmoji(MoodType mood) {
+    switch (mood) {
+      case MoodType.veryHappy:
+        return '😄';
+      case MoodType.happy:
+        return '🙂';
+      case MoodType.neutral:
+        return '😐';
+      case MoodType.sad:
+        return '😢';
+      case MoodType.awful:
+        return '😫';
+    }
   }
 
   @override
@@ -438,6 +476,101 @@ class _JournalingScreenState extends State<JournalingScreen> {
                               ),
                               border: InputBorder.none,
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Mood Selector
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'How are you feeling?',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.bold,
+                                  color: Color.fromRGBO(66, 32, 6, 1),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Select your mood and we\'ll check in with you in 10 minutes',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Nunito',
+                                  color: const Color.fromRGBO(92, 64, 51, 1).withOpacity(0.7),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: MoodType.values.map((mood) {
+                                  final isSelected = _selectedMood == mood;
+                                  return GestureDetector(
+                                    onTap: () {
+                                      setState(() {
+                                        _selectedMood = isSelected ? null : mood;
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 10,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? const Color.fromRGBO(249, 115, 22, 1)
+                                            : const Color.fromRGBO(247, 244, 242, 1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? const Color.fromRGBO(249, 115, 22, 1)
+                                              : const Color.fromRGBO(92, 64, 51, 0.3),
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            _getMoodEmoji(mood),
+                                            style: const TextStyle(fontSize: 18),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            mood.displayName,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontFamily: 'Nunito',
+                                              fontWeight: FontWeight.w600,
+                                              color: isSelected
+                                                  ? Colors.white
+                                                  : const Color.fromRGBO(66, 32, 6, 1),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),

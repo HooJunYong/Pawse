@@ -274,6 +274,9 @@ class UserPlaylist {
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<PlaylistSong> songs;
+  final String icon;
+  final Color color;
+  final bool isFavorite;
 
   const UserPlaylist({
     required this.id,
@@ -284,10 +287,15 @@ class UserPlaylist {
     required this.createdAt,
     required this.updatedAt,
     required this.songs,
+    this.icon = 'music_note',
+    this.color = const Color(0xFFE0F2F1),
+    this.isFavorite = false,
   });
 
   factory UserPlaylist.fromJson(Map<String, dynamic> json) {
     final List<dynamic>? rawSongs = json['songs'] as List<dynamic>?;
+    final String rawIcon = json['icon'] as String? ?? 'music_note';
+    final String rawColor = json['color'] as String? ?? '';
     return UserPlaylist(
       id: json['user_playlist_id'] as String? ?? json['id'] as String? ?? '',
       playlistName: json['playlist_name'] as String? ?? '',
@@ -307,6 +315,9 @@ class UserPlaylist {
                         : Map<String, dynamic>.from(song as Map),
                   ))
               .toList(growable: false),
+      icon: rawIcon,
+      color: rawColor.isEmpty ? const Color(0xFFE0F2F1) : _colorFromHex(rawColor),
+      isFavorite: json['is_favorite'] as bool? ?? false,
     );
   }
 
@@ -320,6 +331,9 @@ class UserPlaylist {
       'created_at': createdAt.toUtc().toIso8601String(),
       'updated_at': updatedAt.toUtc().toIso8601String(),
       'songs': songs.map((song) => song.toJson()).toList(growable: false),
+      'icon': icon,
+      'color': '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+      'is_favorite': isFavorite,
     };
   }
 
@@ -330,6 +344,9 @@ class UserPlaylist {
     DateTime? createdAt,
     DateTime? updatedAt,
     List<PlaylistSong>? songs,
+    String? icon,
+    Color? color,
+    bool? isFavorite,
   }) {
     return UserPlaylist(
       id: id,
@@ -340,6 +357,9 @@ class UserPlaylist {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       songs: songs ?? this.songs,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 
@@ -477,3 +497,42 @@ const Map<String, IconData> _iconLookup = <String, IconData>{
   'radio': Icons.radio,
   'library_music': Icons.library_music,
 };
+
+const List<String> _playlistIconKeys = <String>[
+  'music_note',
+  'album',
+  'headphones',
+  'queue_music',
+  'playlist_play',
+  'radio',
+  'library_music',
+  'star',
+  'celebration',
+  'spa',
+  'self_improvement',
+];
+
+const List<Color> _playlistColors = <Color>[
+  Color(0xFFFFAB91), // Light coral
+  Color(0xFFCE93D8), // Light purple
+  Color(0xFF90CAF9), // Light blue
+  Color(0xFFA5D6A7), // Light green
+  Color(0xFFFFF59D), // Light yellow
+  Color(0xFFFFCC80), // Light orange
+  Color(0xFFEF9A9A), // Light red
+  Color(0xFFB39DDB), // Light deep purple
+  Color(0xFF80DEEA), // Light cyan
+  Color(0xFFC5E1A5), // Light lime
+];
+
+/// Generates a random icon and color for a new playlist.
+/// Returns a map with 'icon' (String) and 'color' (Color) keys.
+Map<String, dynamic> generateRandomPlaylistAppearance() {
+  final int seed = DateTime.now().millisecondsSinceEpoch;
+  final String randomIcon = _playlistIconKeys[seed % _playlistIconKeys.length];
+  final Color randomColor = _playlistColors[seed % _playlistColors.length];
+  return {
+    'icon': randomIcon,
+    'color': randomColor,
+  };
+}

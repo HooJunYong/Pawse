@@ -158,26 +158,19 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
     }();
 
     Widget _buildArtwork() {
-      if (coverUrl != null && coverUrl.isNotEmpty) {
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Image.network(
-            coverUrl,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              color: const Color(0xFF80CBC4),
-              alignment: Alignment.center,
-              child: const Icon(Icons.spa, size: 80, color: Colors.white),
-            ),
-          ),
-        );
-      }
+      // Use playlist icon/color instead of cover image
+      final bool isFavorites = playlist.playlistName.toLowerCase() == 'favorites';
+      final Color bgColor = isFavorites ? Colors.red : playlist.color;
+      final IconData icon = isFavorites 
+          ? Icons.favorite 
+          : iconDataFromString(playlist.icon);
+
       return Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF80CBC4),
+          color: bgColor,
           borderRadius: BorderRadius.circular(24),
         ),
-        child: const Icon(Icons.spa, size: 80, color: Colors.white),
+        child: Icon(icon, size: 80, color: Colors.white),
       );
     }
 
@@ -544,112 +537,167 @@ class _MiniPlayer extends StatelessWidget {
           initialData: audioManager.isPlaying,
           builder: (BuildContext context, AsyncSnapshot<bool> playingSnapshot) {
             final bool isPlaying = playingSnapshot.data ?? false;
-            if (track == null) {
-              return const SizedBox.shrink();
-            }
-            return GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MusicPlayerScreen(
-                      track: track,
-                      userId: userId,
-                    ),
-                  ),
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: (track.albumImageUrl != null && track.albumImageUrl!.isNotEmpty)
-                          ? Image.network(
-                              track.albumImageUrl!,
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFFFCC80),
-                                  borderRadius: BorderRadius.circular(20),
+            return StreamBuilder<Duration?>(
+              stream: audioManager.durationStream,
+              initialData: audioManager.duration,
+              builder: (
+                BuildContext context,
+                AsyncSnapshot<Duration?> durationSnapshot,
+              ) {
+                final Duration totalDuration = durationSnapshot.data ??
+                    (track != null && track.durationSeconds > 0
+                        ? Duration(seconds: track.durationSeconds)
+                        : Duration.zero);
+                return StreamBuilder<Duration>(
+                  stream: audioManager.positionStream,
+                  initialData: audioManager.position,
+                  builder: (
+                    BuildContext context,
+                    AsyncSnapshot<Duration> positionSnapshot,
+                  ) {
+                    final Duration position = positionSnapshot.data ?? Duration.zero;
+                    final double progress = totalDuration.inMilliseconds > 0
+                        ? (position.inMilliseconds / totalDuration.inMilliseconds).clamp(0.0, 1.0)
+                        : 0;
+
+                    if (track == null) {
+                      return const SizedBox.shrink();
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Material(
+                        color: Colors.white,
+                        elevation: 6,
+                        shadowColor: Colors.black.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(32),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(32),
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (BuildContext context) => MusicPlayerScreen(
+                                  attachToExistingSession: true,
+                                  userId: userId,
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    track.title.isNotEmpty ? track.title[0].toUpperCase() : '?',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Row(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: (track.albumImageUrl != null && track.albumImageUrl!.isNotEmpty) ||
+                                             (track.thumbnailUrl != null && track.thumbnailUrl!.isNotEmpty)
+                                          ? Image.network(
+                                              track.albumImageUrl ?? track.thumbnailUrl!,
+                                              width: 40,
+                                              height: 40,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => Container(
+                                                width: 40,
+                                                height: 40,
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFFFCC80),
+                                                  borderRadius: BorderRadius.circular(8),
+                                                ),
+                                                child: const Center(
+                                                  child: Icon(
+                                                    Icons.music_note,
+                                                    color: Color(0xFF422006),
+                                                    size: 20,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          : Container(
+                                              width: 40,
+                                              height: 40,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFFCC80),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  track.title.substring(0, 1).toUpperCase(),
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF422006),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            track.title,
+                                            style: const TextStyle(
+                                              fontFamily: 'Nunito',
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                              color: Color(0xFF422006),
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          Text(
+                                            track.artist,
+                                            style: const TextStyle(
+                                              fontFamily: 'Nunito',
+                                              fontSize: 12,
+                                              color: Colors.grey,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    IconButton(
+                                      iconSize: 32,
+                                      splashRadius: 24,
+                                      color: const Color(0xFF422006),
+                                      onPressed: () => audioManager.togglePlayPause(),
+                                      icon: Icon(
+                                        isPlaying
+                                            ? Icons.pause_circle_filled
+                                            : Icons.play_circle_fill,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(999),
+                                  child: LinearProgressIndicator(
+                                    minHeight: 4,
+                                    value: progress,
+                                    backgroundColor: const Color(0xFFFFE0B2),
+                                    valueColor: const AlwaysStoppedAnimation<Color>(
+                                      Color(0xFF422006),
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                          : Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFCC80),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  track.title.isNotEmpty ? track.title[0].toUpperCase() : '?',
-                                  style: const TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            track.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontFamily: 'Nunito',
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF422006),
+                              ],
                             ),
                           ),
-                          Text(
-                            track.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'Nunito',
-                              fontSize: 12,
-                              color: const Color(0xFF422006).withOpacity(0.7),
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                    Icon(
-                      isPlaying ? Icons.pause_circle_filled : Icons.play_circle_fill,
-                      color: const Color(0xFF422006),
-                      size: 32,
-                    ),
-                  ],
-                ),
-              ),
+                    );
+                  },
+                );
+              },
             );
           },
         );

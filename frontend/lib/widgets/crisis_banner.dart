@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../screens/support/crisis_support_screen.dart';
+
 class CrisisBanner extends StatelessWidget {
   const CrisisBanner({super.key});
 
@@ -45,7 +47,14 @@ class CrisisBanner extends StatelessWidget {
             ),
           ),
           ElevatedButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CrisisSupportScreen(),
+                ),
+              );
+            },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF5350),
               foregroundColor: Colors.white,

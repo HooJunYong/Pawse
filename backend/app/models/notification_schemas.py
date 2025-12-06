@@ -5,6 +5,7 @@ class NotificationSettings(BaseModel):
     user_id: str
     all_notifications_enabled: bool = True
     intelligent_nudges: bool = True
+    mood_nudges_enabled: bool = True
     therapy_sessions: bool = True
     journaling_routine_enabled: bool = False
     journaling_time: str = "20:00"
@@ -16,6 +17,7 @@ class NotificationSettings(BaseModel):
 class UpdateNotificationSettingsRequest(BaseModel):
     all_notifications_enabled: Optional[bool] = None
     intelligent_nudges: Optional[bool] = None
+    mood_nudges_enabled: Optional[bool] = None
     therapy_sessions: Optional[bool] = None
     journaling_routine_enabled: Optional[bool] = None
     journaling_time: Optional[str] = None

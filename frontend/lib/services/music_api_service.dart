@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter/material.dart';
+
 import '../models/music_models.dart';
 import 'api_service.dart';
 
@@ -120,15 +122,24 @@ class MusicApiService {
   Future<UserPlaylist> createPlaylist({
     required String userId,
     required String name,
+    String? icon,
+    Color? color,
     List<String> customTags = const [],
     bool isPublic = false,
   }) async {
+    // Use provided icon/color or generate random ones
+    final String finalIcon = icon ?? (generateRandomPlaylistAppearance()['icon'] as String);
+    final Color finalColor = color ?? (generateRandomPlaylistAppearance()['color'] as Color);
+    
     final payload = {
       'user_id': userId,
       'playlist_name': name,
       'custom_tags': customTags,
       'is_public': isPublic,
       'songs': <Map<String, dynamic>>[],
+      'icon': finalIcon,
+      'color': '#${finalColor.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+      'is_favorite': false,
     };
     final response = await ApiService.post('/music/playlists', payload);
     _throwIfFailed(response.statusCode, response.body);
@@ -157,6 +168,25 @@ class MusicApiService {
     if (response.statusCode == 204 || response.body.isEmpty) {
       return getPlaylist(playlistId);
     }
+    _throwIfFailed(response.statusCode, response.body);
+    final Map<String, dynamic> body = jsonDecode(response.body) as Map<String, dynamic>;
+    return UserPlaylist.fromJson(body);
+  }
+
+  Future<UserPlaylist> updatePlaylist({
+    required String playlistId,
+    String? playlistName,
+    bool? isFavorite,
+    String? icon,
+    String? color,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (playlistName != null) payload['playlist_name'] = playlistName;
+    if (isFavorite != null) payload['is_favorite'] = isFavorite;
+    if (icon != null) payload['icon'] = icon;
+    if (color != null) payload['color'] = color;
+    
+    final response = await ApiService.patch('/music/playlists/$playlistId', payload);
     _throwIfFailed(response.statusCode, response.body);
     final Map<String, dynamic> body = jsonDecode(response.body) as Map<String, dynamic>;
     return UserPlaylist.fromJson(body);

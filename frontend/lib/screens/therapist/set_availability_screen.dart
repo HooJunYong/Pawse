@@ -571,14 +571,24 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
   }
 
   Future<void> _saveAvailability() async {
-    // Prevent setting slots in the past if selected date is today
-    if (DateUtils.isSameDay(widget.selectedDate, DateTime.now())) {
+    // Prevent setting slots in the past ONLY if selected date is today
+    final isToday = DateUtils.isSameDay(widget.selectedDate, DateTime.now());
+    
+    if (isToday) {
       final now = TimeOfDay.now();
+      final nowInMinutes = now.hour * 60 + now.minute;
+      
       for (int i = 0; i < _timeSlots.length; i++) {
+        // Skip locked slots (booked/released) - they don't need validation
+        if (_timeSlots[i]['locked'] == true) {
+          continue;
+        }
+        
         final TimeOfDay from = _timeSlots[i]['from'] as TimeOfDay;
+        final fromInMinutes = from.hour * 60 + from.minute;
+        
         // If the slot starts before now, show error
-        if (from.hour < now.hour ||
-            (from.hour == now.hour && from.minute < now.minute)) {
+        if (fromInMinutes < nowInMinutes) {
           await showDialog(
             context: context,
             builder: (context) => Dialog(
@@ -604,7 +614,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'You cannot set a time slot that starts before the current time.',
+                        'You cannot set a time slot that starts before the current time (${now.format(context)}).',
                         style: const TextStyle(
                           fontFamily: 'Nunito',
                           fontSize: 15,

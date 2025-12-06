@@ -13,9 +13,15 @@ from .routes.chat_routes import router as chat_router
 from .routes.breathing_routes import router as breathing_router
 from .routes.music_routes import router as music_router
 from .routes.notification_routes import router as notification_router
+from .routes.mood_nudge_routes import router as mood_nudge_router
 from .config.settings import ALLOWED_ORIGINS, BACKEND_HOST, BACKEND_PORT
+from .services.notification_background import lifespan
+from .services.mood_nudge_service import init_mood_nudges
 
-app = FastAPI(title="AI Mental Health Companion API")
+app = FastAPI(
+    title="AI Mental Health Companion API",
+    lifespan=lifespan
+)
 
 # CORS Configuration
 app.add_middleware(
@@ -39,6 +45,12 @@ app.include_router(chat_router, tags=["Chat"])
 app.include_router(breathing_router, tags=["Breathing"])
 app.include_router(music_router, tags=["Music"])
 app.include_router(notification_router, tags=["Notifications"])
+app.include_router(mood_nudge_router, tags=["Mood Nudges"])
+
+# Initialize mood nudges on startup
+@app.on_event("startup")
+async def startup_event():
+    init_mood_nudges()
 
 @app.get("/")
 def root():

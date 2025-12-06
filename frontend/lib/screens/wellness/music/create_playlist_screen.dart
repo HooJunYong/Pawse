@@ -19,6 +19,17 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
 
   bool _isSubmitting = false;
   String? _error;
+  late String _previewIcon;
+  late Color _previewColor;
+
+  @override
+  void initState() {
+    super.initState();
+    // Generate random appearance for preview
+    final appearance = generateRandomPlaylistAppearance();
+    _previewIcon = appearance['icon'] as String;
+    _previewColor = appearance['color'] as Color;
+  }
 
   @override
   void dispose() {
@@ -48,7 +59,7 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
                           dimension: 160,
                           child: Container(
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFCC80),
+                              color: _previewColor,
                               borderRadius: BorderRadius.circular(24),
                               boxShadow: [
                                 BoxShadow(
@@ -58,7 +69,11 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
                                 ),
                               ],
                             ),
-                            child: const Icon(Icons.music_note, size: 80, color: Colors.white),
+                            child: Icon(
+                              iconDataFromString(_previewIcon),
+                              size: 80,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -180,6 +195,8 @@ class _CreatePlaylistScreenState extends State<CreatePlaylistScreen> {
       final UserPlaylist playlist = await _musicApi.createPlaylist(
         userId: widget.userId,
         name: name,
+        icon: _previewIcon,
+        color: _previewColor,
       );
       if (!mounted) {
         return;

@@ -2161,6 +2161,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        height: 150,
         padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
         decoration: BoxDecoration(
           color: _surfaceWhite,
@@ -2168,6 +2169,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
           boxShadow: _softShadow,
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
               width: 56,
@@ -2186,12 +2188,14 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
             Text(
               label,
               style: const TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontFamily: 'Nunito',
                 fontWeight: FontWeight.bold,
                 color: _textDark,
               ),
               textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

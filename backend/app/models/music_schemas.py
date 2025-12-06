@@ -104,6 +104,9 @@ class UserPlaylistBase(BaseModel):
     custom_tags: List[str] = Field(default_factory=list)
     songs: List[PlaylistSong] = Field(default_factory=list)
     is_public: bool = False
+    icon: str = Field(default="music_note")
+    color: str = Field(default="#E0F2F1")
+    is_favorite: bool = False
 
 
 class UserPlaylistCreate(UserPlaylistBase):
@@ -114,6 +117,9 @@ class UserPlaylistUpdate(BaseModel):
     playlist_name: Optional[str] = Field(None, max_length=100)
     custom_tags: Optional[List[str]] = None
     is_public: Optional[bool] = None
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_favorite: Optional[bool] = None
 
 
 class UserPlaylistResponse(UserPlaylistBase):

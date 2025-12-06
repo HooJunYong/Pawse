@@ -98,12 +98,19 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE0F2F1),
+                            color: playlist.playlistName.toLowerCase() == 'favorites'
+                                ? Colors.red.withOpacity(0.15)
+                                : playlist.color,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(
-                            Icons.music_note,
-                            color: Color(0xFF4DB6AC),
+                          child: Icon(
+                            playlist.playlistName.toLowerCase() == 'favorites'
+                                ? Icons.favorite
+                                : iconDataFromString(playlist.icon),
+                            color: playlist.playlistName.toLowerCase() == 'favorites'
+                                ? Colors.red
+                                : Colors.white,
+                            size: 28,
                           ),
                         ),
                         const SizedBox(width: 16),
