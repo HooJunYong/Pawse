@@ -259,12 +259,21 @@ def get_pending_therapists() -> list[TherapistProfileResponse]:
     return [TherapistProfileResponse(**t) for t in therapists]
 
 
-def get_all_verified_therapists() -> list[TherapistProfileResponse]:
-    """Get all verified therapists"""
-    therapists = list(db.therapist_profile.find(
-        {"verification_status": "approved"},
-        {"_id": 0}
-    ))
+def get_all_verified_therapists(search_text: Optional[str] = None) -> list[TherapistProfileResponse]:
+    """Get all verified therapists with optional search"""
+    # Build the base query
+    query = {"verification_status": "approved"}
+    
+    # Add search logic if search_text is provided
+    if search_text and search_text.strip():
+        search_pattern = {"$regex": search_text.strip(), "$options": "i"}
+        query["$or"] = [
+            {"first_name": search_pattern},
+            {"last_name": search_pattern},
+            {"specializations": search_pattern}
+        ]
+    
+    therapists = list(db.therapist_profile.find(query, {"_id": 0}))
 
     for therapist in therapists:
         _ensure_profile_picture_fields(therapist)
@@ -386,6 +395,10 @@ def update_therapist_profile(user_id: str, payload: UpdateTherapistProfileReques
         update_data["state"] = payload.state
     if payload.zip is not None:
         update_data["zip"] = payload.zip
+    if payload.specializations is not None:
+        update_data["specializations"] = payload.specializations
+    if payload.languages_spoken is not None:
+        update_data["languages_spoken"] = payload.languages_spoken
     if payload.hourly_rate is not None:
         update_data["hourly_rate"] = payload.hourly_rate
     

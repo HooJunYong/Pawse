@@ -30,6 +30,12 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
   bool _isSubmittingRating = false;
   final DateFormat _sessionFormatter = DateFormat('MMM d, h:mm a');
   int _unreadMessageCount = 0;
+  
+  // Filter state
+  Set<String> _selectedSpecializations = {};
+  Set<String> _selectedLanguages = {};
+  double? _minRate;
+  double? _maxRate;
 
   @override
   void initState() {
@@ -47,8 +53,342 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
 
   void _searchTherapists(String query) {
     setState(() {
-      _therapistsFuture = _apiService.getTherapists(searchQuery: query);
+      _therapistsFuture = _apiService.getTherapists(searchQuery: query.trim().isEmpty ? null : query.trim());
     });
+  }
+
+  List<Therapist> _applyFilters(List<Therapist> therapists) {
+    return therapists.where((therapist) {
+      // Filter by specializations
+      if (_selectedSpecializations.isNotEmpty) {
+        final hasMatchingSpec = _selectedSpecializations.any(
+          (spec) => therapist.specialties.toLowerCase().contains(spec.toLowerCase()),
+        );
+        if (!hasMatchingSpec) return false;
+      }
+
+      // Filter by languages
+      if (_selectedLanguages.isNotEmpty) {
+        final hasMatchingLang = _selectedLanguages.any(
+          (lang) => therapist.languages.toLowerCase().contains(lang.toLowerCase()),
+        );
+        if (!hasMatchingLang) return false;
+      }
+
+      // Filter by hourly rate
+      if (_minRate != null && therapist.price < _minRate!) {
+        return false;
+      }
+      if (_maxRate != null && therapist.price > _maxRate!) {
+        return false;
+      }
+
+      return true;
+    }).toList();
+  }
+
+  void _showFilterBottomSheet() {
+    // Temporary filter state
+    Set<String> tempSpecializations = Set.from(_selectedSpecializations);
+    Set<String> tempLanguages = Set.from(_selectedLanguages);
+    double? tempMinRate = _minRate;
+    double? tempMaxRate = _maxRate;
+    
+    // Controllers for text fields
+    final minRateController = TextEditingController(text: tempMinRate?.toString() ?? '');
+    final maxRateController = TextEditingController(text: tempMaxRate?.toString() ?? '');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.75,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFDFCF8),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            ),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        'Filter Therapists',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF3E2723),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setModalState(() {
+                            tempSpecializations.clear();
+                            tempLanguages.clear();
+                            tempMinRate = null;
+                            tempMaxRate = null;
+                            minRateController.clear();
+                            maxRateController.clear();
+                          });
+                        },
+                        child: const Text('Clear All'),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Filter Content
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Specializations
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Specializations',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3E2723),
+                              ),
+                            ),
+                            Text(
+                              '${tempSpecializations.length}/3',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: tempSpecializations.length >= 3 
+                                  ? const Color(0xFFEF4444) 
+                                  : const Color(0xFF6B7280),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: ['Anxiety', 'Depression', 'Stress', 'Relationships', 'Trauma', 'Family', 'Self-Esteem', 'Grief & Loss'].map((spec) {
+                            final isSelected = tempSpecializations.contains(spec);
+                            final canSelect = isSelected || tempSpecializations.length < 3;
+                            return FilterChip(
+                              label: Text(spec),
+                              selected: isSelected,
+                              onSelected: canSelect ? (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    tempSpecializations.add(spec);
+                                  } else {
+                                    tempSpecializations.remove(spec);
+                                  }
+                                });
+                              } : null,
+                              selectedColor: const Color(0xFFFB923C),
+                              backgroundColor: Colors.white,
+                              disabledColor: Colors.grey.shade200,
+                              labelStyle: TextStyle(
+                                color: !canSelect
+                                  ? Colors.grey.shade400
+                                  : isSelected 
+                                    ? Colors.white 
+                                    : const Color(0xFF3E2723),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              side: BorderSide(
+                                color: !canSelect
+                                  ? Colors.grey.shade300
+                                  : isSelected 
+                                    ? const Color(0xFFFB923C) 
+                                    : Colors.grey.shade300,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Languages
+                        const Text(
+                          'Languages',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3E2723),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: ['English', 'Bahasa Melayu', 'Chinese'].map((lang) {
+                            final isSelected = tempLanguages.contains(lang);
+                            return FilterChip(
+                              label: Text(lang),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    tempLanguages.add(lang);
+                                  } else {
+                                    tempLanguages.remove(lang);
+                                  }
+                                });
+                              },
+                              selectedColor: const Color(0xFFFB923C),
+                              backgroundColor: Colors.white,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : const Color(0xFF3E2723),
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                              side: BorderSide(
+                                color: isSelected ? const Color(0xFFFB923C) : Colors.grey.shade300,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
+                        // Hourly Rate
+                        const Text(
+                          'Hourly Rate (RM)',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3E2723),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: minRateController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Min',
+                                  prefixText: 'RM ',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  tempMinRate = double.tryParse(value);
+                                },
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: Text('—', style: TextStyle(fontSize: 20)),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: maxRateController,
+                                keyboardType: TextInputType.number,
+                                decoration: InputDecoration(
+                                  hintText: 'Max',
+                                  prefixText: 'RM ',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide(color: Colors.grey.shade300),
+                                  ),
+                                ),
+                                onChanged: (value) {
+                                  tempMaxRate = double.tryParse(value);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Apply Button
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, -2),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedSpecializations = tempSpecializations;
+                          _selectedLanguages = tempLanguages;
+                          _minRate = tempMinRate;
+                          _maxRate = tempMaxRate;
+                        });
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFB923C),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Apply Filters',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _handleSessionBooked() {
@@ -301,7 +641,6 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         actions: [
-          // CHANGED: Replaced Filter button with Chat button
           Padding(
             padding: const EdgeInsets.only(right: 4.0),
             child: Stack(
@@ -361,7 +700,6 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                 if (_pendingRating != null) _buildRatingPrompt(),
                 const CrisisBanner(),
                 const SizedBox(height: 24),
-                const SizedBox(height: 16),
 
                 // Search Bar
                 TextField(
@@ -372,9 +710,8 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                     hintText: "Search by name or expertise...",
                     hintStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.search, color: Colors.grey[400]),
-                    // CHANGED: Added Row to hold Clear (conditional) and Filter (always)
                     suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min, // Keeps the row tight
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         if (_searchController.text.isNotEmpty)
                           IconButton(
@@ -384,14 +721,32 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                               _searchTherapists('');
                             },
                           ),
-                        // Filter Button (Always Visible)
                         Padding(
                           padding: const EdgeInsets.only(right: 8.0),
-                          child: IconButton(
-                            icon: const Icon(Icons.tune, color: Color(0xFF4E342E)),
-                            onPressed: () {
-                              // Open Filter Bottom Sheet
-                            },
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.tune, color: Color(0xFF4E342E)),
+                                onPressed: _showFilterBottomSheet,
+                              ),
+                              if (_selectedSpecializations.isNotEmpty || 
+                                  _selectedLanguages.isNotEmpty || 
+                                  _minRate != null || 
+                                  _maxRate != null)
+                                Positioned(
+                                  right: 8,
+                                  top: 8,
+                                  child: Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFFB923C),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ),
                       ],
@@ -423,16 +778,50 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                       return const Center(child: Text('No therapists found.'));
                     }
 
-                    final therapists = snapshot.data!;
+                    final allTherapists = snapshot.data!;
+                    final filteredTherapists = _applyFilters(allTherapists);
+                    
+                    if (filteredTherapists.isEmpty) {
+                      return Center(
+                        child: Column(
+                          children: [
+                            const SizedBox(height: 40),
+                            Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No therapists match your filters',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedSpecializations.clear();
+                                  _selectedLanguages.clear();
+                                  _minRate = null;
+                                  _maxRate = null;
+                                });
+                              },
+                              child: const Text('Clear Filters'),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+
                     return ListView.separated(
                       physics: const NeverScrollableScrollPhysics(),
                       shrinkWrap: true,
-                      itemCount: therapists.length,
+                      itemCount: filteredTherapists.length,
                       separatorBuilder: (context, index) =>
                           const SizedBox(height: 16),
                       itemBuilder: (context, index) {
                         return TherapistCard(
-                          therapist: therapists[index],
+                          therapist: filteredTherapists[index],
                           clientUserId: widget.userId,
                           onSessionBooked: _handleSessionBooked,
                         );

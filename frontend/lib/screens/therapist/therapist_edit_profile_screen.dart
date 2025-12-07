@@ -33,6 +33,21 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
   String _selectedState = 'Select';
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
+  
+  // Specializations and Languages
+  final List<String> _specializations = [
+    'Anxiety',
+    'Depression',
+    'Stress',
+    'Relationships',
+    'Trauma',
+    'Family',
+    'Self-Esteem',
+    'Grief & Loss'
+  ];
+  final List<String> _languages = ['English', 'Bahasa Melayu', 'Chinese'];
+  Set<String> _selectedSpecializations = {};
+  Set<String> _selectedLanguages = {};
 
   @override
   void initState() {
@@ -78,6 +93,18 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           _zipController.text = zip != null ? zip.toString() : '';
           final hourlyRate = data['hourly_rate'];
           _hourlyRateController.text = hourlyRate != null ? hourlyRate.toString() : '';
+          
+          // Load specializations and languages
+          if (data['specializations'] is List) {
+            _selectedSpecializations = Set<String>.from(
+              (data['specializations'] as List).map((e) => e.toString())
+            );
+          }
+          if (data['languages_spoken'] is List) {
+            _selectedLanguages = Set<String>.from(
+              (data['languages_spoken'] as List).map((e) => e.toString())
+            );
+          }
           
           _profilePictureUrl = data['profile_picture_url'] as String?;
           
@@ -212,6 +239,8 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           'city': _cityController.text.trim(),
           'state': _selectedState != 'Select' ? _selectedState : '',
           'zip': _zipController.text.trim().isNotEmpty ? int.tryParse(_zipController.text.trim()) : null,
+          'specializations': _selectedSpecializations.toList(),
+          'languages_spoken': _selectedLanguages.toList(),
           'hourly_rate': _hourlyRateController.text.trim().isNotEmpty ? double.tryParse(_hourlyRateController.text.trim()) : null,
           'delete_profile_picture': _imageBytes == null && _profilePictureUrl == null,
         };
@@ -497,6 +526,127 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
     );
   }
 
+  Widget _buildSpecializationsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Specializations',
+              style: TextStyle(
+                color: Color.fromRGBO(75, 85, 99, 1),
+                fontFamily: 'Nunito',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${_selectedSpecializations.length}/5',
+              style: TextStyle(
+                fontSize: 12,
+                color: _selectedSpecializations.length >= 5 
+                  ? const Color(0xFFEF4444) 
+                  : const Color.fromRGBO(107, 114, 128, 1),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _specializations.map((spec) {
+            final isSelected = _selectedSpecializations.contains(spec);
+            final canSelect = isSelected || _selectedSpecializations.length < 5;
+            return FilterChip(
+              label: Text(spec),
+              selected: isSelected,
+              onSelected: canSelect ? (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedSpecializations.add(spec);
+                  } else {
+                    _selectedSpecializations.remove(spec);
+                  }
+                });
+              } : null,
+              selectedColor: const Color(0xFFFB923C),
+              backgroundColor: Colors.white,
+              disabledColor: Colors.grey.shade200,
+              labelStyle: TextStyle(
+                color: !canSelect
+                  ? Colors.grey.shade400
+                  : isSelected 
+                    ? Colors.white 
+                    : const Color.fromRGBO(66, 32, 6, 1),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontFamily: 'Nunito',
+              ),
+              side: BorderSide(
+                color: !canSelect
+                  ? Colors.grey.shade300
+                  : isSelected 
+                    ? const Color(0xFFFB923C) 
+                    : const Color.fromRGBO(229, 231, 235, 1),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLanguagesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Languages',
+          style: TextStyle(
+            color: Color.fromRGBO(75, 85, 99, 1),
+            fontFamily: 'Nunito',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _languages.map((lang) {
+            final isSelected = _selectedLanguages.contains(lang);
+            return FilterChip(
+              label: Text(lang),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedLanguages.add(lang);
+                  } else {
+                    _selectedLanguages.remove(lang);
+                  }
+                });
+              },
+              selectedColor: const Color(0xFFFB923C),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : const Color.fromRGBO(66, 32, 6, 1),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontFamily: 'Nunito',
+              ),
+              side: BorderSide(
+                color: isSelected ? const Color(0xFFFB923C) : const Color.fromRGBO(229, 231, 235, 1),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
@@ -674,6 +824,10 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
                               return null;
                             },
                           ),
+                          const SizedBox(height: 16),
+                          _buildSpecializationsSection(),
+                          const SizedBox(height: 16),
+                          _buildLanguagesSection(),
                           const SizedBox(height: 16),
                           _buildTextField(
                             controller: _officeNameController,

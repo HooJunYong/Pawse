@@ -46,9 +46,11 @@ class _JoinTherapistState extends State<JoinTherapist> {
     'Anxiety',
     'Depression',
     'Stress',
-    'Trauma',
     'Relationships',
-    'Grief',
+    'Trauma',
+    'Family',
+    'Self-Esteem',
+    'Grief & Loss',
   ];
 
   // Selected languages
@@ -329,6 +331,10 @@ class _JoinTherapistState extends State<JoinTherapist> {
       _showErrorDialog('Please enter your official email');
       return;
     }
+    if (!RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(_emailController.text.trim())) {
+      _showErrorDialog('Please enter a valid email address');
+      return;
+    }
     if (_contactController.text.isEmpty) {
       _showErrorDialog('Please enter your contact number');
       return;
@@ -341,15 +347,33 @@ class _JoinTherapistState extends State<JoinTherapist> {
       _showErrorDialog('Please enter your bio');
       return;
     }
-    if (_zipController.text.isNotEmpty) {
-      if (_zipController.text.length != 5) {
-        _showErrorDialog('Zip code must be exactly 5 digits');
-        return;
-      }
-      if (!RegExp(r'^\d{5}$').hasMatch(_zipController.text)) {
-        _showErrorDialog('Zip code must contain only numbers');
-        return;
-      }
+    if (_officeNameController.text.isEmpty) {
+      _showErrorDialog('Please enter your office name');
+      return;
+    }
+    if (_addressController.text.isEmpty) {
+      _showErrorDialog('Please enter your therapy center address');
+      return;
+    }
+    if (_cityController.text.isEmpty) {
+      _showErrorDialog('Please enter your city');
+      return;
+    }
+    if (_selectedState == 'Select') {
+      _showErrorDialog('Please select your state');
+      return;
+    }
+    if (_zipController.text.isEmpty) {
+      _showErrorDialog('Please enter your zip code');
+      return;
+    }
+    if (_zipController.text.length != 5) {
+      _showErrorDialog('Zip code must be exactly 5 digits');
+      return;
+    }
+    if (!RegExp(r'^\d{5}$').hasMatch(_zipController.text)) {
+      _showErrorDialog('Zip code must contain only numbers');
+      return;
     }
     if (_selectedSpecializations.isEmpty) {
       _showErrorDialog('Please select at least one specialization');
@@ -361,6 +385,10 @@ class _JoinTherapistState extends State<JoinTherapist> {
     }
     if (_hourlyRateController.text.isEmpty) {
       _showErrorDialog('Please enter your hourly rate');
+      return;
+    }
+    if (_imageBytes == null) {
+      _showErrorDialog('Please upload a profile picture');
       return;
     }
 
@@ -384,17 +412,11 @@ class _JoinTherapistState extends State<JoinTherapist> {
           'contact_number': _contactController.text,
           'license_number': _licenseController.text,
           'bio': _bioController.text,
-          'office_name': _officeNameController.text.isNotEmpty
-              ? _officeNameController.text
-              : null,
-          'office_address': _addressController.text.isNotEmpty
-              ? _addressController.text
-              : null,
-          'city': _cityController.text.isNotEmpty ? _cityController.text : null,
-          'state': _selectedState != 'Select' ? _selectedState : null,
-          'zip': _zipController.text.isNotEmpty
-              ? int.tryParse(_zipController.text)
-              : null,
+          'office_name': _officeNameController.text,
+          'office_address': _addressController.text,
+          'city': _cityController.text,
+          'state': _selectedState,
+          'zip': int.parse(_zipController.text),
           'specializations': _selectedSpecializations.toList(),
           'languages': _selectedLanguages.toList(),
           'hourly_rate': double.tryParse(_hourlyRateController.text) ?? 0,
@@ -627,14 +649,30 @@ class _JoinTherapistState extends State<JoinTherapist> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.w600,
-            color: Color.fromRGBO(66, 32, 6, 1),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.w600,
+                color: Color.fromRGBO(66, 32, 6, 1),
+              ),
+            ),
+            if (title == 'Specializations')
+              Text(
+                '${selectedItems.length}/5',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: selectedItems.length >= 5 
+                    ? const Color(0xFFEF4444) 
+                    : const Color.fromRGBO(107, 114, 128, 1),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -642,32 +680,43 @@ class _JoinTherapistState extends State<JoinTherapist> {
           runSpacing: 8,
           children: items.map((item) {
             final isSelected = selectedItems.contains(item);
+            final canSelect = isSelected || selectedItems.length < 5 || title != 'Specializations';
+            
             return GestureDetector(
-              onTap: () => onToggle(item),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color.fromRGBO(249, 115, 22, 1)
-                      : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
+              onTap: canSelect ? () => onToggle(item) : null,
+              child: Opacity(
+                opacity: canSelect ? 1.0 : 0.5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
                     color: isSelected
                         ? const Color.fromRGBO(249, 115, 22, 1)
-                        : const Color.fromRGBO(229, 231, 235, 1),
+                        : canSelect
+                          ? Colors.white
+                          : Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isSelected
+                          ? const Color.fromRGBO(249, 115, 22, 1)
+                          : canSelect
+                            ? const Color.fromRGBO(229, 231, 235, 1)
+                            : Colors.grey.shade300,
+                    ),
                   ),
-                ),
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontFamily: 'Nunito',
-                    color: isSelected
-                        ? Colors.white
-                        : const Color.fromRGBO(66, 32, 6, 1),
+                  child: Text(
+                    item,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Nunito',
+                      color: isSelected
+                          ? Colors.white
+                          : canSelect
+                            ? const Color.fromRGBO(66, 32, 6, 1)
+                            : Colors.grey.shade400,
+                    ),
                   ),
                 ),
               ),

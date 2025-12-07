@@ -93,6 +93,8 @@ class UpdateTherapistProfileRequest(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     zip: Optional[int] = None
+    specializations: Optional[list[str]] = None
+    languages_spoken: Optional[list[str]] = None
     hourly_rate: Optional[float] = None
     profile_picture_base64: Optional[str] = None
     profile_picture_url: Optional[str] = None

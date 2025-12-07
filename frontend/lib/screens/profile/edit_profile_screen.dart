@@ -196,6 +196,13 @@ class _EditProfileState extends State<EditProfile> {
         return;
       }
 
+      if (_selectedState == 'Select') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a state')),
+        );
+        return;
+      }
+
       try {
         showDialog(
           context: context,
@@ -720,10 +727,11 @@ class _EditProfileState extends State<EditProfile> {
                             hintText: 'e.g., +60123456789',
                             keyboardType: TextInputType.phone,
                             validator: (value) {
-                              if (value != null && value.trim().isNotEmpty) {
-                                if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value.trim())) {
-                                  return 'Enter valid phone number';
-                                }
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Phone number is required';
+                              }
+                              if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value.trim())) {
+                                return 'Enter valid phone number';
                               }
                               return null;
                             },
@@ -738,6 +746,12 @@ class _EditProfileState extends State<EditProfile> {
                                   hintText: 'DD/MM/YYYY',
                                   readOnly: true,
                                   onTap: _selectDate,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Date of birth is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -751,6 +765,12 @@ class _EditProfileState extends State<EditProfile> {
                             controller: _homeAddressController,
                             label: 'Home Address',
                             hintText: 'e.g., 123 Jalan Ampang',
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Home address is required';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -760,6 +780,12 @@ class _EditProfileState extends State<EditProfile> {
                                   controller: _cityController,
                                   label: 'City',
                                   hintText: 'e.g., Kuala Lumpur',
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'City is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -775,10 +801,11 @@ class _EditProfileState extends State<EditProfile> {
                             hintText: 'e.g., 50450',
                             keyboardType: TextInputType.number,
                             validator: (value) {
-                              if (value != null && value.trim().isNotEmpty) {
-                                if (!RegExp(r'^\d{5}$').hasMatch(value.trim())) {
-                                  return 'Must be 5 digits';
-                                }
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Zip code is required';
+                              }
+                              if (!RegExp(r'^\d{5}$').hasMatch(value.trim())) {
+                                return 'Must be 5 digits';
                               }
                               return null;
                             },
