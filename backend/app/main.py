@@ -14,6 +14,7 @@ from .routes.breathing_routes import router as breathing_router
 from .routes.music_routes import router as music_router
 from .routes.notification_routes import router as notification_router
 from .routes.mood_nudge_routes import router as mood_nudge_router
+from .routes.admin_routes import router as admin_router
 from .config.settings import ALLOWED_ORIGINS, BACKEND_HOST, BACKEND_PORT
 from .services.notification_background import lifespan
 from .services.mood_nudge_service import init_mood_nudges
@@ -46,6 +47,7 @@ app.include_router(breathing_router, tags=["Breathing"])
 app.include_router(music_router, tags=["Music"])
 app.include_router(notification_router, tags=["Notifications"])
 app.include_router(mood_nudge_router, tags=["Mood Nudges"])
+app.include_router(admin_router, tags=["Admin"])
 
 # Initialize mood nudges on startup
 @app.on_event("startup")

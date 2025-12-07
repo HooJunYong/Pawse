@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../../theme/shadows.dart';
-import '../admin/admin_therapist_management.dart';
+import '../admin/admin_dashboard_screen.dart';
 import '../profile/profile_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
@@ -76,7 +76,7 @@ class _LoginWidgetState extends State<LoginWidget> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => AdminTherapistManagement(adminUserId: userId),
+                builder: (context) => AdminDashboardScreen(adminUserId: userId),
               ),
             );
           } else {
