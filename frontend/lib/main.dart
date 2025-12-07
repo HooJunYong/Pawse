@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'screens/auth/login_screen.dart';
+import 'screens/splash_screen.dart';
 import 'services/local_notification_service.dart';
 import 'services/mood_nudge_service.dart';
 
@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.brown,
       ),
-      home: const LoginWidget(),
+      home: SplashScreen(),
     );
   }
 }

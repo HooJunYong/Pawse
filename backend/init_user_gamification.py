@@ -10,7 +10,7 @@ def init_user_gamification():
     db = get_database()
     
     # Update all users who don't have gamification fields
-    result = db.user_profiles.update_many(
+    result = db.user_profile.update_many(
         {
             "$or": [
                 {"lifetime_points": {"$exists": False}},

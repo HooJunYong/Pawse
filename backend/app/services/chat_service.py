@@ -188,7 +188,7 @@ def fetch_messages(conversation_id: str, *, limit: int = 50, before: Optional[da
         query["created_at"] = {"$lt": before}
 
     cursor = (
-        db.chat_messages
+        db.therapist_chat_messages
         .find(query)
         .sort("created_at", -1)
         .limit(limit)
@@ -241,7 +241,7 @@ def send_message(payload: SendChatMessageRequest) -> ChatMessageResponse:
         "created_at": now_ts,
         "is_read": False,
     }
-    db.chat_messages.insert_one(message_doc)
+    db.therapist_chat_messages.insert_one(message_doc)
 
     unread_field = "unread_for_client" if payload.sender_role == "therapist" else "unread_for_therapist"
     db.chat_conversations.update_one(
@@ -293,7 +293,7 @@ def mark_conversation_read(conversation_id: str, request: MarkConversationReadRe
     )
 
     other_role: ParticipantRole = "therapist" if request.user_role == "client" else "client"
-    db.chat_messages.update_many(
+    db.therapist_chat_messages.update_many(
         {
             "conversation_id": conversation_id,
             "sender_role": other_role,

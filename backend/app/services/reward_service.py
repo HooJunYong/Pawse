@@ -191,7 +191,7 @@ class RewardService:
         
         # 5. Deduct points from user
         new_points = current_points - reward_cost
-        db.user_profiles.update_one(
+        db.user_profile.update_one(
             {"user_id": user_id},
             {"$set": {"current_points": new_points}}
         )

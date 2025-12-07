@@ -20,6 +20,17 @@ from .routes.personality_routes import router as personality_router
 from .routes.drift_bottle_routes import router as drift_bottle_router
 from .routes.activity_routes import router as activity_router
 from .routes.reward_routes import router as reward_router
+from .routes.booking_routes import router as booking_router
+from .routes.journal_routes import router as journal_router
+from .routes.otp_routes import router as otp_router
+from .routes.chat_routes import router as chat_router
+from .routes.breathing_routes import router as breathing_router
+from .routes.music_routes import router as music_router
+from .routes.notification_routes import router as notification_router
+from .routes.mood_nudge_routes import router as mood_nudge_router
+from .routes.admin_routes import router as admin_router
+from .services.notification_background import lifespan
+from .services.mood_nudge_service import init_mood_nudges
 from app.config.settings import get_settings
 
 # Load environment variables
@@ -44,7 +55,8 @@ app = FastAPI(
     description="Backend API for AI Chat Module with Gemini integration",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Add rate limiter to app state
@@ -84,6 +96,15 @@ app.include_router(password_router, tags=["Password"])
 app.include_router(therapist_router, tags=["Therapist"])
 app.include_router(schedule_router, tags=["Schedule"])
 app.include_router(mood_router, tags=["Mood Tracking"])
+app.include_router(booking_router, tags=["Booking"])
+app.include_router(journal_router, tags=["Journal"])
+app.include_router(otp_router, tags=["OTP"])
+app.include_router(chat_router, tags=["Chat"])
+app.include_router(breathing_router, tags=["Breathing"])
+app.include_router(music_router, tags=["Music"])
+app.include_router(notification_router, tags=["Notifications"])
+app.include_router(mood_nudge_router, tags=["Mood Nudges"])
+app.include_router(admin_router, tags=["Admin"])
 
 
 # Get MongoDB database connection
@@ -91,6 +112,7 @@ db = get_database()
 
 @app.on_event("startup")
 async def startup_event():
+    init_mood_nudges()
     """Initialize database indexes and perform startup tasks"""
     logger.info("Starting AI Mental Health Companion API...")
     

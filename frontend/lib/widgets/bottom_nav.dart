@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import '../screens/homepage_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/wellness/wellness_screen.dart';
+import '../screens/chat/chat_session_screen.dart';
+import '../screens/mood/mood_tracking_screen.dart';
+import '../screens/gamification_and_reward/activity_screen.dart';
 // import '../screens/chat/chat_session_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
@@ -60,6 +63,24 @@ class BottomNavBar extends StatelessWidget {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => HomeScreen(userId: userId),
+              ),
+            );
+          } else if (index == 1) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ChatSessionScreen(userId: userId),
+              ),
+            );
+          } else if (index == 2) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => MoodTrackingScreen(userId: userId),
+              ),
+            );
+          } else if (index == 3) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ActivityScreen(userId: userId),
               ),
             );
           } else if (index == 4) {
