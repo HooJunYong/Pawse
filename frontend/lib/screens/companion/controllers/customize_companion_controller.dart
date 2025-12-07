@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../models/companion_model.dart';
 import '../../../models/personality_model.dart';
 import '../../../services/companion_service.dart';
+import '../../../services/reward_service.dart';
 
 /// Controller for customize companion screen business logic
 class CustomizeCompanionController extends ChangeNotifier {
@@ -16,13 +17,11 @@ class CustomizeCompanionController extends ChangeNotifier {
   String? _errorMessage;
   Companion? _createdCompanion;
 
-  // --- Cat Images ---
-  final List<String> catImages = [
-    'assets/images/whitecat1.png',
-    'assets/images/americonsh1.png',
-    'assets/images/siamese1.png',
+  // --- Cat Images (loaded from backend) ---
+  List<String> catImages = [
+    'assets/images/americonsh1.png', // Default fallback
   ];
-  int _currentCatIndex = 1;
+  int _currentCatIndex = 0;
 
   // --- Text Controllers ---
   final TextEditingController nameController = TextEditingController();
@@ -52,6 +51,7 @@ class CustomizeCompanionController extends ChangeNotifier {
 
   CustomizeCompanionController({this.userId}) {
     _loadPersonalities();
+    _loadAvailableSkins();
   }
 
   /// Load personalities from database
@@ -77,6 +77,47 @@ class CustomizeCompanionController extends ChangeNotifier {
       _errorMessage = 'Failed to load personalities: $e';
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Load available companion skins from backend
+  Future<void> _loadAvailableSkins() async {
+    try {
+      if (userId != null) {
+        final response = await RewardService.getAvailableSkins(userId!);
+        
+        // Always start with the default American Shorthair skin
+        catImages = ['assets/images/americonsh1.png'];
+        
+        if (response != null && response['skins'] != null) {
+          final skins = response['skins'] as List;
+          
+          if (skins.isNotEmpty) {
+            // Add redeemed skins (skip if it's the default American Shorthair)
+            for (var skin in skins) {
+              final imagePath = 'assets/images/${skin['image_path']}';
+              if (imagePath != 'assets/images/americonsh1.png') {
+                catImages.add(imagePath);
+              }
+            }
+          }
+        }
+
+        // Ensure at least 3 images (fill with default if needed)
+        while (catImages.length < 3) {
+          catImages.add('assets/images/americonsh1.png');
+        }
+        
+        notifyListeners();
+      }
+    } catch (e) {
+      // If error, use default skins
+      catImages = [
+        'assets/images/americonsh1.png',
+        'assets/images/americonsh1.png',
+        'assets/images/americonsh1.png',
+      ];
       notifyListeners();
     }
   }

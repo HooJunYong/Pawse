@@ -96,6 +96,9 @@ def get_profile_details(user_id: str) -> dict:
         "avatar_url": (profile or {}).get("avatar_url"),
         "avatar_base64": (profile or {}).get("avatar_base64"),
         "profile_picture_url": (profile or {}).get("profile_picture_url"),
+        "current_points": (profile or {}).get("current_points", 0),
+        "lifetime_points": (profile or {}).get("lifetime_points", 0),
+        "current_rank_id": (profile or {}).get("current_rank_id", "rank_bronze"),
     }
 
 def update_user_profile(user_id: str, payload: UpdateProfileRequest) -> UpdateProfileResponse:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../services/activity_service.dart';
 import '../../services/profile_service.dart';
+import 'reward_screen.dart';
 import 'dart:convert';
 
 class ActivityScreen extends StatefulWidget {
@@ -477,28 +478,38 @@ class _ActivityScreenState extends State<ActivityScreen> {
           clipBehavior: Clip.none,
           children: [
             // The Button
-            Container(
-              margin: const EdgeInsets.only(top: 15), // Push down to let cat sit on top
-              width: 180,
-              height: 50,
-              decoration: BoxDecoration(
-                color: kRewardsButtonColor,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 4),
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => RewardScreen(userId: widget.userId),
                   ),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  "Rewards",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(top: 15), // Push down to let cat sit on top
+                width: 180,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: kRewardsButtonColor,
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 4,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    "Rewards",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),

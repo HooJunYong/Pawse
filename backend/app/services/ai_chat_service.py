@@ -144,19 +144,16 @@ Generate only the greeting message, nothing else."""
 
 Conversation history:
 {history_text}
-
 User: {user_message}
 {emotion_context}
 
-Guidelines:
-- Respond naturally and conversationally
-- Show empathy and understanding
-- Keep responses concise (2-4 sentences)
-- Do NOT use asterisks or action descriptions
-- Focus on being supportive and helpful
-- If the user expresses distress, validate their feelings
-
-Generate your response:"""
+---
+SYSTEM INSTRUCTIONS:
+- Stay in character at all times.
+- Do NOT use asterisks (*) for actions.
+- Do NOT output internal thoughts.
+- Reply directly to the user.
+"""
 
             response = self.model.generate_content(prompt)
             ai_response = response.text.strip()
