@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import '../admin/admin_therapist_management.dart';
-import '../homepage_screen.dart';
-import '../mood/mood_check_in_screen.dart';
+import '../../theme/shadows.dart';
+import '../admin/admin_dashboard_screen.dart';
+import '../profile/profile_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -36,8 +36,8 @@ class _LoginWidgetState extends State<LoginWidget> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Show loading indicator and get its controller to hide it later
-      final snackBarController = ScaffoldMessenger.of(context).showSnackBar(
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Logging in...')),
       );
 
@@ -53,9 +53,6 @@ class _LoginWidgetState extends State<LoginWidget> {
         );
 
         if (!mounted) return;
-
-        // Hide the SnackBar before navigating
-        snackBarController.close();
 
         if (response.statusCode == 200) {
           // Success - parse user_id and user_type, navigate accordingly
@@ -79,33 +76,18 @@ class _LoginWidgetState extends State<LoginWidget> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => AdminTherapistManagement(adminUserId: userId),
+                builder: (context) => AdminDashboardScreen(adminUserId: userId),
               ),
             );
           } else {
-            // Check mood log status from login response
-            final hasLoggedMoodToday = data['has_logged_mood_today'] as bool? ?? false;
-            
-            if (hasLoggedMoodToday) {
-              // User already logged mood, go to homepage
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomeScreen(userId: userId),
-                ),
-              );
-            } else {
-              // User hasn't logged mood, go to mood check-in screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MoodCheckInScreen(userId: userId),
-                ),
-              );
-            }
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Profile(userId: userId),
+              ),
+            );
           }
         } else if (response.statusCode == 401) {
-          snackBarController.close(); // Ensure SnackBar is closed on error
           // Invalid credentials - show popup dialog
           showDialog(
             context: context,
@@ -123,7 +105,6 @@ class _LoginWidgetState extends State<LoginWidget> {
             },
           );
         } else if (response.statusCode == 403) {
-          snackBarController.close(); // Ensure SnackBar is closed on error
           // User inactive - show popup dialog
           showDialog(
             context: context,
@@ -141,7 +122,6 @@ class _LoginWidgetState extends State<LoginWidget> {
             },
           );
         } else {
-          snackBarController.close(); // Ensure SnackBar is closed on error
           // Other error - show popup dialog
           final error = jsonDecode(response.body);
           showDialog(
@@ -162,7 +142,6 @@ class _LoginWidgetState extends State<LoginWidget> {
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Hide on exception
         showDialog(
           context: context,
           builder: (BuildContext context) {
@@ -275,13 +254,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              )
-                            ],
+                            boxShadow: kPillShadow,
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -328,13 +301,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.06),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
-                              )
-                            ],
+                            boxShadow: kPillShadow,
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -372,22 +339,29 @@ class _LoginWidgetState extends State<LoginWidget> {
                   ),
                   const SizedBox(height: 24),
                   // Log In button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999)),
-                      ),
-                      onPressed: _submit,
-                      child: const Text(
-                        'Log In',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontFamily: 'Nunito',
-                          color: Colors.white,
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9999),
+                      boxShadow: kButtonShadow,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999)),
+                        ),
+                        onPressed: _submit,
+                        child: const Text(
+                          'Log In',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontFamily: 'Nunito',
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),

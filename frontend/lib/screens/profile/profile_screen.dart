@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
+import '../../widgets/bottom_nav.dart';
 import '../auth/login_screen.dart';
-import '../wellness/wellness_screen.dart';
 import 'change_password_screen.dart';
 import 'edit_profile_screen.dart';
 import 'join_therapist_screen.dart';
-import '../homepage_screen.dart';
-import '../companion/customize_comp_screen.dart';
+import 'notification_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -81,13 +81,7 @@ class _ProfileState extends State<Profile> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        boxShadow: kPillShadow,
       ),
       child: ListTile(
         leading: Icon(icon, color: const Color.fromRGBO(66, 32, 6, 1), size: 20),
@@ -232,19 +226,19 @@ class _ProfileState extends State<Profile> {
                           });
                         },
                       ),
-                      _buildMenuItem(icon: Icons.notifications_outlined, title: 'Notifications', onTap: () {}),
                       _buildMenuItem(
-                        icon: Icons.settings_outlined, 
-                        title: 'Customize Your Companion', 
+                        icon: Icons.notifications_outlined,
+                        title: 'Notifications',
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CustomizeCompanionScreen(userId: widget.userId),
+                              builder: (context) => NotificationScreen(userId: widget.userId),
                             ),
                           );
-                        }
+                        },
                       ),
+                      _buildMenuItem(icon: Icons.settings_outlined, title: 'Customize Your Companion', onTap: () {}),
                       _buildMenuItem(
                         icon: Icons.lock_outline,
                         title: 'Change Password',
@@ -273,31 +267,38 @@ class _ProfileState extends State<Profile> {
                         },
                       ),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9999),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const LoginWidget(),
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(9999),
+                          boxShadow: kButtonShadow,
+                        ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              elevation: 0,
+                              backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9999),
                               ),
-                            );
-                          },
-                          child: const Text(
-                            'Log Out',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontFamily: 'Nunito',
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginWidget(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              'Log Out',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontFamily: 'Nunito',
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
@@ -311,87 +312,12 @@ class _ProfileState extends State<Profile> {
           ),
         ),
       ),
-      // Bottom Navigation Bar
-      // We wrap it in a Row/Container to constrain width to "Mobile Size" (375px)
-      bottomNavigationBar: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 375,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.home_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => HomeScreen(userId: widget.userId)
-                            ),
-                        );},
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chat_bubble_outline),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.calendar_today_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.military_tech_outlined),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {},
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.favorite_outline),
-                      color: const Color.fromRGBO(107, 114, 128, 1),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => WellnessScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
-                    ),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: const Color.fromRGBO(249, 115, 22, 1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.person),
-                        color: Colors.white,
-                        onPressed: () {},
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+      bottomNavigationBar: BottomNavBar(
+        userId: widget.userId,
+        selectedIndex: 5, // Profile is at index 5
+        onTap: (index) {
+          // Handle navigation for other tabs if needed
+        },
       ),
     );
   }

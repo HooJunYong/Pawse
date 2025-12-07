@@ -1,0 +1,538 @@
+import 'package:flutter/material.dart';
+
+/// Supported moods exposed by the backend recommendation endpoint.
+enum MoodType {
+  veryHappy,
+  happy,
+  neutral,
+  sad,
+  awful,
+}
+
+extension MoodTypeX on MoodType {
+  /// API expects snake-case labels with a space separator.
+  String get apiValue {
+    switch (this) {
+      case MoodType.veryHappy:
+        return 'very happy';
+      case MoodType.happy:
+        return 'happy';
+      case MoodType.neutral:
+        return 'neutral';
+      case MoodType.sad:
+        return 'sad';
+      case MoodType.awful:
+        return 'awful';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case MoodType.veryHappy:
+        return 'Very Happy';
+      case MoodType.happy:
+        return 'Happy';
+      case MoodType.neutral:
+        return 'Neutral';
+      case MoodType.sad:
+        return 'Sad';
+      case MoodType.awful:
+        return 'Awful';
+    }
+  }
+}
+
+/// UI helper used by the home screen to render mood cards.
+class MoodOption {
+  final MoodType mood;
+  final String title;
+  final String icon;
+  final Color color;
+
+  const MoodOption({
+    required this.mood,
+    required this.title,
+    required this.icon,
+    required this.color,
+  });
+
+  factory MoodOption.fromJson(Map<String, dynamic> json) {
+    final String rawColor = (json['color'] as String? ?? '').trim();
+    return MoodOption(
+      mood: _moodFromValue(json['mood'] as String? ?? ''),
+      title: json['title'] as String? ?? '',
+      icon: json['icon'] as String? ?? 'music_note',
+      color: _colorFromHex(rawColor.isEmpty ? '#FFE082' : rawColor),
+    );
+  }
+
+  IconData get iconData => _iconLookup[icon] ?? Icons.music_note;
+}
+
+class MusicTrack {
+  final String musicId;
+  final String title;
+  final String artist;
+  final int durationSeconds;
+  final String? thumbnailUrl;
+  final String? albumImageUrl;
+  final String? audioUrl;
+  final String? moodCategory;
+  final bool isLiked;
+  final int playCount;
+  final DateTime addedAt;
+
+  const MusicTrack({
+    required this.musicId,
+    required this.title,
+    required this.artist,
+    required this.durationSeconds,
+    required this.addedAt,
+    this.thumbnailUrl,
+    this.albumImageUrl,
+    this.audioUrl,
+    this.moodCategory,
+    this.isLiked = false,
+    this.playCount = 0,
+  });
+
+  factory MusicTrack.fromJson(Map<String, dynamic> json) {
+    return MusicTrack(
+      musicId: json['music_id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      artist: json['artist'] as String? ?? '',
+      durationSeconds: json['duration_seconds'] is int
+          ? json['duration_seconds'] as int
+          : int.tryParse('${json['duration_seconds']}') ?? 0,
+      addedAt: DateTime.tryParse(json['added_at'] as String? ?? '') ?? DateTime.now().toUtc(),
+      thumbnailUrl: json['thumbnail_url'] as String?,
+      albumImageUrl: json['album_image_url'] as String?,
+        audioUrl: json['audio_url'] as String?,
+      moodCategory: json['mood_category'] as String?,
+      isLiked: json['is_liked'] as bool? ?? false,
+      playCount: json['play_count'] is int
+          ? json['play_count'] as int
+          : int.tryParse('${json['play_count']}') ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toPlaylistSongPayload() {
+    return {
+      'music_id': musicId,
+      'title': title,
+      'artist': artist,
+      'duration_seconds': durationSeconds,
+      if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
+      if (albumImageUrl != null) 'album_image_url': albumImageUrl,
+      if (audioUrl != null) 'audio_url': audioUrl,
+      if (moodCategory != null) 'mood_category': moodCategory,
+      'is_liked': isLiked,
+    };
+  }
+
+  MusicTrack copyWith({
+    String? musicId,
+    String? title,
+    String? artist,
+    int? durationSeconds,
+    DateTime? addedAt,
+    String? thumbnailUrl,
+    String? albumImageUrl,
+    String? audioUrl,
+    String? moodCategory,
+    bool? isLiked,
+    int? playCount,
+  }) {
+    return MusicTrack(
+      musicId: musicId ?? this.musicId,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      durationSeconds: durationSeconds ?? this.durationSeconds,
+      addedAt: addedAt ?? this.addedAt,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      albumImageUrl: albumImageUrl ?? this.albumImageUrl,
+      audioUrl: audioUrl ?? this.audioUrl,
+      moodCategory: moodCategory ?? this.moodCategory,
+      isLiked: isLiked ?? this.isLiked,
+      playCount: playCount ?? this.playCount,
+    );
+  }
+
+  String get durationLabel => _formatDuration(durationSeconds);
+}
+
+class MusicAlbum {
+  final String albumId;
+  final String albumTitle;
+  final String? albumImageUrl;
+  final List<MusicTrack> tracks;
+
+  const MusicAlbum({
+    required this.albumId,
+    required this.albumTitle,
+    required this.albumImageUrl,
+    required this.tracks,
+  });
+
+  factory MusicAlbum.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> rawTracks = json['tracks'] as List<dynamic>? ?? const [];
+    return MusicAlbum(
+      albumId: json['album_id'] as String? ?? '',
+      albumTitle: json['album_title'] as String? ?? '',
+      albumImageUrl: json['album_image_url'] as String?,
+      tracks: rawTracks
+          .map((dynamic item) => MusicTrack.fromJson(
+                (item is Map<String, dynamic>)
+                    ? item
+                    : Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false),
+    );
+  }
+
+  int get trackCount => tracks.length;
+}
+
+class PlaylistSong {
+  final String musicId;
+  final String title;
+  final String artist;
+  final int durationSeconds;
+  final String? thumbnailUrl;
+  final String? albumImageUrl;
+  final String? audioUrl;
+  final String? moodCategory;
+  final bool isLiked;
+
+  const PlaylistSong({
+    required this.musicId,
+    required this.title,
+    required this.artist,
+    required this.durationSeconds,
+    this.thumbnailUrl,
+    this.albumImageUrl,
+    this.audioUrl,
+    this.moodCategory,
+    this.isLiked = false,
+  });
+
+  factory PlaylistSong.fromJson(Map<String, dynamic> json) {
+    return PlaylistSong(
+      musicId: json['music_id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      artist: json['artist'] as String? ?? '',
+      durationSeconds: json['duration_seconds'] is int
+          ? json['duration_seconds'] as int
+          : int.tryParse('${json['duration_seconds']}') ?? 0,
+      thumbnailUrl: json['thumbnail_url'] as String?,
+      albumImageUrl: json['album_image_url'] as String?,
+      audioUrl: json['audio_url'] as String?,
+      moodCategory: json['mood_category'] as String?,
+      isLiked: json['is_liked'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'music_id': musicId,
+      'title': title,
+      'artist': artist,
+      'duration_seconds': durationSeconds,
+      if (thumbnailUrl != null) 'thumbnail_url': thumbnailUrl,
+      if (albumImageUrl != null) 'album_image_url': albumImageUrl,
+      if (audioUrl != null) 'audio_url': audioUrl,
+      if (moodCategory != null) 'mood_category': moodCategory,
+      'is_liked': isLiked,
+    };
+  }
+
+  String get durationLabel => _formatDuration(durationSeconds);
+
+  PlaylistSong copyWith({
+    bool? isLiked,
+  }) {
+    return PlaylistSong(
+      musicId: musicId,
+      title: title,
+      artist: artist,
+      durationSeconds: durationSeconds,
+      thumbnailUrl: thumbnailUrl,
+      albumImageUrl: albumImageUrl,
+      audioUrl: audioUrl,
+      moodCategory: moodCategory,
+      isLiked: isLiked ?? this.isLiked,
+    );
+  }
+}
+
+class UserPlaylist {
+  final String id;
+  final String playlistName;
+  final String userId;
+  final List<String> customTags;
+  final bool isPublic;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final List<PlaylistSong> songs;
+  final String icon;
+  final Color color;
+  final bool isFavorite;
+
+  const UserPlaylist({
+    required this.id,
+    required this.playlistName,
+    required this.userId,
+    required this.customTags,
+    required this.isPublic,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.songs,
+    this.icon = 'music_note',
+    this.color = const Color(0xFFE0F2F1),
+    this.isFavorite = false,
+  });
+
+  factory UserPlaylist.fromJson(Map<String, dynamic> json) {
+    final List<dynamic>? rawSongs = json['songs'] as List<dynamic>?;
+    final String rawIcon = json['icon'] as String? ?? 'music_note';
+    final String rawColor = json['color'] as String? ?? '';
+    return UserPlaylist(
+      id: json['user_playlist_id'] as String? ?? json['id'] as String? ?? '',
+      playlistName: json['playlist_name'] as String? ?? '',
+      userId: json['user_id'] as String? ?? '',
+      customTags: (json['custom_tags'] as List<dynamic>? ?? const [])
+          .map((dynamic e) => e.toString())
+          .toList(growable: false),
+      isPublic: json['is_public'] as bool? ?? false,
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now().toUtc(),
+      updatedAt: DateTime.tryParse(json['updated_at'] as String? ?? '') ?? DateTime.now().toUtc(),
+      songs: rawSongs == null
+          ? const []
+          : rawSongs
+              .map((dynamic song) => PlaylistSong.fromJson(
+                    (song is Map<String, dynamic>)
+                        ? song
+                        : Map<String, dynamic>.from(song as Map),
+                  ))
+              .toList(growable: false),
+      icon: rawIcon,
+      color: rawColor.isEmpty ? const Color(0xFFE0F2F1) : _colorFromHex(rawColor),
+      isFavorite: json['is_favorite'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'user_playlist_id': id,
+      'playlist_name': playlistName,
+      'user_id': userId,
+      'custom_tags': customTags,
+      'is_public': isPublic,
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt.toUtc().toIso8601String(),
+      'songs': songs.map((song) => song.toJson()).toList(growable: false),
+      'icon': icon,
+      'color': '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}',
+      'is_favorite': isFavorite,
+    };
+  }
+
+  UserPlaylist copyWith({
+    String? playlistName,
+    List<String>? customTags,
+    bool? isPublic,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<PlaylistSong>? songs,
+    String? icon,
+    Color? color,
+    bool? isFavorite,
+  }) {
+    return UserPlaylist(
+      id: id,
+      playlistName: playlistName ?? this.playlistName,
+      userId: userId,
+      customTags: customTags ?? this.customTags,
+      isPublic: isPublic ?? this.isPublic,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      songs: songs ?? this.songs,
+      icon: icon ?? this.icon,
+      color: color ?? this.color,
+      isFavorite: isFavorite ?? this.isFavorite,
+    );
+  }
+
+  int get songCount => songs.length;
+}
+
+class MoodTherapyRecommendation {
+  final String id;
+  final String title;
+  final String description;
+  final UserPlaylist playlist;
+  final String icon;
+  final Color color;
+
+  const MoodTherapyRecommendation({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.playlist,
+    required this.icon,
+    required this.color,
+  });
+
+  factory MoodTherapyRecommendation.fromJson(
+    Map<String, dynamic> json, {
+    required String userId,
+  }) {
+    final String rawId = (json['id'] as String? ?? '').trim();
+    final String title = (json['title'] as String? ?? 'Mood Therapy Mix').trim();
+    final String description = (json['description'] as String? ?? '').trim();
+    final String icon = (json['icon'] as String? ?? 'music_note').trim();
+    final String rawColor = (json['color'] as String? ?? '').trim();
+    final List<dynamic> rawTracks = json['tracks'] as List<dynamic>? ?? const [];
+    Map<String, dynamic> castTrack(dynamic value) {
+      if (value is Map<String, dynamic>) {
+        return value;
+      }
+      if (value is Map) {
+        return value.map(
+          (dynamic key, dynamic v) => MapEntry('$key', v),
+        );
+      }
+      throw ArgumentError('Invalid track payload for mood therapy playlist');
+    }
+
+    final List<PlaylistSong> songs = <PlaylistSong>[];
+    for (final dynamic song in rawTracks) {
+      try {
+        songs.add(PlaylistSong.fromJson(castTrack(song)));
+      } catch (_) {
+        continue;
+      }
+    }
+
+    final DateTime now = DateTime.now().toUtc();
+    final String generatedId = rawId.isEmpty
+        ? 'mood-${title.isEmpty ? 'therapy' : title.toLowerCase().replaceAll(RegExp(r"[^a-z0-9]+"), '-')}-${now.microsecondsSinceEpoch}'
+        : rawId;
+
+    final UserPlaylist playlist = UserPlaylist(
+      id: generatedId,
+      playlistName: title.isEmpty ? 'Mood Therapy Mix' : title,
+      userId: userId,
+      customTags: const <String>['mood-therapy'],
+      isPublic: false,
+      createdAt: now,
+      updatedAt: now,
+      songs: songs,
+    );
+
+    return MoodTherapyRecommendation(
+      id: generatedId,
+      title: playlist.playlistName,
+      description: description,
+      playlist: playlist,
+      icon: icon,
+      color: _colorFromHex(rawColor.isEmpty ? '#FFE082' : rawColor),
+    );
+  }
+}
+
+String _formatDuration(int totalSeconds) {
+  if (totalSeconds <= 0) {
+    return '0:00';
+  }
+  final int minutes = totalSeconds ~/ 60;
+  final int seconds = totalSeconds % 60;
+  return '${minutes.toString()}:${seconds.toString().padLeft(2, '0')}';
+}
+
+MoodType _moodFromValue(String value) {
+  return MoodType.values.firstWhere(
+    (mood) => mood.apiValue == value || mood.name == value,
+    orElse: () => MoodType.happy,
+  );
+}
+
+Color _colorFromHex(String hex) {
+  var cleaned = hex.replaceAll('#', '').toUpperCase();
+  if (cleaned.length == 6) {
+    cleaned = 'FF$cleaned';
+  }
+  final int colorInt = int.tryParse(cleaned, radix: 16) ?? 0xFFFFE082;
+  return Color(colorInt);
+}
+
+IconData iconDataFromString(String iconName) {
+  return _iconLookup[iconName] ?? Icons.music_note;
+}
+
+const Map<String, IconData> _iconLookup = <String, IconData>{
+  'cloud': Icons.cloud,
+  'book': Icons.book,
+  'bolt': Icons.bolt,
+  'spa': Icons.spa,
+  'self_improvement': Icons.self_improvement,
+  'music_note': Icons.music_note,
+  'water_drop': Icons.water_drop,
+  'opacity': Icons.opacity,
+  'wb_sunny': Icons.wb_sunny,
+  'air': Icons.air,
+  'celebration': Icons.celebration,
+  'star': Icons.star,
+  'refresh': Icons.refresh,
+  'local_fire_department': Icons.local_fire_department,
+  'filter_center_focus': Icons.filter_center_focus,
+  'trending_up': Icons.trending_up,
+  'nightlight_round': Icons.nightlight_round,
+  'light_mode': Icons.light_mode,
+  'feather': Icons.eco,
+  'album': Icons.album,
+  'headphones': Icons.headphones,
+  'queue_music': Icons.queue_music,
+  'playlist_play': Icons.playlist_play,
+  'radio': Icons.radio,
+  'library_music': Icons.library_music,
+};
+
+const List<String> _playlistIconKeys = <String>[
+  'music_note',
+  'album',
+  'headphones',
+  'queue_music',
+  'playlist_play',
+  'radio',
+  'library_music',
+  'star',
+  'celebration',
+  'spa',
+  'self_improvement',
+];
+
+const List<Color> _playlistColors = <Color>[
+  Color(0xFFFFAB91), // Light coral
+  Color(0xFFCE93D8), // Light purple
+  Color(0xFF90CAF9), // Light blue
+  Color(0xFFA5D6A7), // Light green
+  Color(0xFFFFF59D), // Light yellow
+  Color(0xFFFFCC80), // Light orange
+  Color(0xFFEF9A9A), // Light red
+  Color(0xFFB39DDB), // Light deep purple
+  Color(0xFF80DEEA), // Light cyan
+  Color(0xFFC5E1A5), // Light lime
+];
+
+/// Generates a random icon and color for a new playlist.
+/// Returns a map with 'icon' (String) and 'color' (Color) keys.
+Map<String, dynamic> generateRandomPlaylistAppearance() {
+  final int seed = DateTime.now().millisecondsSinceEpoch;
+  final String randomIcon = _playlistIconKeys[seed % _playlistIconKeys.length];
+  final Color randomColor = _playlistColors[seed % _playlistColors.length];
+  return {
+    'icon': randomIcon,
+    'color': randomColor,
+  };
+}

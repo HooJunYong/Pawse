@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
+
 class ChangePassword extends StatefulWidget {
   final String userId;
   const ChangePassword({super.key, required this.userId});
@@ -90,15 +92,21 @@ class _ChangePasswordState extends State<ChangePassword> {
       return;
     }
 
-    // Check if new password meets minimum length
-    if (_newPasswordController.text.length < 6) {
-      _showErrorDialog('Password must be at least 6 characters');
+    // Check if confirm password is empty
+    if (_confirmPasswordController.text.isEmpty) {
+      _showErrorDialog('Please confirm your new password');
       return;
     }
 
     // Check if new password is same as current password
     if (_newPasswordController.text == _currentPasswordController.text) {
       _showErrorDialog('New password must be different from current password');
+      return;
+    }
+
+    // Check if new password meets requirements
+    if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#\$&*~]).{8,}$').hasMatch(_newPasswordController.text)) {
+      _showErrorDialog('Password must be at least 8 characters and include uppercase, lowercase, number, and special character.');
       return;
     }
 
@@ -117,6 +125,8 @@ class _ChangePasswordState extends State<ChangePassword> {
 
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      
+      // The backend will verify the current password and update to new password
       final response = await http.put(
         Uri.parse('$apiUrl/change-password/${widget.userId}'),
         headers: {'Content-Type': 'application/json'},
@@ -139,17 +149,13 @@ class _ChangePasswordState extends State<ChangePassword> {
           Navigator.pop(context); // Return to profile page
         } else {
           final error = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed: ${error['detail'] ?? 'Unknown error'}')),
-          );
+          _showErrorDialog(error['detail'] ?? 'Unknown error');
         }
       }
     } catch (e) {
       if (mounted) {
-        Navigator.pop(context); // Close loading dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        Navigator.pop(context); // Close loading dialog if still open
+        _showErrorDialog('Error: $e');
       }
     }
   }
@@ -173,37 +179,36 @@ class _ChangePasswordState extends State<ChangePassword> {
           ),
         ),
         const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          decoration: InputDecoration(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(229, 231, 235, 1)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color.fromRGBO(249, 115, 22, 1)),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            suffixIcon: IconButton(
-              icon: Icon(
-                obscureText ? Icons.visibility_off : Icons.visibility,
-                color: const Color.fromRGBO(107, 114, 128, 1),
-              ),
-              onPressed: onToggleVisibility,
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: kPillShadow,
+            color: Colors.white,
+            border: Border.all(
+              color: const Color.fromRGBO(229, 231, 235, 1),
+              width: 1,
             ),
           ),
-          style: const TextStyle(
-            fontSize: 14,
-            fontFamily: 'Nunito',
-            color: Color.fromRGBO(66, 32, 6, 1),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: TextField(
+            controller: controller,
+            obscureText: obscureText,
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: const Color.fromRGBO(107, 114, 128, 1),
+                ),
+                onPressed: onToggleVisibility,
+              ),
+            ),
+            style: const TextStyle(
+              fontSize: 14,
+              fontFamily: 'Nunito',
+              color: Color.fromRGBO(66, 32, 6, 1),
+            ),
           ),
         ),
       ],
@@ -314,24 +319,31 @@ class _ChangePasswordState extends State<ChangePassword> {
                       },
                     ),
                     const SizedBox(height: 32),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9999),
+                        boxShadow: kButtonShadow,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
                           ),
-                        ),
-                        onPressed: _updatePassword,
-                        child: const Text(
-                          'Update Password',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontFamily: 'Nunito',
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                          onPressed: _updatePassword,
+                          child: const Text(
+                            'Update Password',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),

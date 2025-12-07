@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
+import '../../theme/shadows.dart';
+
 class EditProfile extends StatefulWidget {
   final String userId;
   const EditProfile({super.key, required this.userId});
@@ -19,6 +21,7 @@ class _EditProfileState extends State<EditProfile> {
   final TextEditingController _firstNameController = TextEditingController();
   final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _homeAddressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
@@ -44,6 +47,7 @@ class _EditProfileState extends State<EditProfile> {
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose();
     _dobController.dispose();
     _homeAddressController.dispose();
     _cityController.dispose();
@@ -63,6 +67,7 @@ class _EditProfileState extends State<EditProfile> {
           _firstNameController.text = (data['first_name'] as String?) ?? '';
           _lastNameController.text = (data['last_name'] as String?) ?? '';
           _emailController.text = (data['email'] as String?) ?? '';
+          _phoneController.text = (data['phone_number'] as String?) ?? '';
           _dobController.text = (data['date_of_birth'] as String?) ?? '';
           _selectedGender = (data['gender'] as String?) ?? 'Select';
           if (_selectedGender.isEmpty) _selectedGender = 'Select';
@@ -191,6 +196,13 @@ class _EditProfileState extends State<EditProfile> {
         return;
       }
 
+      if (_selectedState == 'Select') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please select a state')),
+        );
+        return;
+      }
+
       try {
         showDialog(
           context: context,
@@ -209,6 +221,7 @@ class _EditProfileState extends State<EditProfile> {
           'first_name': _firstNameController.text.trim(),
           'last_name': _lastNameController.text.trim(),
           'email': _emailController.text.trim(),
+          'phone_number': _phoneController.text.trim(),
           'date_of_birth': _dobController.text.trim(),
           'gender': _selectedGender,
           'home_address': _homeAddressController.text.trim(),
@@ -399,20 +412,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedGender,
@@ -465,20 +472,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _selectedState,
@@ -557,19 +558,14 @@ class _EditProfileState extends State<EditProfile> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                offset: const Offset(0, 2),
-                blurRadius: 4,
-              ),
-            ],
+            boxShadow: kPillShadow,
             color: Colors.white,
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
               width: 1,
             ),
           ),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: TextFormField(
             controller: controller,
             readOnly: readOnly,
@@ -583,7 +579,7 @@ class _EditProfileState extends State<EditProfile> {
                 fontSize: 14,
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
             ),
             style: const TextStyle(
               fontFamily: 'Nunito',
@@ -725,6 +721,22 @@ class _EditProfileState extends State<EditProfile> {
                             },
                           ),
                           const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _phoneController,
+                            label: 'Phone Number',
+                            hintText: 'e.g., +60123456789',
+                            keyboardType: TextInputType.phone,
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Phone number is required';
+                              }
+                              if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value.trim())) {
+                                return 'Enter valid phone number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
                           Row(
                             children: [
                               Expanded(
@@ -734,6 +746,12 @@ class _EditProfileState extends State<EditProfile> {
                                   hintText: 'DD/MM/YYYY',
                                   readOnly: true,
                                   onTap: _selectDate,
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'Date of birth is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -747,6 +765,12 @@ class _EditProfileState extends State<EditProfile> {
                             controller: _homeAddressController,
                             label: 'Home Address',
                             hintText: 'e.g., 123 Jalan Ampang',
+                            validator: (value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Home address is required';
+                              }
+                              return null;
+                            },
                           ),
                           const SizedBox(height: 16),
                           Row(
@@ -756,6 +780,12 @@ class _EditProfileState extends State<EditProfile> {
                                   controller: _cityController,
                                   label: 'City',
                                   hintText: 'e.g., Kuala Lumpur',
+                                  validator: (value) {
+                                    if (value == null || value.trim().isEmpty) {
+                                      return 'City is required';
+                                    }
+                                    return null;
+                                  },
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -771,10 +801,11 @@ class _EditProfileState extends State<EditProfile> {
                             hintText: 'e.g., 50450',
                             keyboardType: TextInputType.number,
                             validator: (value) {
-                              if (value != null && value.trim().isNotEmpty) {
-                                if (!RegExp(r'^\d{5}$').hasMatch(value.trim())) {
-                                  return 'Must be 5 digits';
-                                }
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Zip code is required';
+                              }
+                              if (!RegExp(r'^\d{5}$').hasMatch(value.trim())) {
+                                return 'Must be 5 digits';
                               }
                               return null;
                             },

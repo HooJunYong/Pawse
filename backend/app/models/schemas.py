@@ -26,6 +26,7 @@ class UpdateProfileRequest(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     email: Optional[EmailStr] = None
+    phone_number: Optional[str] = None
     date_of_birth: Optional[str] = None
     gender: Optional[str] = None
     home_address: Optional[str] = None
@@ -39,6 +40,29 @@ class UpdateProfileRequest(BaseModel):
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
+
+class CreateOtpRequest(BaseModel):
+    email: EmailStr
+
+class VerifyOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str
+    new_password: str
+
+class OtpResponse(BaseModel):
+    message: str
+    otp_code: Optional[str] = None  # Only for development
+    expires_in_minutes: Optional[int] = None
+
+class VerifyOtpResponse(BaseModel):
+    success: bool
+    message: str
+    user_id: Optional[str] = None
+    email: Optional[str] = None
 
 class TherapistApplicationRequest(BaseModel):
     user_id: str
@@ -69,6 +93,8 @@ class UpdateTherapistProfileRequest(BaseModel):
     city: Optional[str] = None
     state: Optional[str] = None
     zip: Optional[int] = None
+    specializations: Optional[list[str]] = None
+    languages_spoken: Optional[list[str]] = None
     hourly_rate: Optional[float] = None
     profile_picture_base64: Optional[str] = None
     profile_picture_url: Optional[str] = None
@@ -131,6 +157,8 @@ class TherapistProfileResponse(BaseModel):
     rejection_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    average_rating: Optional[float] = None
+    rating_count: int = 0
 
 class TherapistApplicationResponse(BaseModel):
     success: bool
@@ -203,4 +231,15 @@ class TherapistDashboardResponse(BaseModel):
 class EditAvailabilityRequest(BaseModel):
     start_time: str
     end_time: str
+
+class NextAvailabilityResponse(BaseModel):
+    has_availability: bool
+    message: Optional[str] = None
+    date: Optional[str] = None
+    day_name: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    start_iso: Optional[str] = None
+    end_iso: Optional[str] = None
+    minutes_until: Optional[int] = None
 

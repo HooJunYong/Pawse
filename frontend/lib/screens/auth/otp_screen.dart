@@ -1,8 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
+
+import '../../theme/shadows.dart';
+import 'reset_password_screen.dart';
 
 class OtpWidget extends StatefulWidget {
-  const OtpWidget({Key? key}) : super(key: key);
+  final String email;
+  const OtpWidget({Key? key, required this.email}) : super(key: key);
 
   @override
   State<OtpWidget> createState() => _OtpWidgetState();
@@ -12,6 +20,7 @@ class _OtpWidgetState extends State<OtpWidget> {
   final int _length = 6;
   late final List<TextEditingController> _controllers;
   late final List<FocusNode> _nodes;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -40,7 +49,7 @@ class _OtpWidgetState extends State<OtpWidget> {
     setState(() {});
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     final code = _controllers.map((c) => c.text.trim()).join();
     if (code.length != _length || code.contains(RegExp(r"\D"))) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -48,38 +57,120 @@ class _OtpWidgetState extends State<OtpWidget> {
       );
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Verifying code: $code')),
-    );
+
+    setState(() => _isLoading = true);
+
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.post(
+        Uri.parse('$apiUrl/otp/verify'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': widget.email,
+          'otp': code,
+        }),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Success! Navigate to reset password screen with OTP code
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ResetPassword(
+              email: widget.email,
+              otpCode: code,
+            ),
+          ),
+        );
+      } else {
+        final error = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error['detail'] ?? 'Invalid OTP code'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connection error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
-  void _resend() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Code resent to your email')),
-    );
+  Future<void> _resend() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.post(
+        Uri.parse('$apiUrl/otp/create'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': widget.email}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('New code sent to your email'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Clear existing input
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+        _nodes[0].requestFocus();
+      } else {
+        final error = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error['detail'] ?? 'Failed to resend code'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Connection error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Widget _otpBox(int index) {
     return SizedBox(
-      width: 48,
+      width: 44,
       height: 56,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(12)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color.fromRGBO(0, 0, 0, 0.06),
-              offset: Offset(0, 2),
-              blurRadius: 4,
-            )
-          ],
+          boxShadow: kPillShadow,
           color: const Color.fromRGBO(255, 255, 255, 1),
           border: Border.all(
             color: const Color.fromRGBO(229, 231, 235, 1),
             width: 1,
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
         alignment: Alignment.center,
         child: TextField(
           controller: _controllers[index],
@@ -115,7 +206,19 @@ class _OtpWidgetState extends State<OtpWidget> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
-                  const SizedBox(height: 16),
+                  // Lock Icon
+                  Image.asset(
+                    'assets/images/otp.png',
+                    width: 100,
+                    height: 100,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.lock_outline,
+                      size: 50,
+                      color: Color.fromRGBO(249, 115, 22, 1),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   const Text(
                     'Check Your Email',
                     textAlign: TextAlign.center,
@@ -144,37 +247,53 @@ class _OtpWidgetState extends State<OtpWidget> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       _otpBox(0),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _otpBox(1),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _otpBox(2),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _otpBox(3),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _otpBox(4),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       _otpBox(5),
                     ],
                   ),
                   const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(9999),
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(9999),
+                      boxShadow: kButtonShadow,
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
                         ),
-                      ),
-                      onPressed: _submit,
-                      child: const Text(
-                        'Verify',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontFamily: 'Nunito',
-                          color: Colors.white,
-                        ),
+                        onPressed: _isLoading ? null : _submit,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Verify',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontFamily: 'Nunito',
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ),

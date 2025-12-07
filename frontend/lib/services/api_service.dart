@@ -37,6 +37,16 @@ class ApiService {
     );
   }
 
+  /// Make a PATCH request
+  static Future<http.Response> patch(
+      String endpoint, Map<String, dynamic> body) async {
+    return await http.patch(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(body),
+    );
+  }
+
   /// Make a DELETE request
   static Future<http.Response> delete(String endpoint) async {
     return await http.delete(

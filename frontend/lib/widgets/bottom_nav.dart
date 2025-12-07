@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../screens/homepage_screen.dart';
-import '../screens/chat/chat_session_screen.dart';
-import '../screens/mood/mood_tracking_screen.dart';
 import '../screens/profile/profile_screen.dart';
-import '../screens/gamification_and_reward/activity_screen.dart';
-import '../screens/gamification_and_reward/reward_screen.dart'; 
+import '../screens/wellness/wellness_screen.dart';
+// import '../screens/chat/chat_session_screen.dart';
 
 class BottomNavBar extends StatelessWidget {
   final int selectedIndex;
@@ -34,16 +33,19 @@ class BottomNavBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(0, Icons.home_rounded),
-          _buildNavItem(1, Icons.chat_bubble_outline_rounded),
-          _buildNavItem(2, Icons.calendar_today_rounded),
-          _buildNavItem(3, Icons.military_tech_outlined), // Medal/Award icon
-          _buildNavItem(4, Icons.local_florist_outlined), // Plant icon
-          _buildNavItem(5, Icons.person_outline_rounded),
-        ],
+      child: SizedBox(
+        width: 375,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _buildNavItem(0, Icons.home_rounded),
+            _buildNavItem(1, Icons.chat_bubble_outline_rounded),
+            _buildNavItem(2, Icons.calendar_today_rounded),
+            _buildNavItem(3, Icons.military_tech_outlined), // Medal/Award icon
+            _buildNavItem(4, Icons.local_florist_outlined), // Plant icon
+            _buildNavItem(5, Icons.person_outline_rounded),
+          ],
+        ),
       ),
     );
   }
@@ -53,59 +55,25 @@ class BottomNavBar extends StatelessWidget {
     return Builder(
       builder: (context) => GestureDetector(
         onTap: () {
+          onTap(index); // Always update parent state
           if (index == 0) {
-            Navigator.of(context).push(
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => HomeScreen(userId: userId),
               ),
             );
-          } else {
-            onTap(index);
-          }
-          if (index == 1) {
-            Navigator.of(context).push(
+          } else if (index == 4) {
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => ChatSessionScreen(userId: userId),
+                builder: (context) => WellnessScreen(userId: userId),
               ),
             );
-          } else {
-            onTap(index);
-          }
-          if (index == 2) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => MoodTrackingScreen(userId: userId),
-              ),
-            );
-          } else {
-            onTap(index);
-          }
-          if (index == 3) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ActivityScreen(userId: userId),
-              ),
-            );
-          } else {
-            onTap(index);
-          }
-          if (index == 4) {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (context) => ActivityScreen(userId: userId),
-              ),
-            );
-          } else {
-            onTap(index);
-          }
-          if (index == 5) {
-            Navigator.of(context).push(
+          } else if (index == 5) {
+            Navigator.of(context).pushReplacement(
               MaterialPageRoute(
                 builder: (context) => Profile(userId: userId),
               ),
             );
-          } else {
-            onTap(index);
           }
         },
         child: Container(

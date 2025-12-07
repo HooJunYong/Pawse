@@ -33,6 +33,21 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
   String _selectedState = 'Select';
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
+  
+  // Specializations and Languages
+  final List<String> _specializations = [
+    'Anxiety',
+    'Depression',
+    'Stress',
+    'Relationships',
+    'Trauma',
+    'Family',
+    'Self-Esteem',
+    'Grief & Loss'
+  ];
+  final List<String> _languages = ['English', 'Bahasa Melayu', 'Chinese'];
+  Set<String> _selectedSpecializations = {};
+  Set<String> _selectedLanguages = {};
 
   @override
   void initState() {
@@ -78,6 +93,18 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           _zipController.text = zip != null ? zip.toString() : '';
           final hourlyRate = data['hourly_rate'];
           _hourlyRateController.text = hourlyRate != null ? hourlyRate.toString() : '';
+          
+          // Load specializations and languages
+          if (data['specializations'] is List) {
+            _selectedSpecializations = Set<String>.from(
+              (data['specializations'] as List).map((e) => e.toString())
+            );
+          }
+          if (data['languages_spoken'] is List) {
+            _selectedLanguages = Set<String>.from(
+              (data['languages_spoken'] as List).map((e) => e.toString())
+            );
+          }
           
           _profilePictureUrl = data['profile_picture_url'] as String?;
           
@@ -212,6 +239,8 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           'city': _cityController.text.trim(),
           'state': _selectedState != 'Select' ? _selectedState : '',
           'zip': _zipController.text.trim().isNotEmpty ? int.tryParse(_zipController.text.trim()) : null,
+          'specializations': _selectedSpecializations.toList(),
+          'languages_spoken': _selectedLanguages.toList(),
           'hourly_rate': _hourlyRateController.text.trim().isNotEmpty ? double.tryParse(_hourlyRateController.text.trim()) : null,
           'delete_profile_picture': _imageBytes == null && _profilePictureUrl == null,
         };
@@ -230,12 +259,26 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           Navigator.pop(context); // Close loading dialog
         }
 
+        Map<String, dynamic>? updatedProfile;
+        if (response.body.isNotEmpty) {
+          try {
+            updatedProfile = jsonDecode(response.body) as Map<String, dynamic>;
+          } catch (_) {
+            updatedProfile = null;
+          }
+        }
+
         if (response.statusCode == 200) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Profile updated successfully!')),
             );
-            Navigator.of(context).pop(true); // Return true to indicate success
+            Navigator.of(context).pop({
+              'updated': true,
+              'profilePictureUrl': updatedProfile != null
+                  ? updatedProfile['profile_picture_url'] as String?
+                  : null,
+            });
           }
         } else {
           final error = jsonDecode(response.body);
@@ -275,20 +318,42 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
         ),
       );
     } else if (_profilePictureUrl != null && _profilePictureUrl!.isNotEmpty) {
-      avatarWidget = Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: const Color(0xFFF97316),
-            width: 3,
+      if (_isDataUri(_profilePictureUrl!)) {
+        final decoded = _decodeDataUri(_profilePictureUrl!);
+        if (decoded != null) {
+          avatarWidget = Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: const Color(0xFFF97316),
+                width: 3,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 48,
+              backgroundColor: const Color(0xFFFED7AA),
+              backgroundImage: MemoryImage(decoded),
+            ),
+          );
+        } else {
+          avatarWidget = _initialsCircle();
+        }
+      } else {
+        avatarWidget = Container(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFF97316),
+              width: 3,
+            ),
           ),
-        ),
-        child: CircleAvatar(
-          radius: 48,
-          backgroundColor: const Color(0xFFFED7AA),
-          backgroundImage: NetworkImage(_profilePictureUrl!),
-        ),
-      );
+          child: CircleAvatar(
+            radius: 48,
+            backgroundColor: const Color(0xFFFED7AA),
+            backgroundImage: NetworkImage(_profilePictureUrl!),
+          ),
+        );
+      }
     } else {
       avatarWidget = _initialsCircle();
     }
@@ -358,6 +423,23 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
         ),
       ),
     );
+  }
+
+  bool _isDataUri(String value) {
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String value) {
+    final parts = value.split(',');
+    if (parts.length < 2) {
+      return null;
+    }
+    try {
+      return base64Decode(parts.last);
+    } catch (_) {
+      return null;
+    }
   }
 
   Widget _buildStateDropdown() {
@@ -439,6 +521,127 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
               },
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecializationsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Specializations',
+              style: TextStyle(
+                color: Color.fromRGBO(75, 85, 99, 1),
+                fontFamily: 'Nunito',
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${_selectedSpecializations.length}/5',
+              style: TextStyle(
+                fontSize: 12,
+                color: _selectedSpecializations.length >= 5 
+                  ? const Color(0xFFEF4444) 
+                  : const Color.fromRGBO(107, 114, 128, 1),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _specializations.map((spec) {
+            final isSelected = _selectedSpecializations.contains(spec);
+            final canSelect = isSelected || _selectedSpecializations.length < 5;
+            return FilterChip(
+              label: Text(spec),
+              selected: isSelected,
+              onSelected: canSelect ? (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedSpecializations.add(spec);
+                  } else {
+                    _selectedSpecializations.remove(spec);
+                  }
+                });
+              } : null,
+              selectedColor: const Color(0xFFFB923C),
+              backgroundColor: Colors.white,
+              disabledColor: Colors.grey.shade200,
+              labelStyle: TextStyle(
+                color: !canSelect
+                  ? Colors.grey.shade400
+                  : isSelected 
+                    ? Colors.white 
+                    : const Color.fromRGBO(66, 32, 6, 1),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontFamily: 'Nunito',
+              ),
+              side: BorderSide(
+                color: !canSelect
+                  ? Colors.grey.shade300
+                  : isSelected 
+                    ? const Color(0xFFFB923C) 
+                    : const Color.fromRGBO(229, 231, 235, 1),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLanguagesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Languages',
+          style: TextStyle(
+            color: Color.fromRGBO(75, 85, 99, 1),
+            fontFamily: 'Nunito',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _languages.map((lang) {
+            final isSelected = _selectedLanguages.contains(lang);
+            return FilterChip(
+              label: Text(lang),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _selectedLanguages.add(lang);
+                  } else {
+                    _selectedLanguages.remove(lang);
+                  }
+                });
+              },
+              selectedColor: const Color(0xFFFB923C),
+              backgroundColor: Colors.white,
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : const Color.fromRGBO(66, 32, 6, 1),
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontFamily: 'Nunito',
+              ),
+              side: BorderSide(
+                color: isSelected ? const Color(0xFFFB923C) : const Color.fromRGBO(229, 231, 235, 1),
+              ),
+            );
+          }).toList(),
         ),
       ],
     );
@@ -622,8 +825,18 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
                             },
                           ),
                           const SizedBox(height: 16),
+                          _buildSpecializationsSection(),
+                          const SizedBox(height: 16),
+                          _buildLanguagesSection(),
+                          const SizedBox(height: 16),
                           _buildTextField(
                             controller: _officeNameController,
+                            label: 'Therapy Center Name',
+                            hintText: 'e.g., Mindful Haven Therapy',
+                          ),
+                          const SizedBox(height: 16),
+                          _buildTextField(
+                            controller: _officeAddressController,
                             label: 'Therapy Center Address',
                             hintText: 'e.g., 123 Jalan Ampang',
                           ),

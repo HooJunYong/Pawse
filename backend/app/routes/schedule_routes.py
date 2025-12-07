@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 from typing import Optional
 from ..models.schemas import (
     SetAvailabilityRequest, AvailabilityResponse, TherapistScheduleResponse, 
-    TherapistDashboardResponse, EditAvailabilityRequest
+    TherapistDashboardResponse, EditAvailabilityRequest, NextAvailabilityResponse
 )
 from ..services.schedule_service import (
     set_therapist_availability,
@@ -13,6 +13,7 @@ from ..services.schedule_service import (
     get_therapist_dashboard,
     edit_availability_slot,
     get_therapist_schedule_for_month,
+    get_next_available_slot,
 )
 
 router = APIRouter()
@@ -61,3 +62,8 @@ def get_dashboard(user_id: str):
 def edit_availability(availability_id: str, payload: EditAvailabilityRequest, user_id: str = Query(...)):
     """Edit an existing availability slot"""
     return edit_availability_slot(availability_id, user_id, payload)
+
+@router.get("/therapist/next-availability/{user_id}", response_model=NextAvailabilityResponse)
+def get_next_availability(user_id: str, search_days: int = Query(30, ge=1, le=90)):
+    """Get the next available slot for a therapist within the next search_days."""
+    return get_next_available_slot(user_id, search_days)

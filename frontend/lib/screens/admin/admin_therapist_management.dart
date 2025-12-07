@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import '../auth/login_screen.dart';
-
 class AdminTherapistManagement extends StatefulWidget {
   final String adminUserId;
   const AdminTherapistManagement({super.key, required this.adminUserId});
@@ -34,6 +32,11 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        // Debug: print first application to check fields
+        if (data.isNotEmpty) {
+          print('First application data: ${data[0]}');
+          print('Profile picture URL: ${data[0]['profile_picture_url']}');
+        }
         setState(() {
           _pendingApplications = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -586,7 +589,12 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
       appBar: AppBar(
         backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
         elevation: 0,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Color.fromRGBO(66, 32, 6, 1)),
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
         title: const Text(
           'Therapist Applications',
           style: TextStyle(
@@ -599,17 +607,6 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
           IconButton(
             icon: const Icon(Icons.refresh, color: Color.fromRGBO(66, 32, 6, 1)),
             onPressed: _loadPendingApplications,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Color.fromRGBO(66, 32, 6, 1)),
-            onPressed: () {
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const LoginWidget()),
-                (route) => false,
-              );
-            },
-            tooltip: 'Logout',
           ),
         ],
       ),
@@ -655,83 +652,127 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
                   color: const Color.fromRGBO(249, 115, 22, 1),
                   onRefresh: _loadPendingApplications,
                   child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     itemCount: _pendingApplications.length,
                     itemBuilder: (context, index) {
                       final app = _pendingApplications[index];
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ListTile(
-                          contentPadding: const EdgeInsets.all(16),
-                          leading: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: const Color.fromRGBO(254, 243, 199, 1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.person_outline,
-                              color: Color.fromRGBO(249, 115, 22, 1),
-                              size: 32,
-                            ),
-                          ),
-                          title: Text(
-                            '${app['first_name']} ${app['last_name']}',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontFamily: 'Nunito',
-                              fontWeight: FontWeight.bold,
-                              color: Color.fromRGBO(66, 32, 6, 1),
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 4),
-                              Text(
-                                app['email'] ?? 'No email',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontFamily: 'Nunito',
-                                  color: Color.fromRGBO(107, 114, 128, 1),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: const Color.fromRGBO(254, 243, 199, 1),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'Pending Review',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontFamily: 'Nunito',
-                                    fontWeight: FontWeight.w600,
-                                    color: Color.fromRGBO(146, 64, 14, 1),
-                                  ),
-                                ),
+                      return InkWell(
+                        onTap: () => _showApplicationDetails(app),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          trailing: const Icon(
-                            Icons.chevron_right,
-                            color: Color.fromRGBO(107, 114, 128, 1),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: const Color.fromRGBO(254, 243, 199, 1),
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: app['profile_picture_url'] != null && app['profile_picture_url'].isNotEmpty
+                                        ? ClipRRect(
+                                            borderRadius: BorderRadius.circular(24),
+                                            child: Image.network(
+                                              app['profile_picture_url'],
+                                              width: 48,
+                                              height: 48,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                return const Icon(
+                                                  Icons.person,
+                                                  color: Color.fromRGBO(249, 115, 22, 1),
+                                                );
+                                              },
+                                            ),
+                                          )
+                                        : const Icon(
+                                            Icons.person,
+                                            color: Color.fromRGBO(249, 115, 22, 1),
+                                          ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${app['first_name']} ${app['last_name']}',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontFamily: 'Nunito',
+                                            fontWeight: FontWeight.bold,
+                                            color: Color.fromRGBO(66, 32, 6, 1),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          app['email'] ?? 'No email',
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontFamily: 'Nunito',
+                                            color: Color.fromRGBO(107, 114, 128, 1),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time,
+                                        size: 16,
+                                        color: Color.fromRGBO(249, 115, 22, 1),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color.fromRGBO(254, 243, 199, 1),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Text(
+                                          'Pending Review',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontFamily: 'Nunito',
+                                            fontWeight: FontWeight.w600,
+                                            color: Color.fromRGBO(146, 64, 14, 1),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const Icon(
+                                    Icons.chevron_right,
+                                    color: Color.fromRGBO(107, 114, 128, 1),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                          onTap: () => _showApplicationDetails(app),
                         ),
                       );
                     },

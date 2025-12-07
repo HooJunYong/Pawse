@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../theme/shadows.dart';
+
 // A new SignupWidget that matches the style of your LoginWidget
 class SignupWidget extends StatefulWidget {
   const SignupWidget({Key? key}) : super(key: key);
@@ -23,6 +25,7 @@ class _SignupWidgetState extends State<SignupWidget> {
   
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -36,6 +39,10 @@ class _SignupWidgetState extends State<SignupWidget> {
 
   Future<void> _submit() async {
     if (_formKey.currentState?.validate() ?? false) {
+      setState(() {
+        _isLoading = true;
+      });
+
       final email = _emailController.text.trim();
       final password = _passwordController.text;
       final firstName = _firstNameController.text.trim();
@@ -86,6 +93,12 @@ class _SignupWidgetState extends State<SignupWidget> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to connect to server: $e')),
         );
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
@@ -118,13 +131,7 @@ class _SignupWidgetState extends State<SignupWidget> {
         Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
-            boxShadow: const [
-              BoxShadow(
-                color: Color.fromRGBO(0, 0, 0, 0.06),
-                offset: Offset(0, 2),
-                blurRadius: 4,
-              )
-            ],
+            boxShadow: kPillShadow,
             color: const Color.fromRGBO(255, 255, 255, 1),
             border: Border.all(
               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -173,8 +180,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                         padding: const EdgeInsets.only(bottom: 10),
                         child: Image.asset(
                           'assets/images/edit.png',
-                          width: 130,
-                          height: 130,
+                          width: 100,
+                          height: 100,
                           fit: BoxFit.contain,
                         ),
                       ),
@@ -258,8 +265,8 @@ class _SignupWidgetState extends State<SignupWidget> {
                         if (value == null || value.isEmpty) {
                           return 'Please enter a password';
                         }
-                        if (value.length < 6) {
-                          return 'Must be at least 6 characters';
+                        if (!RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?=.*[!@#\$&*~]).{8,}$').hasMatch(value)) {
+                          return 'Must be 8+ chars, with Upper, Lower, Number & Special';
                         }
                         return null;
                       },
@@ -299,24 +306,40 @@ class _SignupWidgetState extends State<SignupWidget> {
                     const SizedBox(height: 24),
                     
                     // Sign Up button
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(9999),
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(9999),
+                        boxShadow: kButtonShadow,
+                      ),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            elevation: 0,
+                            backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9999),
+                            ),
                           ),
-                        ),
-                        onPressed: _submit,
-                        child: const Text(
-                          'Sign Up',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontFamily: 'Nunito',
-                            color: Colors.white,
-                          ),
+                          onPressed: _isLoading ? null : _submit,
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  'Sign Up',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontFamily: 'Nunito',
+                                    color: Colors.white,
+                                  ),
+                                ),
                         ),
                       ),
                     ),

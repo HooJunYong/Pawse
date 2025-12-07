@@ -34,9 +34,9 @@ def get_pending_applications():
     return get_pending_therapists()
 
 @router.get("/therapist/verified", response_model=list[TherapistProfileResponse])
-def get_verified_therapists():
-    """Get all verified therapists"""
-    return get_all_verified_therapists()
+def get_verified_therapists(search: Optional[str] = None):
+    """Get all verified therapists with optional search"""
+    return get_all_verified_therapists(search_text=search)
 
 @router.put("/therapist/verify/{user_id}")
 def verify_therapist(

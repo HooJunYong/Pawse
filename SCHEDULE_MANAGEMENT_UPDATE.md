@@ -297,3 +297,10 @@ db.therapist_availability.find({
 4. **Visual Calendar**: Add color coding for booked vs available slots
 5. **Conflict Detection**: Warn if setting availability conflicts with existing sessions
 6. **Mobile Responsive**: Optimize for smaller screens
+
+## Booking Flow Status
+
+- [x] Backend booking APIs for availability, creation, and upcoming sessions
+- [x] Flutter booking session screen with themed calendar and slot picker
+- [x] Booking success confirmation screen linked back to homepage
+- [ ] Automated end-to-end booking flow tests

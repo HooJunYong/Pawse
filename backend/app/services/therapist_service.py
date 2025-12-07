@@ -1,13 +1,119 @@
 import uuid
 import logging
-from typing import Optional
+from typing import Optional, List, Tuple
 from fastapi import HTTPException
 from ..models.database import db
 from ..models.schemas import TherapistApplicationRequest, TherapistApplicationResponse, TherapistProfileResponse, UpdateTherapistProfileRequest
 from ..config.timezone import now_my
-import base64
 
 logger = logging.getLogger(__name__)
+
+
+def _guess_image_mime(image_base64: str) -> str:
+    """Derive the most likely mime type from a base64-encoded image."""
+
+    sample = image_base64.strip()[:30]
+    if sample.startswith('/9j/'):
+        return 'image/jpeg'
+    if sample.startswith('iVBORw0KGgo'):
+        return 'image/png'
+    if sample.startswith('R0lGOD'):
+        return 'image/gif'
+    if sample.startswith('Qk'):
+        return 'image/bmp'
+    return 'image/png'
+
+
+def _normalize_profile_picture_input(value: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
+    """Normalise incoming profile picture data to ensure DB always stores a usable URL.
+
+    Returns a tuple of (url/data-uri, raw_base64_without_prefix).
+    """
+
+    if value is None:
+        return None, None
+
+    candidate = value.strip()
+    if not candidate:
+        return None, None
+
+    if candidate.lower().startswith('data:image'):
+        parts = candidate.split(',', 1)
+        base64_payload = parts[1] if len(parts) == 2 else ''
+        return candidate, base64_payload or None
+
+    if candidate.lower().startswith('http://') or candidate.lower().startswith('https://'):
+        return candidate, None
+
+    # Treat as raw base64 content and wrap in a data URI so the front-end can render it.
+    mime_type = _guess_image_mime(candidate)
+    data_uri = f"data:{mime_type};base64,{candidate}"
+    return data_uri, candidate
+
+
+def _ensure_profile_picture_fields(doc: dict) -> None:
+    """Ensure profile picture fields inside the document are normalised."""
+
+    if not isinstance(doc, dict):
+        return
+
+    candidates: list[str] = []
+    raw_url = doc.get('profile_picture_url')
+    raw_base64 = doc.get('profile_picture_base64')
+
+    if isinstance(raw_url, str):
+        candidates.append(raw_url)
+    if isinstance(raw_base64, str):
+        candidates.append(raw_base64)
+
+    resolved_url: Optional[str] = None
+    resolved_base64: Optional[str] = None
+
+    for candidate in candidates:
+        url, base64_payload = _normalize_profile_picture_input(candidate)
+        if url and not resolved_url:
+            resolved_url = url
+        if base64_payload and not resolved_base64:
+            resolved_base64 = base64_payload
+
+    if resolved_url:
+        doc['profile_picture_url'] = resolved_url
+    if resolved_base64:
+        doc['profile_picture_base64'] = resolved_base64
+
+
+def _compute_rating_summary(therapist_ids: List[str]) -> dict[str, dict[str, float | int]]:
+    """Return average rating and count for each therapist id provided."""
+
+    if not therapist_ids:
+        return {}
+
+    summary: dict[str, list[float]] = {}
+    cursor = db.therapy_sessions.find(
+        {
+            "therapist_user_id": {"$in": therapist_ids},
+            "user_rating": {"$exists": True, "$ne": None},
+        },
+        {"therapist_user_id": 1, "user_rating": 1},
+    )
+
+    for doc in cursor:
+        rating_value = doc.get("user_rating")
+        therapist_id = doc.get("therapist_user_id")
+        if therapist_id and isinstance(rating_value, (int, float)):
+            summary.setdefault(therapist_id, []).append(float(rating_value))
+
+    aggregates: dict[str, dict[str, float | int]] = {}
+    for therapist_id, ratings in summary.items():
+        if not ratings:
+            continue
+        average = round(sum(ratings) / len(ratings), 1)
+        aggregates[therapist_id] = {
+            "average_rating": average,
+            "rating_count": len(ratings),
+        }
+
+    return aggregates
 
 def submit_therapist_application(payload: TherapistApplicationRequest) -> TherapistApplicationResponse:
     """Submit a therapist application"""
@@ -25,6 +131,8 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
         if existing_therapist.get("verification_status") == "rejected":
             # Allow resubmission - update the existing document
             now = now_my()
+            normalized_url, base64_payload = _normalize_profile_picture_input(payload.profile_picture)
+
             update_doc = {
                 "license_number": payload.license_number,
                 "first_name": payload.first_name,
@@ -40,7 +148,8 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
                 "specializations": payload.specializations,
                 "languages_spoken": payload.languages,
                 "hourly_rate": payload.hourly_rate,
-                "profile_picture_url": payload.profile_picture,
+                "profile_picture_url": normalized_url,
+                "profile_picture_base64": base64_payload,
                 "verification_status": "pending",  # Reset to pending
                 "verified_at": None,
                 "rejection_reason": None,  # Clear rejection reason
@@ -76,6 +185,8 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
     
     now = now_my()
     
+    normalized_url, base64_payload = _normalize_profile_picture_input(payload.profile_picture)
+
     therapist_doc = {
         "user_id": payload.user_id,
         "license_number": payload.license_number,
@@ -92,7 +203,8 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
         "specializations": payload.specializations,
         "languages_spoken": payload.languages,
         "hourly_rate": payload.hourly_rate,
-        "profile_picture_url": payload.profile_picture,  # Can store base64 or URL
+        "profile_picture_url": normalized_url,
+        "profile_picture_base64": base64_payload,
         "verification_status": "pending",  # pending, approved, rejected
         "verified_at": None,
         "created_at": now,
@@ -119,6 +231,17 @@ def get_therapist_profile(user_id: str) -> TherapistProfileResponse:
     
     if not therapist:
         raise HTTPException(status_code=404, detail="Therapist profile not found")
+
+    _ensure_profile_picture_fields(therapist)
+
+    rating_map = _compute_rating_summary([user_id])
+    rating_info = rating_map.get(user_id)
+    if rating_info:
+        therapist["average_rating"] = rating_info["average_rating"]
+        therapist["rating_count"] = rating_info["rating_count"]
+    else:
+        therapist["average_rating"] = None
+        therapist["rating_count"] = 0
     
     return TherapistProfileResponse(**therapist)
 
@@ -129,17 +252,41 @@ def get_pending_therapists() -> list[TherapistProfileResponse]:
         {"verification_status": "pending"},
         {"_id": 0}
     ))
+
+    for therapist in therapists:
+        _ensure_profile_picture_fields(therapist)
     
     return [TherapistProfileResponse(**t) for t in therapists]
 
 
-def get_all_verified_therapists() -> list[TherapistProfileResponse]:
-    """Get all verified therapists"""
-    therapists = list(db.therapist_profile.find(
-        {"verification_status": "approved"},
-        {"_id": 0}
-    ))
+def get_all_verified_therapists(search_text: Optional[str] = None) -> list[TherapistProfileResponse]:
+    """Get all verified therapists with optional search"""
+    # Build the base query
+    query = {"verification_status": "approved"}
     
+    # Add search logic if search_text is provided
+    if search_text and search_text.strip():
+        search_pattern = {"$regex": search_text.strip(), "$options": "i"}
+        query["$or"] = [
+            {"first_name": search_pattern},
+            {"last_name": search_pattern},
+            {"specializations": search_pattern}
+        ]
+    
+    therapists = list(db.therapist_profile.find(query, {"_id": 0}))
+
+    for therapist in therapists:
+        _ensure_profile_picture_fields(therapist)
+
+    therapist_ids = [t.get("user_id", "") for t in therapists if t.get("user_id")]
+    rating_map = _compute_rating_summary(therapist_ids)
+
+    for therapist in therapists:
+        therapist_id = therapist.get("user_id")
+        rating_info = rating_map.get(therapist_id, {}) if therapist_id else {}
+        therapist["average_rating"] = rating_info.get("average_rating")
+        therapist["rating_count"] = rating_info.get("rating_count", 0)
+
     return [TherapistProfileResponse(**t) for t in therapists]
 
 
@@ -248,17 +395,25 @@ def update_therapist_profile(user_id: str, payload: UpdateTherapistProfileReques
         update_data["state"] = payload.state
     if payload.zip is not None:
         update_data["zip"] = payload.zip
+    if payload.specializations is not None:
+        update_data["specializations"] = payload.specializations
+    if payload.languages_spoken is not None:
+        update_data["languages_spoken"] = payload.languages_spoken
     if payload.hourly_rate is not None:
         update_data["hourly_rate"] = payload.hourly_rate
     
     # Handle profile picture
     if payload.delete_profile_picture:
         update_data["profile_picture_url"] = None
+        update_data["profile_picture_base64"] = None
     elif payload.profile_picture_base64:
-        # Store base64 image directly
-        update_data["profile_picture_url"] = payload.profile_picture_base64
+        normalized_url, base64_payload = _normalize_profile_picture_input(payload.profile_picture_base64)
+        update_data["profile_picture_url"] = normalized_url
+        update_data["profile_picture_base64"] = base64_payload
     elif payload.profile_picture_url is not None:
-        update_data["profile_picture_url"] = payload.profile_picture_url
+        normalized_url, base64_payload = _normalize_profile_picture_input(payload.profile_picture_url)
+        update_data["profile_picture_url"] = normalized_url
+        update_data["profile_picture_base64"] = base64_payload
     
     try:
         db.therapist_profile.update_one(
@@ -271,6 +426,7 @@ def update_therapist_profile(user_id: str, payload: UpdateTherapistProfileReques
         updated_therapist = db.therapist_profile.find_one({"user_id": user_id}, {"_id": 0})
         if not updated_therapist:
             raise HTTPException(status_code=404, detail="Updated profile not found")
+        _ensure_profile_picture_fields(updated_therapist)
         return TherapistProfileResponse(**updated_therapist)  # type: ignore
     except Exception as e:
         logger.error(f"Failed to update therapist profile: {e}")
