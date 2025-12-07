@@ -34,6 +34,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
   // Filter state
   Set<String> _selectedSpecializations = {};
   Set<String> _selectedLanguages = {};
+  Set<String> _selectedStates = {};
   double? _minRate;
   double? _maxRate;
 
@@ -75,6 +76,14 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
         if (!hasMatchingLang) return false;
       }
 
+      // Filter by state
+      if (_selectedStates.isNotEmpty) {
+        final hasMatchingState = _selectedStates.any(
+          (state) => therapist.location.toLowerCase() == state.toLowerCase(),
+        );
+        if (!hasMatchingState) return false;
+      }
+
       // Filter by hourly rate
       if (_minRate != null && therapist.price < _minRate!) {
         return false;
@@ -91,6 +100,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
     // Temporary filter state
     Set<String> tempSpecializations = Set.from(_selectedSpecializations);
     Set<String> tempLanguages = Set.from(_selectedLanguages);
+    Set<String> tempStates = Set.from(_selectedStates);
     double? tempMinRate = _minRate;
     double? tempMaxRate = _maxRate;
     
@@ -142,6 +152,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                           setModalState(() {
                             tempSpecializations.clear();
                             tempLanguages.clear();
+                            tempStates.clear();
                             tempMinRate = null;
                             tempMaxRate = null;
                             minRateController.clear();
@@ -270,6 +281,73 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                         
                         const SizedBox(height: 24),
                         
+                        // State
+                        const Text(
+                          'State',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF3E2723),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            'Johor',
+                            'Kedah',
+                            'Kelantan',
+                            'Kuala Lumpur',
+                            'Labuan',
+                            'Malacca',
+                            'Negeri Sembilan',
+                            'Pahang',
+                            'Penang',
+                            'Perak',
+                            'Perlis',
+                            'Putrajaya',
+                            'Sabah',
+                            'Sarawak',
+                            'Selangor',
+                            'Terengganu',
+                          ].map((state) {
+                            final isSelected = tempStates.contains(state);
+                            return FilterChip(
+                              label: Text(state),
+                              selected: isSelected,
+                              onSelected: (selected) {
+                                setModalState(() {
+                                  if (selected) {
+                                    tempStates.add(state);
+                                  } else {
+                                    tempStates.remove(state);
+                                  }
+                                });
+                              },
+                              backgroundColor: Colors.white,
+                              selectedColor: const Color(0xFFFED7AA),
+                              checkmarkColor: const Color(0xFFFB923C),
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? const Color(0xFF92400E)
+                                    : const Color(0xFF6B7280),
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? const Color(0xFFFB923C)
+                                      : const Color(0xFFE5E7EB),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        
+                        const SizedBox(height: 24),
+                        
                         // Hourly Rate
                         const Text(
                           'Hourly Rate (RM)',
@@ -359,6 +437,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                         setState(() {
                           _selectedSpecializations = tempSpecializations;
                           _selectedLanguages = tempLanguages;
+                          _selectedStates = tempStates;
                           _minRate = tempMinRate;
                           _maxRate = tempMaxRate;
                         });
@@ -802,6 +881,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                                 setState(() {
                                   _selectedSpecializations.clear();
                                   _selectedLanguages.clear();
+                                  _selectedStates.clear();
                                   _minRate = null;
                                   _maxRate = null;
                                 });
