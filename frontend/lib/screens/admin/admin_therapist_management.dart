@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/therapist_application_notification_service.dart';
+
 class AdminTherapistManagement extends StatefulWidget {
   final String adminUserId;
   const AdminTherapistManagement({super.key, required this.adminUserId});
@@ -72,6 +74,13 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
         Navigator.pop(context); // Close loading dialog
 
         if (response.statusCode == 200) {
+          // Send approval notification to therapist
+          await TherapistApplicationNotificationService.showApprovedNotification(
+            userId: userId,
+            firstName: firstName,
+            lastName: lastName,
+          );
+          
           _showSuccessDialog('$firstName $lastName has been approved as a therapist!');
           _loadPendingApplications(); // Refresh list
         } else {
@@ -207,6 +216,14 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
           Navigator.pop(context); // Close loading dialog
 
           if (response.statusCode == 200) {
+            // Send rejection notification to applicant
+            await TherapistApplicationNotificationService.showRejectedNotification(
+              userId: userId,
+              firstName: firstName,
+              lastName: lastName,
+              rejectionReason: result,
+            );
+            
             _showSuccessDialog('Application rejected');
             _loadPendingApplications(); // Refresh list
           } else {

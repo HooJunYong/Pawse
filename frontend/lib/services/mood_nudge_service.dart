@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'local_notification_service.dart';
@@ -174,8 +177,8 @@ class MoodNudgeService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastMoodKey, mood.apiValue);
 
-    // Get a random nudge for this mood
-    final nudge = _getRandomNudgeForMood(mood);
+    // Get a random nudge for this mood (now fetches from API)
+    final nudge = await _getRandomNudgeForMood(mood);
 
     // Schedule notification for 10 minutes from now
     await _notificationService.scheduleNotification(
@@ -188,7 +191,28 @@ class MoodNudgeService {
   }
 
   /// Get a random nudge for a specific mood
-  Map<String, String> _getRandomNudgeForMood(MoodType mood) {
+  /// Fetches from API, falls back to offline nudges if API fails
+  Future<Map<String, String>> _getRandomNudgeForMood(MoodType mood) async {
+    try {
+      // Try to fetch from API first
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/mood-nudges/${mood.apiValue}/random'),
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return {
+          'title': data['title'] ?? 'Check In',
+          'message': data['message'] ?? 'Take a moment to notice how you\'re feeling.',
+        };
+      }
+    } catch (e) {
+      print('Error fetching mood nudge from API: $e');
+      // Fall through to offline nudges
+    }
+
+    // Fallback to offline nudges
     final nudges = _offlineNudges[mood.apiValue] ?? [];
     if (nudges.isEmpty) {
       return {
@@ -208,7 +232,7 @@ class MoodNudgeService {
 
   /// Send an immediate test nudge (for testing purposes)
   Future<void> sendTestNudge(MoodType mood) async {
-    final nudge = _getRandomNudgeForMood(mood);
+    final nudge = await _getRandomNudgeForMood(mood);
     await _notificationService.showNotification(
       id: 999,
       title: '🧪 Test: ${nudge['title']!}',
