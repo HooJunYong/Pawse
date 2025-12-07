@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'screens/auth/login_screen.dart';
+import 'services/booking_status_notification_service.dart';
 import 'services/chat_notification_service.dart';
 import 'services/custom_reminder_service.dart';
 import 'services/local_notification_service.dart';
@@ -31,6 +32,9 @@ Future<void> main() async {
   
   // Initialize custom reminder service (journaling, hydration, breathing)
   await CustomReminderService.initialize();
+  
+  // Initialize booking status notification service
+  await BookingStatusNotificationService.initialize();
   
   runApp(MyApp());
 }

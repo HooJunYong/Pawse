@@ -177,7 +177,7 @@ class TherapistApplicationNotificationService {
       // Show the notification
       await _notifications.show(
         notificationId,
-        'Application Update',
+        'Application been rejected.',
         'Your application has been reviewed. Tap to see details.',
         notificationDetails,
         payload: 'rejected:$userId:$rejectionReason',
