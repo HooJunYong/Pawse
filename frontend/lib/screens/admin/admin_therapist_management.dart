@@ -32,6 +32,11 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        // Debug: print first application to check fields
+        if (data.isNotEmpty) {
+          print('First application data: ${data[0]}');
+          print('Profile picture URL: ${data[0]['profile_picture_url']}');
+        }
         setState(() {
           _pendingApplications = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -679,11 +684,11 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
                                       color: const Color.fromRGBO(254, 243, 199, 1),
                                       borderRadius: BorderRadius.circular(24),
                                     ),
-                                    child: app['profile_picture'] != null && app['profile_picture'].isNotEmpty
+                                    child: app['profile_picture_url'] != null && app['profile_picture_url'].isNotEmpty
                                         ? ClipRRect(
                                             borderRadius: BorderRadius.circular(24),
                                             child: Image.network(
-                                              app['profile_picture'],
+                                              app['profile_picture_url'],
                                               width: 48,
                                               height: 48,
                                               fit: BoxFit.cover,
