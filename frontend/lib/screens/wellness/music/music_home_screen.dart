@@ -16,7 +16,7 @@ class MusicHomeScreen extends StatefulWidget {
   State<MusicHomeScreen> createState() => _MusicHomeScreenState();
 }
 
-class _MusicHomeScreenState extends State<MusicHomeScreen> {
+class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingObserver {
   final MusicApiService _musicApi = const MusicApiService();
   List<MoodTherapyRecommendation> _moodTherapyPlaylists =
       const <MoodTherapyRecommendation>[];
@@ -33,8 +33,24 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _fetchMoodTherapyPlaylists();
     _fetchPlaylists();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Refresh playlists when app comes back to foreground
+    // This catches favorites updates from the music player
+    if (state == AppLifecycleState.resumed) {
+      _fetchPlaylists(showLoader: false);
+    }
   }
 
   Widget _buildPlaylistsSection(BuildContext context) {
@@ -684,7 +700,16 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> {
     });
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => MusicPlayerScreen(track: track, userId: widget.userId)),
+      MaterialPageRoute(
+        builder: (context) => MusicPlayerScreen(
+          track: track,
+          userId: widget.userId,
+          onLikeToggled: () {
+            // Refresh playlists in real-time when favorite is toggled
+            _fetchPlaylists(showLoader: false);
+          },
+        ),
+      ),
     );
     if (mounted) {
       _fetchPlaylists(showLoader: false);

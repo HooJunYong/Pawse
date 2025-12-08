@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-import 'screens/splash_screen.dart';
+import 'screens/auth/login_screen.dart';
+import 'services/booking_status_notification_service.dart';
+import 'services/chat_notification_service.dart';
+import 'services/custom_reminder_service.dart';
 import 'services/local_notification_service.dart';
 import 'services/mood_nudge_service.dart';
+import 'services/session_reminder_service.dart';
+import 'services/therapist_application_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,6 +21,21 @@ Future<void> main() async {
   final moodNudgeService = MoodNudgeService();
   await moodNudgeService.initialize();
   
+  // Initialize session reminder service
+  await SessionReminderService.initialize();
+  
+  // Initialize chat notification service
+  await ChatNotificationService.initialize();
+  
+  // Initialize therapist application notification service
+  await TherapistApplicationNotificationService.initialize();
+  
+  // Initialize custom reminder service (journaling, hydration, breathing)
+  await CustomReminderService.initialize();
+  
+  // Initialize booking status notification service
+  await BookingStatusNotificationService.initialize();
+  
   runApp(MyApp());
 }
 
@@ -27,7 +47,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.brown,
       ),
-      home: SplashScreen(),
+      home: const LoginWidget(),
     );
   }
 }

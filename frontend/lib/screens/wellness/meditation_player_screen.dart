@@ -188,13 +188,7 @@ class _MeditationPlayerScreenState extends State<MeditationPlayerScreen> {
                         letterSpacing: 1,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.more_horiz,
-                          size: 28, color: _textDark),
-                      onPressed: () {
-                        // Option menu (e.g., settings, volume)
-                      },
-                    ),
+                    const SizedBox(width: 48), // Placeholder for symmetry
                   ],
                 ),
               ),

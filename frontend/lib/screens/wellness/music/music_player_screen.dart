@@ -14,6 +14,7 @@ class MusicPlayerScreen extends StatelessWidget {
   final int initialIndex;
   final bool attachToExistingSession;
   final String? userId;
+  final VoidCallback? onLikeToggled;
 
   const MusicPlayerScreen({
     super.key,
@@ -22,6 +23,7 @@ class MusicPlayerScreen extends StatelessWidget {
     this.initialIndex = 0,
     this.attachToExistingSession = false,
     this.userId,
+    this.onLikeToggled,
   });
 
   @override
@@ -34,6 +36,7 @@ class MusicPlayerScreen extends StatelessWidget {
         initialIndex: initialIndex,
         attachToExistingSession: attachToExistingSession,
         userId: userId,
+        onLikeToggled: onLikeToggled,
       ),
     );
   }
@@ -45,6 +48,7 @@ class _MusicPlayerView extends StatefulWidget {
   final int initialIndex;
   final bool attachToExistingSession;
   final String? userId;
+  final VoidCallback? onLikeToggled;
 
   const _MusicPlayerView({
     this.track,
@@ -52,6 +56,7 @@ class _MusicPlayerView extends StatefulWidget {
     this.initialIndex = 0,
     this.attachToExistingSession = false,
     this.userId,
+    this.onLikeToggled,
   });
 
   @override
@@ -314,8 +319,23 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                                       selectedTrack?.isLiked == true ? Icons.favorite : Icons.favorite_border,
                                       color: selectedTrack?.isLiked == true ? Colors.red : Colors.white,
                                     ),
-                                    onPressed: (widget.userId != null && selectedTrack != null)
-                                        ? () => player.toggleLike(widget.userId!)
+                                    onPressed: selectedTrack != null && widget.userId != null
+                                        ? () async {
+                                            try {
+                                              await player.toggleLike(widget.userId!);
+                                              // Notify parent to refresh playlists
+                                              widget.onLikeToggled?.call();
+                                            } catch (e) {
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text('Failed to update favorite: $e'),
+                                                    backgroundColor: Colors.red,
+                                                  ),
+                                                );
+                                              }
+                                            }
+                                          }
                                         : null,
                                   ),
                                 ],
