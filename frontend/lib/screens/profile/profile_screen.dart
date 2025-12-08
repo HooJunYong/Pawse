@@ -8,9 +8,12 @@ import '../../theme/shadows.dart';
 import '../../widgets/bottom_nav.dart';
 import '../auth/login_screen.dart';
 import 'change_password_screen.dart';
+import 'contact_us_screen.dart';
 import 'edit_profile_screen.dart';
+import 'help_support_screen.dart';
 import 'join_therapist_screen.dart';
 import 'notification_screen.dart';
+import 'privacy_policy_screen.dart';
 import '../companion/customize_comp_screen.dart';
 import '../companion/manage_companion_screen.dart';
 
@@ -32,10 +35,7 @@ class _ProfileState extends State<Profile> {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: const Color(0xFFFED7AA),
-        border: Border.all(
-          color: const Color(0xFFF97316),
-          width: 3,
-        ),
+        border: Border.all(color: const Color(0xFFF97316), width: 3),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.1),
@@ -86,7 +86,11 @@ class _ProfileState extends State<Profile> {
         boxShadow: kPillShadow,
       ),
       child: ListTile(
-        leading: Icon(icon, color: const Color.fromRGBO(66, 32, 6, 1), size: 20),
+        leading: Icon(
+          icon,
+          color: const Color.fromRGBO(66, 32, 6, 1),
+          size: 20,
+        ),
         title: Text(
           title,
           style: const TextStyle(
@@ -128,7 +132,11 @@ class _ProfileState extends State<Profile> {
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                        const Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: Colors.red,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'Failed to load profile',
@@ -139,7 +147,10 @@ class _ProfileState extends State<Profile> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text('${snapshot.error}', style: const TextStyle(fontSize: 12)),
+                        Text(
+                          '${snapshot.error}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: () {
@@ -219,7 +230,8 @@ class _ProfileState extends State<Profile> {
                           await Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => EditProfile(userId: widget.userId),
+                              builder: (context) =>
+                                  EditProfile(userId: widget.userId),
                             ),
                           );
                           // Refresh profile data after returning from edit page
@@ -235,33 +247,39 @@ class _ProfileState extends State<Profile> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => NotificationScreen(userId: widget.userId),
+                              builder: (context) =>
+                                  NotificationScreen(userId: widget.userId),
                             ),
                           );
                         },
                       ),
                       _buildMenuItem(
-                        icon: Icons.settings_outlined, 
-                        title: 'Customize Your Companion', 
+                        icon: Icons.settings_outlined,
+                        title: 'Customize Your Companion',
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => CustomizeCompanionScreen(userId: widget.userId),
+                              builder: (context) => CustomizeCompanionScreen(
+                                userId: widget.userId,
+                              ),
                             ),
                           );
-                        }),
+                        },
+                      ),
                       _buildMenuItem(
-                        icon: Icons.pets, 
-                        title: 'Manage Your Companions', 
+                        icon: Icons.pets,
+                        title: 'Manage Your Companions',
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ManageCompanionScreen(userId: widget.userId),
+                              builder: (context) =>
+                                  ManageCompanionScreen(userId: widget.userId),
                             ),
                           );
-                        }),
+                        },
+                      ),
                       _buildMenuItem(
                         icon: Icons.lock_outline,
                         title: 'Change Password',
@@ -269,14 +287,48 @@ class _ProfileState extends State<Profile> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => ChangePassword(userId: widget.userId),
+                              builder: (context) =>
+                                  ChangePassword(userId: widget.userId),
                             ),
                           );
                         },
                       ),
-                      _buildMenuItem(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
-                      _buildMenuItem(icon: Icons.email_outlined, title: 'Contact Us', onTap: () {}),
-                      _buildMenuItem(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () {}),
+                      _buildMenuItem(
+                        icon: Icons.help_outline,
+                        title: 'Help & Support',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HelpSupportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.email_outlined,
+                        title: 'Contact Us',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ContactUsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy Policy',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
+                      ),
                       _buildMenuItem(
                         icon: Icons.person_add_outlined,
                         title: 'Join as a Therapist',
@@ -284,7 +336,8 @@ class _ProfileState extends State<Profile> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => JoinTherapist(userId: widget.userId),
+                              builder: (context) =>
+                                  JoinTherapist(userId: widget.userId),
                             ),
                           );
                         },
@@ -300,7 +353,12 @@ class _ProfileState extends State<Profile> {
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               elevation: 0,
-                              backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                              backgroundColor: const Color.fromRGBO(
+                                66,
+                                32,
+                                6,
+                                1,
+                              ),
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(9999),

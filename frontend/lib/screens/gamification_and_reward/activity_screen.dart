@@ -5,6 +5,7 @@ import '../../services/activity_service.dart';
 import '../../services/profile_service.dart';
 import 'reward_screen.dart';
 import 'dart:convert';
+import 'dart:typed_data';
 
 class ActivityScreen extends StatefulWidget {
   final String userId;
@@ -27,8 +28,9 @@ class _ActivityScreenState extends State<ActivityScreen> {
   // State variables
   bool _isLoading = true;
   String? _errorMessage;
-  String _userName = "User";
-  String _userAvatar = 'assets/images/americonsh1.png';
+  String _userFirstName = 'Friend';
+  String _userInitials = 'U';
+  ImageProvider? _userAvatarImage;
   String _rankName = "Bronze";
   int _currentPoints = 0;
   int _nextRankPoints = 0;
@@ -88,22 +90,142 @@ class _ActivityScreenState extends State<ActivityScreen> {
   Future<void> _loadUserProfile() async {
     try {
       final response = await ProfileService.getProfile(widget.userId);
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (response.statusCode != 200) {
+        return;
+      }
+      final dynamic decoded = jsonDecode(response.body);
+      if (!mounted) {
+        return;
+      }
+      if (decoded is Map<String, dynamic>) {
+        final String firstName = _extractFirstName(decoded['full_name']);
+        final String initials = _extractInitials(
+          decoded['initials'],
+          decoded['full_name'],
+        );
+        final ImageProvider? avatar = _resolveProfileAvatar(
+          decoded['avatar_base64']?.toString(),
+          decoded['avatar_url']?.toString(),
+        );
+
         setState(() {
-          final firstName = data['first_name'] ?? '';
-          final lastName = data['last_name'] ?? '';
-          _userName = firstName.isNotEmpty ? firstName : 'User';
-          
-          // Check for avatar
-          final avatarUrl = data['avatar_url'] as String?;
-          if (avatarUrl != null && avatarUrl.isNotEmpty) {
-            _userAvatar = avatarUrl;
+          if (firstName.isNotEmpty) {
+            _userFirstName = firstName;
           }
+          if (initials.isNotEmpty) {
+            _userInitials = initials;
+          }
+          _userAvatarImage = avatar;
         });
       }
-    } catch (e) {
-      // Keep default values on error
+    } catch (_) {
+      // Silently ignore profile load failures; keep friendly fallback.
+    }
+  }
+
+  String _extractFirstName(dynamic fullNameValue) {
+    if (fullNameValue is! String) {
+      return '';
+    }
+    final String trimmed = fullNameValue.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+    final List<String> parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.isEmpty) {
+      return '';
+    }
+    final String first = parts.first.trim();
+    if (first.isEmpty) {
+      return '';
+    }
+    if (first.length == 1) {
+      return first.toUpperCase();
+    }
+    return first[0].toUpperCase() + first.substring(1);
+  }
+
+  String _extractInitials(dynamic initialsValue, dynamic fullNameValue) {
+    if (initialsValue is String && initialsValue.trim().isNotEmpty) {
+      final trimmed = initialsValue.trim();
+      return trimmed.length > 2
+          ? trimmed.substring(0, 2).toUpperCase()
+          : trimmed.toUpperCase();
+    }
+    if (fullNameValue is! String) {
+      return '';
+    }
+    final parts = fullNameValue
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) {
+      return '';
+    }
+    if (parts.length == 1) {
+      return parts.first[0].toUpperCase();
+    }
+    final firstInitial = parts[0][0].toUpperCase();
+    final secondInitial = parts[1][0].toUpperCase();
+    return '$firstInitial$secondInitial';
+  }
+
+  ImageProvider? _resolveProfileAvatar(String? base64Value, String? urlValue) {
+    final ImageProvider? fromBase64 = _decodeAvatarBase64(base64Value);
+    if (fromBase64 != null) {
+      return fromBase64;
+    }
+
+    final String? trimmedUrl = urlValue?.trim();
+    if (trimmedUrl == null || trimmedUrl.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(trimmedUrl)) {
+      final bytes = _decodeDataUri(trimmedUrl);
+      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    }
+    return NetworkImage(trimmedUrl);
+  }
+
+  ImageProvider? _decodeAvatarBase64(String? value) {
+    if (value == null) {
+      return null;
+    }
+    final String trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    if (_isDataUri(trimmed)) {
+      final bytes = _decodeDataUri(trimmed);
+      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    }
+    try {
+      final bytes = base64Decode(trimmed);
+      return bytes.isNotEmpty ? MemoryImage(bytes) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool _isDataUri(String? value) {
+    if (value == null) {
+      return false;
+    }
+    final lower = value.toLowerCase();
+    return lower.startsWith('data:image/');
+  }
+
+  Uint8List? _decodeDataUri(String dataUri) {
+    final separator = dataUri.indexOf(',');
+    if (separator == -1 || separator == dataUri.length - 1) {
+      return null;
+    }
+    final payload = dataUri.substring(separator + 1).trim();
+    try {
+      return base64Decode(payload);
+    } catch (_) {
+      return null;
     }
   }
 
@@ -187,44 +309,38 @@ class _ActivityScreenState extends State<ActivityScreen> {
     return Row(
       children: [
         Container(
-          width: 50,
-          height: 50,
+          padding: const EdgeInsets.all(3),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.black, width: 1.5),
-            color: Colors.white,
+            border: Border.all(color: Colors.black, width: 1),
           ),
-          child: ClipOval(
-            child: _userAvatar.startsWith('http')
-                ? Image.network(
-                    _userAvatar,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Image.asset(
-                        'assets/images/americonsh1.png',
-                        fit: BoxFit.cover,
-                      );
-                    },
+          child: CircleAvatar(
+            radius: 28,
+            backgroundColor: Colors.white,
+            backgroundImage: _userAvatarImage,
+            child: _userAvatarImage == null
+                ? Text(
+                    _userInitials,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF9A3412),
+                    ),
                   )
-                : Image.asset(
-                    _userAvatar,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.pets, color: Colors.grey);
-                    },
-                  ),
+                : null,
           ),
         ),
-        const SizedBox(width: 12),
-        Text(
-          _userName,
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: kTextColor,
+        const SizedBox(width: 16),
+        Expanded(
+          child: Text(
+            _userFirstName.isNotEmpty ? _userFirstName : 'Friend',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: kRewardsButtonColor,
+            ),
           ),
         ),
-        const Spacer(),
         RankBadge(userId: widget.userId),
       ],
     );
