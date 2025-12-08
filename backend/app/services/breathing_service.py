@@ -14,6 +14,7 @@ from ..models.breathing_schemas import (
     BreathingSessionResponse,
     BreathingStatsResponse,
 )
+from .activity_service import ActivityService
 
 DEFAULT_EXERCISES: List[dict] = [
     {
@@ -207,6 +208,16 @@ class BreathingService:
             "created_at": now,
         }
         self.sessions.insert_one(doc)
+
+        # Track activity ONLY if the session was meaningful
+        # Criteria: At least 60 seconds duration OR at least 3 cycles completed
+        if duration_seconds >= 60 or data["cycles_completed"] >= 3:
+            try:
+                ActivityService.track_activity(data["user_id"], "breathing_complete")
+            except Exception as e:
+                # Log error but don't fail the session logging
+                print(f"Error tracking activity: {e}")
+
         return BreathingSessionResponse(**self._map_session(doc))
 
     def get_user_sessions(

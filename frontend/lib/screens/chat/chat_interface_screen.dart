@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../../services/chat_session_service.dart';
 import '../../services/api_service.dart';
+import '../../services/tts_service.dart';
 import '../../models/companion_model.dart';
 import '../../models/chat_message_model.dart';
 import '../../widgets/typing_indicator.dart';
@@ -30,6 +31,7 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   
   bool _isLoading = true;
   bool _isSending = false;
+  bool _ttsEnabled = false; // TTS toggle state
   String? _sessionId;
   String? _errorMessage;
 
@@ -198,6 +200,15 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             _messages[loadingIndex] = aiResponse;
           }
         });
+        
+        // 4. If TTS is enabled, play the AI response
+        if (_ttsEnabled) {
+          TTSService.generateAndPlayAudio(
+            text: aiResponse.messageText,
+            companionId: widget.companion.companionId,
+          );
+        }
+        
         // Scroll to the bottom to show the new AI message
         _scrollToBottom(); 
       } else {
@@ -292,6 +303,39 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             ),
           ],
         ),
+        actions: [
+          // TTS Toggle Button
+          IconButton(
+            icon: Icon(
+              _ttsEnabled ? Icons.volume_up : Icons.volume_off,
+              color: _ttsEnabled ? _btnBrown : Colors.grey,
+            ),
+            onPressed: () {
+              setState(() {
+                _ttsEnabled = !_ttsEnabled;
+              });
+              
+              // Stop audio if TTS is disabled
+              if (!_ttsEnabled) {
+                TTSService.stopAudio();
+              }
+              
+              // Show feedback
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _ttsEnabled 
+                        ? 'Text-to-speech enabled' 
+                        : 'Text-to-speech disabled'
+                  ),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            tooltip: _ttsEnabled ? 'Disable TTS' : 'Enable TTS',
+          ),
+        ],
       ),
       body: Column(
         children: [

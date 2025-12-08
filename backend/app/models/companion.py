@@ -15,6 +15,7 @@ class AICompanion(BaseModel):
     is_default: bool = Field(default=False)
     is_active: bool = Field(default=True)
     voice_tone: Optional[str] = Field(default=None, description="Voice tone for TTS")
+    gender: Optional[str] = Field(default="female", description="Voice gender for TTS (female/male)")
     
     class Config:
         json_schema_extra = {
@@ -27,7 +28,8 @@ class AICompanion(BaseModel):
                 "image": "luna.jpg",
                 "is_default": True,
                 "is_active": True,
-                "voice_tone": "warm"
+                "voice_tone": "warm",
+                "gender": "female"
             }
         }
 
@@ -42,6 +44,7 @@ class AICompanionCreate(BaseModel):
     is_default: bool = False
     is_active: bool = True
     voice_tone: Optional[str] = None
+    gender: Optional[str] = "female"
 
 
 class AICompanionUpdate(BaseModel):
@@ -54,6 +57,7 @@ class AICompanionUpdate(BaseModel):
     is_default: Optional[bool] = None
     is_active: Optional[bool] = None
     voice_tone: Optional[str] = None
+    gender: Optional[str] = None
 
 
 class AICompanionResponse(BaseModel):
@@ -68,3 +72,4 @@ class AICompanionResponse(BaseModel):
     is_default: bool
     is_active: bool
     voice_tone: Optional[str] = None
+    gender: Optional[str] = None

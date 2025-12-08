@@ -182,6 +182,21 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                             return _buildCompanionCard(companion, isSelected);
                           }).toList(),
 
+                          const SizedBox(height: 20),
+                          
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                            child: Text(
+                              'Cannot find a Companion that you like? Go ahead and create a new Companion at Profile --> Customize Your Companion!',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: _textDark.withOpacity(0.6),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+
                           const SizedBox(height: 100), // Extra space for button
                         ],
                       ),

@@ -227,6 +227,13 @@ class MusicApiService {
         .toList(growable: false);
   }
 
+  Future<bool> recordPlay(String musicId, String userId) async {
+    final endpoint = _buildEndpoint('/music/$musicId/play', {'user_id': userId});
+    final response = await ApiService.post(endpoint, {});
+    _throwIfFailed(response.statusCode, response.body);
+    return jsonDecode(response.body) as bool;
+  }
+
   Future<bool> toggleLike(String musicId, String userId) async {
     final endpoint = _buildEndpoint('/music/$musicId/toggle-like', {'user_id': userId});
     final response = await ApiService.post(endpoint, {});

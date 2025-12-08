@@ -158,6 +158,15 @@ class _CustomizeCompanionScreenState extends State<CustomizeCompanionScreen> {
                     onChanged: controller.updateVoiceTone,
                   ),
 
+                  const SizedBox(height: 25),
+
+                  // --- Gender Section ---
+                  GenderSection(
+                    selectedGender: controller.selectedGender,
+                    genders: controller.genders,
+                    onChanged: controller.updateGender,
+                  ),
+
                   const SizedBox(height: 40),
 
                   // --- Save Button ---

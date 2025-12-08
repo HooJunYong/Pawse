@@ -10,6 +10,7 @@ class Companion {
   final bool isDefault;
   final bool isActive;
   final String? voiceTone;
+  final String? gender;
 
   Companion({
     required this.companionId,
@@ -22,6 +23,7 @@ class Companion {
     required this.isDefault,
     required this.isActive,
     this.voiceTone,
+    this.gender,
   });
 
   /// Create a Companion from JSON
@@ -37,6 +39,7 @@ class Companion {
       isDefault: json['is_default'] ?? false,
       isActive: json['is_active'] ?? true,
       voiceTone: json['voice_tone'],
+      gender: json['gender'],
     );
   }
 
@@ -53,6 +56,7 @@ class Companion {
       'is_default': isDefault,
       'is_active': isActive,
       'voice_tone': voiceTone,
+      'gender': gender,
     };
   }
 }
@@ -67,6 +71,7 @@ class CompanionCreate {
   final bool isDefault;
   final bool isActive;
   final String? voiceTone;
+  final String? gender;
 
   CompanionCreate({
     required this.personalityId,
@@ -77,6 +82,7 @@ class CompanionCreate {
     this.isDefault = false,
     this.isActive = true,
     this.voiceTone,
+    this.gender,
   });
 
   /// Convert to JSON for API request
@@ -90,6 +96,7 @@ class CompanionCreate {
       'is_default': isDefault,
       'is_active': isActive,
       'voice_tone': voiceTone,
+      'gender': gender,
     };
   }
 }

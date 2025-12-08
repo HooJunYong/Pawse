@@ -23,6 +23,8 @@ from ..services.user_playlist_service import (
     UserPlaylistService,
 )
 
+from ..services.activity_service import ActivityService
+
 router = APIRouter(prefix="/music", tags=["Music"])
 
 music_service = MusicService(db)
@@ -136,6 +138,23 @@ def toggle_like(
 def create_playlist(payload: UserPlaylistCreate) -> UserPlaylistResponse:
     return playlist_service.create_playlist(payload)
 
+@router.post("/{music_id}/play")
+def record_play(
+    music_id: str,
+    user_id: str = Query(..., description="User ID performing the action"),
+) -> bool:
+    """
+    Record a music track play.
+    Increments play count and tracks user activity (e.g., for 'listen to 3 songs' goal).
+    """
+    # 1. Increment play count in MusicService
+    track = music_service.increment_play_count(music_id)
+    if not track:
+        raise HTTPException(status_code=404, detail="Music track not found")
+
+    ActivityService.track_activity(user_id=user_id, action_key="music_listen", item_id=music_id)
+    
+    return True
 
 @router.get("/playlists", response_model=List[UserPlaylistResponse])
 def list_playlists(

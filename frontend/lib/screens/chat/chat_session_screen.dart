@@ -192,22 +192,36 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                     child: Column(
                       children: [
                         
-                        // 1. Cat Image - Load from companion data
+                        // Cat Image - Load from companion data
                         Transform.translate(
                           offset: const Offset(0, -50),
-                          child: Center(
-                            child: _companionData?.image != null
-                                ? Image.asset(
-                                    'assets/images/${_companionData!.image}',
-                                    height: 200,
-                                    width: 200,
-                                    fit: BoxFit.contain,
-                                  )
-                                : Image.asset('assets/images/americonsh1.png'),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Center(
+                                child: _companionData?.image != null
+                                    ? Image.asset(
+                                        'assets/images/${_companionData!.image}',
+                                        height: 200,
+                                        width: 200,
+                                        fit: BoxFit.contain,
+                                      )
+                                    : Image.asset('assets/images/americonsh1.png'),
+                              ),
+                              if (_companionData != null) ...[
+                                const SizedBox(height: 10),
+                                Text(
+                                  _companionData!.companionName,
+                                  style: TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.bold,
+                                    color: _textBlack,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         ),
-                        
-                        const SizedBox(height: 2),
 
                         // 2. Action Buttons (New Chat & Change A Cat)
                         Row(

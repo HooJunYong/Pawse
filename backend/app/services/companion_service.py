@@ -61,7 +61,8 @@ class CompanionService:
             "created_at": datetime.utcnow(),
             "is_default": companion_data.is_default,
             "is_active": companion_data.is_active,
-            "voice_tone": companion_data.voice_tone
+            "voice_tone": companion_data.voice_tone,
+            "gender": companion_data.gender,
         }
         
         # Insert into database

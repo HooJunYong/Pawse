@@ -152,7 +152,7 @@ class ActivityService:
     # ==================== Activity Tracking ====================
 
     @staticmethod
-    def track_activity(user_id: str, action_key: str) -> Optional[Dict[str, Any]]:
+    def track_activity(user_id: str, action_key: str, item_id: str = None) -> Optional[Dict[str, Any]]:
         """
         Track when user performs an action.
         Updates progress for the corresponding activity if assigned and pending.
@@ -160,6 +160,7 @@ class ActivityService:
         Args:
             user_id: The user ID
             action_key: The action key (e.g., 'chat_message', 'throw_bottle', 'log_mood_note')
+            item_id: Optional ID of the item being tracked (e.g., music_id) to ensure uniqueness
             
         Returns:
             Dict with tracking result info, or None if skipped
@@ -185,14 +186,33 @@ class ActivityService:
             logger.debug(f"No pending activity found for user {user_id} with action_key: {action_key}")
             return None
         
+        # Check for uniqueness if item_id is provided
+        if item_id:
+            completed_items = user_activity.get("completed_items", [])
+            if item_id in completed_items:
+                logger.info(f"User {user_id} already completed action {action_key} with item {item_id}")
+                return {
+                    "action_key": action_key,
+                    "activity_id": user_activity["activity_id"],
+                    "previous_progress": user_activity["progress"],
+                    "new_progress": user_activity["progress"],
+                    "target": user_activity["target"],
+                    "is_completed": False,
+                    "message": "Item already counted"
+                }
+
         # Increment progress
         new_progress = user_activity["progress"] + 1
         target = user_activity["target"]
         
-        # Update the progress
+        # Update the progress and completed_items
+        update_ops = {"$set": {"progress": new_progress}}
+        if item_id:
+            update_ops["$push"] = {"completed_items": item_id}
+
         db.user_activities.update_one(
             {"_id": user_activity["_id"]},
-            {"$set": {"progress": new_progress}}
+            update_ops
         )
         
         result = {

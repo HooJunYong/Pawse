@@ -456,23 +456,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
     );
   }
 
-  Future<void> _sendTestNotification() async {
-    try {
-      await NotificationService.sendTestNotification(widget.userId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Test notification sent! Check your notification list.')),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send test: $e')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -493,13 +476,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report, color: Color(0xFF422006)),
-            tooltip: 'Send Test Notification',
-            onPressed: _sendTestNotification,
-          ),
-        ],
       ),
       body: FutureBuilder<NotificationSettings>(
         future: _settingsFuture,

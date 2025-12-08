@@ -29,8 +29,12 @@ class CustomizeCompanionController extends ChangeNotifier {
   final TextEditingController customDescriptionController = TextEditingController();
 
   // --- Voice Tone ---
-  final List<String> voiceTones = ['Gentle', 'Energetic', 'Serious'];
+  final List<String> voiceTones = ['Gentle', 'Energetic', 'Serious', 'Playful'];
   String? _selectedVoiceTone;
+
+  // --- Gender ---
+  final List<String> genders = ['Female', 'Male'];
+  String? _selectedGender;
 
   // --- Getters ---
   List<Personality> get personalities => _personalities;
@@ -42,6 +46,7 @@ class CustomizeCompanionController extends ChangeNotifier {
   Companion? get createdCompanion => _createdCompanion;
   int get currentCatIndex => _currentCatIndex;
   String? get selectedVoiceTone => _selectedVoiceTone;
+  String? get selectedGender => _selectedGender;
 
   /// Get current selected image (only filename, not full path)
   String get currentImageName {
@@ -153,6 +158,12 @@ class CustomizeCompanionController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Update selected gender
+  void updateGender(String? gender) {
+    _selectedGender = gender;
+    notifyListeners();
+  }
+
   /// Validate form inputs
   String? validateInputs() {
     if (nameController.text.trim().isEmpty) {
@@ -217,7 +228,8 @@ class CustomizeCompanionController extends ChangeNotifier {
         image: currentImageName,
         isDefault: false,
         isActive: true,
-        voiceTone: _selectedVoiceTone,
+        voiceTone: _selectedVoiceTone?.toLowerCase(),
+        gender: _selectedGender?.toLowerCase(),
       );
 
       _createdCompanion = await CompanionService.createCompanion(companionData);
@@ -246,6 +258,7 @@ class CustomizeCompanionController extends ChangeNotifier {
     customDescriptionController.clear();
     _currentCatIndex = 1;
     _selectedVoiceTone = null;
+    _selectedGender = null;
     _isCustomPersonality = false;
     if (_personalities.isNotEmpty) {
       _selectedPersonality = _personalities.first;

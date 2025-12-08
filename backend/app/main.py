@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from dotenv import load_dotenv
 import os
 import logging
+from pathlib import Path
 
 from app.models.database import get_database, initialize_indexes
 from app.routes import session_router, message_router, companion_router
@@ -29,6 +31,7 @@ from .routes.music_routes import router as music_router
 from .routes.notification_routes import router as notification_router
 from .routes.mood_nudge_routes import router as mood_nudge_router
 from .routes.admin_routes import router as admin_router
+from .routes.tts_routes import router as tts_router
 from .services.notification_background import lifespan
 from .services.mood_nudge_service import init_mood_nudges
 from app.config.settings import get_settings
@@ -105,7 +108,14 @@ app.include_router(music_router, tags=["Music"])
 app.include_router(notification_router, tags=["Notifications"])
 app.include_router(mood_nudge_router, tags=["Mood Nudges"])
 app.include_router(admin_router, tags=["Admin"])
+app.include_router(tts_router, tags=["TTS"])
 
+# Create static directory for audio files if it doesn't exist
+static_audio_dir = Path("app/static/audio")
+static_audio_dir.mkdir(parents=True, exist_ok=True)
+
+# Mount static files directory for audio
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # Get MongoDB database connection
 db = get_database()

@@ -12,6 +12,7 @@ import '../widgets/bottom_nav.dart';
 import 'therapist/find_therapist_screen.dart';
 import '../screens/chat/chat_session_screen.dart';
 import '../screens/driftbottle/drift_bottle_screen.dart';
+import '../services/music_tracking_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -46,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    MusicTrackingService.instance.initialize(widget.userId);
     _initDismissedCancelledSessions();
     _loadUpcomingSessions(initialLoad: true, resetToggle: true);
     _loadUserProfile();
