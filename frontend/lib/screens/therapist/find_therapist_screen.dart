@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -25,6 +27,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
   final ChatService _chatService = ChatService();
   late Future<List<Therapist>> _therapistsFuture;
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
   PendingRatingSession? _pendingRating;
   int _selectedRating = 0;
   bool _isSubmittingRating = false;
@@ -48,13 +51,27 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   void _searchTherapists(String query) {
     setState(() {
-      _therapistsFuture = _apiService.getTherapists(searchQuery: query.trim().isEmpty ? null : query.trim());
+      final trimmedQuery = query.trim();
+      _therapistsFuture = _apiService.getTherapists(
+        searchQuery: trimmedQuery.isEmpty ? null : trimmedQuery,
+      );
+    });
+  }
+
+  void _onSearchChanged(String query) {
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+    
+    // If query is empty or has 1+ characters, search after debounce
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _searchTherapists(query);
     });
   }
 
@@ -783,8 +800,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                 // Search Bar
                 TextField(
                   controller: _searchController,
-                  onSubmitted: _searchTherapists,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: _onSearchChanged,
                   decoration: InputDecoration(
                     hintText: "Search by name or expertise...",
                     hintStyle: TextStyle(color: Colors.grey[400]),
@@ -797,6 +813,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
                             icon: Icon(Icons.clear, color: Colors.grey[400]),
                             onPressed: () {
                               _searchController.clear();
+                              _debounceTimer?.cancel();
                               _searchTherapists('');
                             },
                           ),

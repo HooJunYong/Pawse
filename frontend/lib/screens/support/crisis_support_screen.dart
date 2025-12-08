@@ -10,7 +10,7 @@ class CrisisSupportScreen extends StatelessWidget {
       path: phoneNumber,
     );
     if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
+      await launchUrl(launchUri, mode: LaunchMode.externalApplication);
     } else {
       throw 'Could not launch $phoneNumber';
     }
@@ -141,8 +141,8 @@ class CrisisSupportScreen extends StatelessWidget {
                   icon: Icons.phone_in_talk,
                   name: 'MIASA',
                   description: 'Mental health support',
-                  phoneNumber: '1800183336',
-                  displayNumber: '1800-18-3336',
+                  phoneNumber: '1800180066',
+                  displayNumber: '1800 180 066',
                 ),
 
                 const SizedBox(height: 32),
