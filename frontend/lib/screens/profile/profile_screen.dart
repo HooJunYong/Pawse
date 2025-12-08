@@ -8,9 +8,12 @@ import '../../theme/shadows.dart';
 import '../../widgets/bottom_nav.dart';
 import '../auth/login_screen.dart';
 import 'change_password_screen.dart';
+import 'contact_us_screen.dart';
 import 'edit_profile_screen.dart';
+import 'help_support_screen.dart';
 import 'join_therapist_screen.dart';
 import 'notification_screen.dart';
+import 'privacy_policy_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -251,9 +254,42 @@ class _ProfileState extends State<Profile> {
                           );
                         },
                       ),
-                      _buildMenuItem(icon: Icons.help_outline, title: 'Help & Support', onTap: () {}),
-                      _buildMenuItem(icon: Icons.email_outlined, title: 'Contact Us', onTap: () {}),
-                      _buildMenuItem(icon: Icons.privacy_tip_outlined, title: 'Privacy Policy', onTap: () {}),
+                      _buildMenuItem(
+                        icon: Icons.help_outline,
+                        title: 'Help & Support',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const HelpSupportScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.email_outlined,
+                        title: 'Contact Us',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ContactUsScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                      _buildMenuItem(
+                        icon: Icons.privacy_tip_outlined,
+                        title: 'Privacy Policy',
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
+                      ),
                       _buildMenuItem(
                         icon: Icons.person_add_outlined,
                         title: 'Join as a Therapist',
