@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../models/music_models.dart';
 import '../../../services/audio_manager.dart';
@@ -14,6 +15,13 @@ class MusicHomeScreen extends StatefulWidget {
 
   @override
   State<MusicHomeScreen> createState() => _MusicHomeScreenState();
+
+  /// Call this static method from mood tracking screens after saving a new mood
+  /// to refresh mood-based playlists across the app
+  static Future<void> notifyMoodChanged() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('music_mood_changed_flag', DateTime.now().toIso8601String());
+  }
 }
 
 class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingObserver {
@@ -29,12 +37,13 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
   String? _activeMoodPlaylistId;
   String? _moodError;
   String? _playlistError;
+  String? _lastFetchedMood; // Track the mood used for last playlist generation
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _fetchMoodTherapyPlaylists();
+    _loadCachedMoodPlaylists();
     _fetchPlaylists();
   }
 
@@ -46,9 +55,9 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Refresh playlists when app comes back to foreground
-    // This catches favorites updates from the music player
+    // Check if mood changed when app comes back to foreground
     if (state == AppLifecycleState.resumed) {
+      _checkAndRefreshMoodPlaylists();
       _fetchPlaylists(showLoader: false);
     }
   }
@@ -296,7 +305,23 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
   Widget _buildMoodSection() {
     Widget content;
     if (_isLoadingMoodTherapy) {
-      content = const Center(child: CircularProgressIndicator());
+      content = Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Curating your mood playlists...',
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 12,
+                color: const Color(0xFF422006).withOpacity(0.6),
+              ),
+            ),
+          ],
+        ),
+      );
     } else if (_moodError != null) {
       content = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -309,7 +334,7 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
             ),
           ),
           TextButton(
-            onPressed: () => _fetchMoodTherapyPlaylists(showLoader: true),
+            onPressed: () => _checkAndRefreshMoodPlaylists(),
             child: const Text('Retry'),
           ),
         ],
@@ -442,6 +467,51 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
     );
   }
 
+  /// Load cached mood playlists and check if mood has changed
+  Future<void> _loadCachedMoodPlaylists() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedMood = prefs.getString('music_last_mood_${widget.userId}');
+      
+      // Store the cached mood
+      _lastFetchedMood = cachedMood;
+      
+      // Check if mood has changed and fetch if needed
+      await _checkAndRefreshMoodPlaylists();
+    } catch (e) {
+      // If cache loading fails, just fetch fresh data
+      await _fetchMoodTherapyPlaylists(showLoader: true);
+    }
+  }
+
+  /// Check if user's mood has changed and refresh playlists if needed
+  Future<void> _checkAndRefreshMoodPlaylists() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentMood = prefs.getString('last_mood');
+      
+      // If mood changed or no playlists loaded yet, fetch new playlists
+      if (currentMood != _lastFetchedMood || _moodTherapyPlaylists.isEmpty) {
+        // Only show loader if we have no playlists at all
+        await _fetchMoodTherapyPlaylists(showLoader: _moodTherapyPlaylists.isEmpty);
+      } else {
+        // Mood hasn't changed and we have playlists, just stop loading indicator
+        if (mounted) {
+          setState(() {
+            _isLoadingMoodTherapy = false;
+          });
+        }
+      }
+    } catch (e) {
+      // Silently fail - keep using cached playlists
+      if (mounted) {
+        setState(() {
+          _isLoadingMoodTherapy = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchMoodTherapyPlaylists({bool showLoader = true}) async {
     if (showLoader) {
       setState(() {
@@ -459,11 +529,18 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
       if (!mounted) {
         return;
       }
+      
+      // Save current mood and playlists to cache
+      final prefs = await SharedPreferences.getInstance();
+      final currentMood = prefs.getString('last_mood');
+      await prefs.setString('music_last_mood_${widget.userId}', currentMood ?? 'generic');
+      
       setState(() {
         _moodTherapyPlaylists = recommendations.length <= 3
             ? recommendations
             : recommendations.take(3).toList(growable: false);
         _isLoadingMoodTherapy = false;
+        _lastFetchedMood = currentMood;
         if (_currentMoodPlaylist == null && recommendations.isNotEmpty) {
           final UserPlaylist playlist = recommendations.first.playlist;
           _currentMoodPlaylist = playlist;
@@ -522,7 +599,7 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
       _activeMoodPlaylistId = null;
     });
     await Future.wait<void>([
-      _fetchMoodTherapyPlaylists(showLoader: false),
+      _checkAndRefreshMoodPlaylists(),
       _fetchPlaylists(showLoader: false),
     ]);
   }
