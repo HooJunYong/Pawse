@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav.dart';
+import '../../widgets/rank_badge.dart';
 import '../../services/activity_service.dart';
 import '../../services/profile_service.dart';
 import 'reward_screen.dart';
@@ -29,7 +30,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
   String _userName = "User";
   String _userAvatar = 'assets/images/americonsh1.png';
   String _rankName = "Bronze";
-  Color _rankColor = const Color(0xFFCD7F32);
   int _currentPoints = 0;
   int _nextRankPoints = 0;
   int _pointsNeeded = 0;
@@ -62,15 +62,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
           _nextRankPoints = rankProgress['next_rank_min_points'] ?? 0;
           _pointsNeeded = rankProgress['points_needed'] ?? 0;
           _progressPercentage = (rankProgress['progress_percentage'] ?? 0).toDouble();
-          
-          // Set rank color based on rank name
-          if (_rankName.toLowerCase().contains('silver')) {
-            _rankColor = const Color(0xFFC0C0C0);
-          } else if (_rankName.toLowerCase().contains('gold')) {
-            _rankColor = const Color(0xFFFFD700);
-          } else {
-            _rankColor = const Color(0xFFCD7F32); // Bronze
-          }
         });
       }
 
@@ -234,21 +225,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
           ),
         ),
         const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: _rankColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            _rankName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-            ),
-          ),
-        ),
+        RankBadge(userId: widget.userId),
       ],
     );
   }
@@ -322,7 +299,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
           const SizedBox(height: 15),
           const Text(
             "Earn points by completing activities to level up your badge!",
+            textAlign: TextAlign.center,
             style: TextStyle(
+              fontFamily: 'Urbanist',
+              fontWeight: FontWeight.w600,
               fontSize: 14,
               color: Colors.black87,
               height: 1.4,
@@ -461,7 +441,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               child: const Text(
                 "Click me to get\nrewards!",
                 style: TextStyle(
-                  fontFamily: 'Courier', // Monospace font to look like pixel/game font
+                  fontFamily: 'Pixelify Sans',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.black,

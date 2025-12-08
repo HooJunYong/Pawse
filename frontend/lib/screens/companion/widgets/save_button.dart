@@ -5,12 +5,14 @@ class SaveButton extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onPressed;
   final Color buttonColor;
+  final String buttonText;
 
   const SaveButton({
     super.key,
     required this.isLoading,
     required this.onPressed,
     this.buttonColor = const Color(0xFF5D2D05),
+    this.buttonText = 'Save',
   });
 
   @override
@@ -36,9 +38,9 @@ class SaveButton extends StatelessWidget {
                     strokeWidth: 2,
                   ),
                 )
-              : const Text(
-                  'Save',
-                  style: TextStyle(
+              : Text(
+                  buttonText,
+                  style: const TextStyle(
                     fontFamily: 'Urbanist',
                     color: Colors.white,
                     fontSize: 16,

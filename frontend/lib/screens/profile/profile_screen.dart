@@ -12,6 +12,7 @@ import 'edit_profile_screen.dart';
 import 'join_therapist_screen.dart';
 import 'notification_screen.dart';
 import '../companion/customize_comp_screen.dart';
+import '../companion/manage_companion_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -247,6 +248,17 @@ class _ProfileState extends State<Profile> {
                             context,
                             MaterialPageRoute(
                               builder: (context) => CustomizeCompanionScreen(userId: widget.userId),
+                            ),
+                          );
+                        }),
+                      _buildMenuItem(
+                        icon: Icons.pets, 
+                        title: 'Manage Your Companions', 
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ManageCompanionScreen(userId: widget.userId),
                             ),
                           );
                         }),

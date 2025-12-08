@@ -92,6 +92,9 @@ flutter:
     - family: Urbanist
       fonts:
         - asset: assets/fonts/Urbanist-VariableFont_wght.ttf
+    - family: Pixelify Sans
+      fonts:
+        - asset: assets/fonts/PixelifySans-VariableFont_wght.ttf
   #   - family: Trajan Pro
   #     fonts:
   #       - asset: fonts/TrajanPro.ttf

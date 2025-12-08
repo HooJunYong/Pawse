@@ -136,6 +136,23 @@ class CompanionService {
     return await ApiService.get('/api/companions/$companionId/personality');
   }
 
+  /// Update an existing companion
+  static Future<Companion> updateCompanion(String companionId, Map<String, dynamic> updateData) async {
+    try {
+      final response = await ApiService.put('/api/companions/$companionId', updateData);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Companion.fromJson(data);
+      } else {
+        final error = jsonDecode(response.body);
+        throw Exception(error['detail'] ?? 'Failed to update companion');
+      }
+    } catch (e) {
+      throw Exception('Error updating companion: $e');
+    }
+  }
+
   // ==================== Personality API ====================
 
   /// Create a new personality

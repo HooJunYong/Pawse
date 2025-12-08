@@ -45,7 +45,7 @@ def check_today_log(user_id: str) -> bool:
         bool: True if user has logged mood today, False otherwise
     """
     try:
-        today = date_type.today()
+        today = now_my().date()
         
         existing_mood = db.mood_tracking.find_one({
             "user_id": user_id,
@@ -71,6 +71,9 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
     """
     try:
         
+        server_date = now_my().date() 
+        clean_date_str = server_date.isoformat()
+
         # Generate unique mood ID
         mood_id = generate_mood_id()
         
@@ -78,7 +81,7 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         mood_doc = {
             "mood_id": mood_id,
             "user_id": mood_data.user_id,
-            "date": mood_data.date.isoformat(),
+            "date": clean_date_str,
             "mood_level": mood_data.mood_level.value,
             "note": mood_data.note,
         }
@@ -89,7 +92,7 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create mood entry")
         
-        today = date_type.today()
+        today = now_my().date()
         is_today = (mood_data.date == today)
 
         if mood_data.note and mood_data.note.strip() and is_today:
@@ -107,7 +110,7 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         return MoodResponse(
             mood_id=mood_id,
             user_id=mood_data.user_id,
-            date=mood_data.date,
+            date=server_date,
             mood_level=mood_data.mood_level,
             note=mood_data.note,
         )
@@ -146,7 +149,7 @@ def update_mood(user_id: str, mood_id: str, mood_data: MoodUpdate) -> MoodRespon
         
         # Check if this mood entry is for today
         mood_date = date_type.fromisoformat(existing_mood["date"])
-        today = date_type.today()
+        today = now_my().date()
         is_today = (mood_date == today)
 
         # Check if user is adding a note for the first time
