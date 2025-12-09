@@ -250,41 +250,14 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  widget.counterpartName,
-                  style: const TextStyle(
-                    color: _textDark,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    fontFamily: 'Nunito',
-                  ),
-                ),
-                Row(
-                  children: [
-                    Container(
-                      width: 8,
-                      height: 8,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF22C55E), // Online Green
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'Online',
-                      style: TextStyle(
-                        color: Color(0xFF22C55E),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'Nunito',
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+            Text(
+              widget.counterpartName,
+              style: const TextStyle(
+                color: _textDark,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                fontFamily: 'Nunito',
+              ),
             ),
           ],
         ),

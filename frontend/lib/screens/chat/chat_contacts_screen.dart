@@ -234,9 +234,6 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
     final avatarUrl = conversation.displayAvatar(
       isTherapist: widget.isTherapist,
     );
-    
-    // Mock Online Status (You can replace this with real logic if available)
-    final bool isOnline = true; // Changed to true to demonstrate the online indicator
 
     return GestureDetector(
       onTap: () => _openChat(conversation),
@@ -251,51 +248,33 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         child: Row(
           children: [
             // Avatar
-            Stack(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: _bgCream, width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 6,
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: _bgCream, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 6,
+                  )
+                ],
+              ),
+              child: CircleAvatar(
+                backgroundColor: const Color(0xFFFFF3E0),
+                backgroundImage: _buildAvatarImage(avatarUrl),
+                child: (avatarUrl == null || avatarUrl.isEmpty)
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : '?',
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: _primaryBrown,
+                        ),
                       )
-                    ],
-                  ),
-                  child: CircleAvatar(
-                    backgroundColor: const Color(0xFFFFF3E0),
-                    backgroundImage: _buildAvatarImage(avatarUrl),
-                    child: (avatarUrl == null || avatarUrl.isEmpty)
-                        ? Text(
-                            name.isNotEmpty ? name[0].toUpperCase() : '?',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                              color: _primaryBrown,
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
-                if (isOnline)
-                  Positioned(
-                    right: 2,
-                    bottom: 2,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: _onlineGreen,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: _surfaceWhite, width: 2),
-                      ),
-                    ),
-                  ),
-              ],
+                    : null,
+              ),
             ),
             const SizedBox(width: 16),
             
