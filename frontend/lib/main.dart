@@ -25,17 +25,12 @@ Future<void> main() async {
   // Initialize session reminder service
   await SessionReminderService.initialize();
   
-  // Initialize chat notification service
-  await ChatNotificationService.initialize();
-  
   // Initialize therapist application notification service
   await TherapistApplicationNotificationService.initialize();
   
   // Initialize custom reminder service (journaling, hydration, breathing)
   await CustomReminderService.initialize();
   
-  // Initialize booking status notification service
-  await BookingStatusNotificationService.initialize();
   
   runApp(MyApp());
 }

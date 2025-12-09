@@ -7,7 +7,7 @@ import '../models/chat_message.dart';
 /// - Client receives message from therapist
 /// - Therapist receives message from client
 class ChatNotificationService {
-  static final FlutterLocalNotificationsPlugin _notifications =
+  static final FlutterLocalNotificationsPlugin _notifications = 
       FlutterLocalNotificationsPlugin();
 
   // Notification channel ID for chat messages
@@ -15,51 +15,6 @@ class ChatNotificationService {
   static const String _channelName = 'Chat Messages';
   static const String _channelDescription =
       'Notifications for new chat messages';
-
-  /// Initialize the chat notification service
-  /// Call this in main.dart during app startup
-  static Future<void> initialize() async {
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-
-    await _notifications.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: _onNotificationTapped,
-    );
-
-    // Create notification channel for Android
-    const androidChannel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      description: _channelDescription,
-      importance: Importance.high,
-      playSound: true,
-      enableVibration: true,
-    );
-
-    await _notifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
-
-    print('ChatNotificationService initialized');
-  }
-
-  /// Handle notification tap - navigate to chat screen
-  static void _onNotificationTapped(NotificationResponse response) {
-    // TODO: Navigate to chat screen with the conversation ID
-    // You can parse response.payload to get the conversation ID
-    print('Chat notification tapped: ${response.payload}');
-  }
 
   /// Show notification for a new chat message
   /// 
