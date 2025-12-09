@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import 'services/booking_status_notification_service.dart';
 import 'services/chat_notification_service.dart';

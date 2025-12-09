@@ -124,8 +124,6 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                     children: [
                       _buildSocialButton(Icons.facebook, '@pawsefacebook'),
                       _buildSocialButton(Icons.photo_camera, '@pawseInstagram'),
-                      _buildSocialButton(Icons.alternate_email, '@pawseTwitter'),
-                      _buildSocialButton(Icons.language, 'pawse.com'),
                     ],
                   ),
                 ],

@@ -70,9 +70,30 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         MoodResponse: The created mood entry
     """
     try:
+        # Get server's current date
+        server_today = now_my().date()
         
-        server_date = now_my().date() 
-        clean_date_str = server_date.isoformat()
+        # Determine which date to use:
+        # - If mood_data.date is today (or not provided), use server_today to ensure consistency
+        # - If mood_data.date is a past date, use that date (for retroactive logging)
+        if mood_data.date == server_today or mood_data.date >= server_today:
+            # User is logging for today - use server date to prevent timezone issues
+            entry_date = server_today
+        else:
+            # User is logging for a past date - use the provided date
+            entry_date = mood_data.date
+        
+        # Check if mood already exists for this date
+        existing_mood = db.mood_tracking.find_one({
+            "user_id": mood_data.user_id,
+            "date": entry_date.isoformat()
+        })
+        
+        if existing_mood:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Mood entry already exists for {entry_date.isoformat()}"
+            )
 
         # Generate unique mood ID
         mood_id = generate_mood_id()
@@ -81,7 +102,7 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         mood_doc = {
             "mood_id": mood_id,
             "user_id": mood_data.user_id,
-            "date": clean_date_str,
+            "date": entry_date.isoformat(),
             "mood_level": mood_data.mood_level.value,
             "note": mood_data.note,
         }
@@ -92,8 +113,8 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         if not result.inserted_id:
             raise HTTPException(status_code=500, detail="Failed to create mood entry")
         
-        today = now_my().date()
-        is_today = (mood_data.date == today)
+        # Track activity only if logging for today with a note
+        is_today = (entry_date == server_today)
 
         if mood_data.note and mood_data.note.strip() and is_today:
             try:
@@ -110,7 +131,7 @@ def create_mood_entry(mood_data: MoodCreate) -> MoodResponse:
         return MoodResponse(
             mood_id=mood_id,
             user_id=mood_data.user_id,
-            date=server_date,
+            date=entry_date,
             mood_level=mood_data.mood_level,
             note=mood_data.note,
         )
