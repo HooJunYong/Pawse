@@ -98,9 +98,16 @@ def get_album_recommendations(
 
 @router.get("/search", response_model=List[MusicTrackResponse])
 def search_music(
-    query: str = Query(..., min_length=2, description="Search term for iTunes"),
+    query: str = Query(..., description="Search term for iTunes"),
     limit: int = Query(10, ge=1, le=50),
 ) -> List[MusicTrackResponse]:
+    # Custom validation for better user experience
+    if len(query.strip()) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter at least 2 characters to search"
+        )
+    
     try:
         return music_service.search_tracks(
             query,

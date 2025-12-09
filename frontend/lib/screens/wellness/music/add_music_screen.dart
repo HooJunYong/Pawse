@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/music_models.dart';
+import '../../../services/favorites_manager.dart';
 import '../../../services/music_api_service.dart';
 
 class AddMusicScreen extends StatefulWidget {
@@ -22,11 +23,13 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
   List<MusicTrack> _results = const <MusicTrack>[];
   bool _isSearching = false;
   String? _error;
+  int _addedSongsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _playlist = widget.playlist;
+    _loadTopSongs();
   }
 
   @override
@@ -52,7 +55,10 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
                   controller: _searchController,
                   textInputAction: TextInputAction.search,
                   onSubmitted: _performSearch,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (value) {
+                    setState(() {});
+                    _onSearchChanged(value);
+                  },
                   decoration: InputDecoration(
                     hintText: 'Search songs or artists...',
                     prefixIcon: const Icon(Icons.search, color: Colors.grey),
@@ -63,9 +69,9 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
                             onPressed: () {
                               setState(() {
                                 _searchController.clear();
-                                _results = const <MusicTrack>[];
                                 _error = null;
                               });
+                              _loadTopSongs();
                             },
                           ),
                     filled: true,
@@ -99,7 +105,18 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
           children: [
             IconButton(
               icon: const Icon(Icons.arrow_back, color: Color(0xFF422006)),
-              onPressed: () => Navigator.pop(context, _playlist ?? widget.playlist),
+              onPressed: () {
+                // Show summary if songs were added
+                if (_addedSongsCount > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$_addedSongsCount song${_addedSongsCount == 1 ? '' : 's'} added to ${(_playlist ?? widget.playlist).playlistName}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+                Navigator.pop(context, _playlist ?? widget.playlist);
+              },
             ),
             Expanded(
               child: Column(
@@ -127,7 +144,18 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
               ),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, _playlist ?? widget.playlist),
+              onPressed: () {
+                // Show summary if songs were added
+                if (_addedSongsCount > 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$_addedSongsCount song${_addedSongsCount == 1 ? '' : 's'} added to ${(_playlist ?? widget.playlist).playlistName}'),
+                      duration: const Duration(seconds: 3),
+                    ),
+                  );
+                }
+                Navigator.pop(context, _playlist ?? widget.playlist);
+              },
               child: const Text('Done'),
             ),
           ],
@@ -140,6 +168,33 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
     if (_isSearching) {
       return const Center(child: CircularProgressIndicator());
     }
+    
+    // Check if user typed only 1 character
+    if (_searchController.text.trim().length == 1) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 64,
+              color: const Color(0xFF422006).withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Please enter at least 2 characters to search',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 16,
+                color: const Color(0xFF422006).withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
     if (_error != null) {
       return Center(
         child: Column(
@@ -163,23 +218,23 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
       );
     }
     if (_results.isEmpty) {
-      return Center(
-        child: Text(
-          'Search Spotify to add songs to "${playlist.playlistName}".',
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            fontFamily: 'Nunito',
-            color: Color(0xFF422006),
-          ),
-        ),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
-    return ListView.separated(
-      itemCount: _results.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final MusicTrack track = _results[index];
+    return StreamBuilder<Map<String, bool>>(
+      stream: FavoritesManager.instance.favoritesStream,
+      builder: (context, favSnapshot) {
+        // Sync favorite states with FavoritesManager in real-time
+        final syncedResults = _results.map((track) {
+          final isLiked = FavoritesManager.instance.isFavorite(track.musicId);
+          return track.copyWith(isLiked: isLiked);
+        }).toList();
+        
+        return ListView.separated(
+          itemCount: syncedResults.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final MusicTrack track = syncedResults[index];
         final bool alreadyAdded = playlist.songs.any((song) => song.musicId == track.musicId);
         final bool isLoading = _pendingAdds.contains(track.musicId);
         return Container(
@@ -212,13 +267,28 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      track.artist,
-                      style: TextStyle(
-                        fontFamily: 'Nunito',
-                        fontSize: 12,
-                        color: const Color(0xFF422006).withOpacity(0.6),
-                      ),
+                    Row(
+                      children: [
+                        if (track.isLiked == true)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(
+                              Icons.favorite,
+                              size: 12,
+                              color: Color(0xFFFF8A65),
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            track.artist,
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 12,
+                              color: const Color(0xFF422006).withOpacity(0.6),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -237,15 +307,55 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
         );
       },
     );
+      },
+    );
+  }
+
+  void _onSearchChanged(String query) {
+    final String trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      _loadTopSongs();
+      return;
+    }
+    if (trimmed.length >= 2) {
+      _performSearch(trimmed);
+    }
+  }
+
+  Future<void> _loadTopSongs() async {
+    setState(() {
+      _isSearching = true;
+      _error = null;
+    });
+    try {
+      final List<MusicTrack> results = await _musicApi.getTopTracks(limit: 20);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _results = results;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = 'Unable to load top songs: $error';
+      });
+    } finally {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _isSearching = false;
+      });
+    }
   }
 
   Future<void> _performSearch(String query) async {
     final String trimmed = query.trim();
     if (trimmed.isEmpty) {
-      setState(() {
-        _results = const <MusicTrack>[];
-        _error = null;
-      });
+      _loadTopSongs();
       return;
     }
     setState(() {
@@ -286,24 +396,36 @@ class _AddMusicScreenState extends State<AddMusicScreen> {
         playlistId: (_playlist ?? widget.playlist).id,
         track: track,
       );
+      
+      // If added to Favorites playlist, refresh FavoritesManager
+      if (updated.isFavorite || updated.playlistName.toLowerCase() == 'favorites') {
+        await FavoritesManager.instance.loadFavorites(widget.userId);
+      }
+      
+      // If added to Favorites playlist, refresh FavoritesManager
+      if (updated.isFavorite || updated.playlistName.toLowerCase() == 'favorites') {
+        await FavoritesManager.instance.loadFavorites(widget.userId, forceRefresh: true);
+      }
+      
       if (!mounted) {
         return;
       }
       setState(() {
         _playlist = updated;
+        _addedSongsCount++;
       });
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Added "${track.title}" to ${updated.playlistName}.')),
-      );
     } catch (error) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to add song: $error')),
+        SnackBar(
+          content: Text('Unable to add song: $error'),
+          duration: const Duration(seconds: 3),
+        ),
       );
     } finally {
       if (!mounted) {

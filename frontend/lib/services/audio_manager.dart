@@ -116,6 +116,9 @@ class AudioManager {
       preload: true,
     );
 
+    // Set default repeat mode to repeat all
+    await _player.setLoopMode(LoopMode.all);
+
     if (autoPlay) {
       await _player.play();
     }

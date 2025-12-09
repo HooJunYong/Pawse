@@ -1017,7 +1017,38 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
   _MusicSearchDelegate(this.musicApi, this.userId);
 
   @override
-  String get searchFieldLabel => 'Search tracks';
+  String get searchFieldLabel => 'Search songs or artists...';
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return ThemeData(
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Color(0xFFF7F4F2),
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.grey),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        hintStyle: TextStyle(
+          fontFamily: 'Nunito',
+          color: Colors.grey.withOpacity(0.8),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide.none,
+        ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+      ),
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(
+          fontFamily: 'Nunito',
+          fontSize: 16,
+          color: Color(0xFF422006),
+        ),
+      ),
+    );
+  }
 
   @override
   List<Widget>? buildActions(BuildContext context) {
@@ -1026,7 +1057,7 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
     }
     return [
       IconButton(
-        icon: const Icon(Icons.clear),
+        icon: const Icon(Icons.clear, color: Colors.grey),
         onPressed: () => query = '',
       ),
     ];
@@ -1035,7 +1066,7 @@ class _MusicSearchDelegate extends SearchDelegate<MusicTrack?> {
   @override
   Widget? buildLeading(BuildContext context) {
     return IconButton(
-      icon: const Icon(Icons.arrow_back),
+      icon: const Icon(Icons.arrow_back, color: Color(0xFF422006)),
       onPressed: () => close(context, null),
     );
   }
@@ -1100,55 +1131,117 @@ class _TopTracks extends StatelessWidget {
           );
         }
         
-        // Sync favorite states with FavoritesManager
-        final favoritesManager = FavoritesManager.instance;
-        final syncedResults = results.map((track) {
-          final isLiked = favoritesManager.isFavorite(track.musicId);
-          return track.copyWith(isLiked: isLiked);
-        }).toList();
-        
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                'Top Songs',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF422006),
+        return StreamBuilder<Map<String, bool>>(
+          stream: FavoritesManager.instance.favoritesStream,
+          builder: (context, favSnapshot) {
+            // Sync favorite states with FavoritesManager in real-time
+            final syncedResults = results.map((track) {
+              final isLiked = FavoritesManager.instance.isFavorite(track.musicId);
+              return track.copyWith(isLiked: isLiked);
+            }).toList();
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Text(
+                    'Top Songs',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF422006),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            Expanded(
-              child: ListView.separated(
-                itemCount: syncedResults.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final track = syncedResults[index];
-                  return ListTile(
-                    leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
-                    title: Text(track.title),
-                    subtitle: Text(track.artist),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MusicPlayerScreen(
-                            playlist: syncedResults,
-                            initialIndex: index,
-                            userId: userId,
+                Expanded(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: syncedResults.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final track = syncedResults[index];
+                      return InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => MusicPlayerScreen(
+                                playlist: syncedResults,
+                                initialIndex: index,
+                                userId: userId,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.03),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      track.title,
+                                      style: const TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF422006),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        if (track.isLiked)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(
+                                              Icons.favorite,
+                                              size: 12,
+                                              color: Color(0xFFFF8A65),
+                                            ),
+                                          ),
+                                        Expanded(
+                                          child: Text(
+                                            track.artist,
+                                            style: TextStyle(
+                                              fontFamily: 'Nunito',
+                                              fontSize: 12,
+                                              color: const Color(0xFF422006).withOpacity(0.6),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.play_circle_filled, color: Color(0xFFFF8A65)),
+                            ],
                           ),
                         ),
                       );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -1174,11 +1267,33 @@ class _SearchResults extends StatelessWidget {
     if (normalizedQuery.isEmpty) {
       return const SizedBox.shrink();
     }
-    if (normalizedQuery.length < 2) {
-      return const Center(
-        child: Text('Type at least 2 characters to search.'),
+    
+    // Check if user typed only 1 character
+    if (normalizedQuery.length == 1) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search,
+              size: 64,
+              color: const Color(0xFF422006).withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Please enter at least 2 characters to search',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Nunito',
+                fontSize: 16,
+                color: const Color(0xFF422006).withOpacity(0.7),
+              ),
+            ),
+          ],
+        ),
       );
     }
+    
     return FutureBuilder<List<MusicTrack>>(
       future: musicApi.searchTracks(query: normalizedQuery, limit: 25),
       builder: (context, snapshot) {
@@ -1195,30 +1310,92 @@ class _SearchResults extends StatelessWidget {
           return const Center(child: Text('No matches found.'));
         }
         
-        // Sync favorite states with FavoritesManager
-        final favoritesManager = FavoritesManager.instance;
-        final syncedResults = results.map((track) {
-          final isLiked = favoritesManager.isFavorite(track.musicId);
-          return track.copyWith(isLiked: isLiked);
-        }).toList();
-        
-        return ListView.separated(
-          itemCount: syncedResults.length,
-          separatorBuilder: (_, __) => const Divider(height: 1),
-          itemBuilder: (context, index) {
-            final track = syncedResults[index];
-            return ListTile(
-              leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
-              title: Text(track.title),
-              subtitle: Text(track.artist),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => MusicPlayerScreen(
-                      playlist: syncedResults,
-                      initialIndex: index,
-                      userId: userId,
+        return StreamBuilder<Map<String, bool>>(
+          stream: FavoritesManager.instance.favoritesStream,
+          builder: (context, favSnapshot) {
+            // Sync favorite states with FavoritesManager in real-time
+            final syncedResults = results.map((track) {
+              final isLiked = FavoritesManager.instance.isFavorite(track.musicId);
+              return track.copyWith(isLiked: isLiked);
+            }).toList();
+            
+            return ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              itemCount: syncedResults.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final track = syncedResults[index];
+                return InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => MusicPlayerScreen(
+                          playlist: syncedResults,
+                          initialIndex: index,
+                          userId: userId,
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.03),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                track.title,
+                                style: const TextStyle(
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF422006),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  if (track.isLiked)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 4),
+                                      child: Icon(
+                                        Icons.favorite,
+                                        size: 12,
+                                        color: Color(0xFFFF8A65),
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      track.artist,
+                                      style: TextStyle(
+                                        fontFamily: 'Nunito',
+                                        fontSize: 12,
+                                        color: const Color(0xFF422006).withOpacity(0.6),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.play_circle_filled, color: Color(0xFFFF8A65)),
+                      ],
                     ),
                   ),
                 );

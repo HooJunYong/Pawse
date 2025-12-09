@@ -32,8 +32,8 @@ class FavoritesManager {
   UserPlaylist? get favoritesPlaylist => _favoritesPlaylist;
 
   /// Initialize favorites for a user
-  Future<void> loadFavorites(String userId) async {
-    if (_currentUserId == userId && _favoriteStates.isNotEmpty) {
+  Future<void> loadFavorites(String userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _currentUserId == userId && _favoriteStates.isNotEmpty) {
       return; // Already loaded for this user
     }
 

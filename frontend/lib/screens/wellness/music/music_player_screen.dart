@@ -585,7 +585,7 @@ class _AddToPlaylistSheetState extends State<_AddToPlaylistSheet> {
 
       // If added to Favorites playlist, refresh FavoritesManager
       if (updatedPlaylist.isFavorite || updatedPlaylist.playlistName.toLowerCase() == 'favorites') {
-        await FavoritesManager.instance.loadFavorites(widget.userId);
+        await FavoritesManager.instance.loadFavorites(widget.userId, forceRefresh: true);
       }
 
       if (mounted) {

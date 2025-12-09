@@ -41,11 +41,17 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
     _playlist = _syncPlaylistFavorites(widget.playlist);
     
     // Listen for favorite changes
-    _favoritesSub = _favoritesManager.favoritesStream.listen((_) {
+    _favoritesSub = _favoritesManager.favoritesStream.listen((_) async {
       if (mounted && _playlist != null) {
-        setState(() {
-          _playlist = _syncPlaylistFavorites(_playlist!);
-        });
+        // If this is the Favorites playlist, refresh from backend to get newly added songs
+        if (_playlist!.isFavorite || _playlist!.playlistName.toLowerCase() == 'favorites') {
+          await _refreshPlaylistFromBackend();
+        } else {
+          // For other playlists, just sync the isLiked flags
+          setState(() {
+            _playlist = _syncPlaylistFavorites(_playlist!);
+          });
+        }
       }
     });
   }
@@ -318,6 +324,13 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
         playlistId: (_playlist ?? widget.playlist).id,
         musicId: song.musicId,
       );
+      
+      // If removing from Favorites playlist, refresh FavoritesManager to update heart icons
+      final currentPlaylist = _playlist ?? widget.playlist;
+      if (currentPlaylist.isFavorite || currentPlaylist.playlistName.toLowerCase() == 'favorites') {
+        await FavoritesManager.instance.loadFavorites(widget.userId, forceRefresh: true);
+      }
+      
       if (!mounted) {
         return;
       }
@@ -485,6 +498,28 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
       setState(() {
         _isRefreshing = false;
       });
+    }
+  }
+
+  /// Refresh playlist from backend (used for Favorites playlist real-time updates)
+  Future<void> _refreshPlaylistFromBackend() async {
+    if (_isRefreshing) return;
+    
+    try {
+      final UserPlaylist refreshed = await _musicApi.getPlaylist((_playlist ?? widget.playlist).id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _playlist = refreshed;
+      });
+    } catch (error) {
+      // Silently fail - user can manually refresh if needed
+      if (mounted) {
+        setState(() {
+          _playlist = _syncPlaylistFavorites(_playlist!);
+        });
+      }
     }
   }
 }
