@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../models/music_models.dart';
 import '../../../services/audio_manager.dart';
+import '../../../services/favorites_manager.dart';
 import '../../../services/music_api_service.dart';
 import 'create_playlist_screen.dart';
 import 'music_player_screen.dart';
@@ -26,6 +29,8 @@ class MusicHomeScreen extends StatefulWidget {
 
 class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingObserver {
   final MusicApiService _musicApi = const MusicApiService();
+  final FavoritesManager _favoritesManager = FavoritesManager.instance;
+  StreamSubscription<Map<String, bool>>? _favoritesSub;
   List<MoodTherapyRecommendation> _moodTherapyPlaylists =
       const <MoodTherapyRecommendation>[];
   List<UserPlaylist> _playlists = const <UserPlaylist>[];
@@ -43,13 +48,25 @@ class _MusicHomeScreenState extends State<MusicHomeScreen> with WidgetsBindingOb
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _initializeFavorites();
     _loadCachedMoodPlaylists();
     _fetchPlaylists();
+  }
+
+  Future<void> _initializeFavorites() async {
+    await _favoritesManager.loadFavorites(widget.userId);
+    
+    // Listen for favorite changes
+    _favoritesSub = _favoritesManager.favoritesStream.listen((_) {
+      // Refresh playlists when favorites change
+      _fetchPlaylists(showLoader: false);
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _favoritesSub?.cancel();
     super.dispose();
   }
 
@@ -1082,6 +1099,14 @@ class _TopTracks extends StatelessWidget {
             child: Text('Search for songs or artists to get started.'),
           );
         }
+        
+        // Sync favorite states with FavoritesManager
+        final favoritesManager = FavoritesManager.instance;
+        final syncedResults = results.map((track) {
+          final isLiked = favoritesManager.isFavorite(track.musicId);
+          return track.copyWith(isLiked: isLiked);
+        }).toList();
+        
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1099,10 +1124,10 @@ class _TopTracks extends StatelessWidget {
             ),
             Expanded(
               child: ListView.separated(
-                itemCount: results.length,
+                itemCount: syncedResults.length,
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (context, index) {
-                  final track = results[index];
+                  final track = syncedResults[index];
                   return ListTile(
                     leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
                     title: Text(track.title),
@@ -1112,7 +1137,7 @@ class _TopTracks extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (context) => MusicPlayerScreen(
-                            playlist: results,
+                            playlist: syncedResults,
                             initialIndex: index,
                             userId: userId,
                           ),
@@ -1169,11 +1194,19 @@ class _SearchResults extends StatelessWidget {
         if (results.isEmpty) {
           return const Center(child: Text('No matches found.'));
         }
+        
+        // Sync favorite states with FavoritesManager
+        final favoritesManager = FavoritesManager.instance;
+        final syncedResults = results.map((track) {
+          final isLiked = favoritesManager.isFavorite(track.musicId);
+          return track.copyWith(isLiked: isLiked);
+        }).toList();
+        
         return ListView.separated(
-          itemCount: results.length,
+          itemCount: syncedResults.length,
           separatorBuilder: (_, __) => const Divider(height: 1),
           itemBuilder: (context, index) {
-            final track = results[index];
+            final track = syncedResults[index];
             return ListTile(
               leading: _ArtworkPreview(url: track.thumbnailUrl ?? track.albumImageUrl),
               title: Text(track.title),
@@ -1183,7 +1216,7 @@ class _SearchResults extends StatelessWidget {
                   context,
                   MaterialPageRoute(
                     builder: (context) => MusicPlayerScreen(
-                      playlist: results,
+                      playlist: syncedResults,
                       initialIndex: index,
                       userId: userId,
                     ),

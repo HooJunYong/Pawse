@@ -2,7 +2,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
-from ..config import settings
+from ..config.settings import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ def send_otp_email(to_email: str, otp_code: str) -> bool:
         # Create message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = 'Your Pawse Verification Code'
-        msg['From'] = f"{settings.SMTP_FROM_NAME} <{settings.SMTP_USER}>"
+        msg['From'] = f"{SMTP_FROM_NAME} <{SMTP_USER}>"
         msg['To'] = to_email
 
         # HTML email body with styled OTP
@@ -96,9 +96,9 @@ def send_otp_email(to_email: str, otp_code: str) -> bool:
         msg.attach(MIMEText(html, 'html'))
 
         # Connect to Gmail SMTP server and send
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
             server.starttls()  # Enable TLS encryption
-            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(msg)
         
         logger.info(f"OTP email sent successfully to {to_email}")

@@ -5,11 +5,13 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/music_models.dart';
 import '../services/audio_manager.dart';
+import '../services/favorites_manager.dart';
 import '../services/music_api_service.dart';
 
 class AudioPlayerProvider extends ChangeNotifier {
   final AudioManager _audioManager = AudioManager.instance;
   final MusicApiService _musicApi = const MusicApiService();
+  final FavoritesManager _favoritesManager = FavoritesManager.instance;
 
   StreamSubscription<MusicTrack?>? _trackSub;
   StreamSubscription<PlayerState>? _playerStateSub;
@@ -17,6 +19,7 @@ class AudioPlayerProvider extends ChangeNotifier {
   StreamSubscription<Duration?>? _durationSub;
   StreamSubscription<bool>? _shuffleSub;
   StreamSubscription<LoopMode>? _loopSub;
+  StreamSubscription<Map<String, bool>>? _favoritesSub;
 
   MusicTrack? _currentTrack;
   bool _isPlaying = false;
@@ -81,6 +84,34 @@ class AudioPlayerProvider extends ChangeNotifier {
       _loopMode = mode;
       notifyListeners();
     });
+
+    // Listen to favorites changes
+    _favoritesSub = _favoritesManager.favoritesStream.listen((favStates) {
+      // Update current track if its favorite state changed
+      if (_currentTrack != null) {
+        final newLikedState = favStates[_currentTrack!.musicId] ?? false;
+        if (_currentTrack!.isLiked != newLikedState) {
+          _currentTrack = _currentTrack!.copyWith(isLiked: newLikedState);
+          notifyListeners();
+        }
+      }
+      
+      // Update playlist tracks
+      bool playlistChanged = false;
+      final updatedPlaylist = _playlist.map((track) {
+        final newLikedState = favStates[track.musicId] ?? false;
+        if (track.isLiked != newLikedState) {
+          playlistChanged = true;
+          return track.copyWith(isLiked: newLikedState);
+        }
+        return track;
+      }).toList();
+      
+      if (playlistChanged) {
+        _playlist = updatedPlaylist;
+        notifyListeners();
+      }
+    });
   }
 
   @override
@@ -91,6 +122,7 @@ class AudioPlayerProvider extends ChangeNotifier {
     _durationSub?.cancel();
     _shuffleSub?.cancel();
     _loopSub?.cancel();
+    _favoritesSub?.cancel();
     super.dispose();
   }
 
@@ -137,46 +169,17 @@ class AudioPlayerProvider extends ChangeNotifier {
   Future<void> toggleLike(String userId) async {
     if (_currentTrack == null) return;
     
-    final String musicId = _currentTrack!.musicId;
-    final bool oldState = _currentTrack!.isLiked;
-    final bool newState = !oldState;
-    
-    // Optimistic update
-    _currentTrack = _currentTrack!.copyWith(isLiked: newState);
-    
-    // Update in playlist as well
-    _playlist = _playlist.map((t) {
-      if (t.musicId == musicId) {
-        return t.copyWith(isLiked: newState);
-      }
-      return t;
-    }).toList();
-    
-    notifyListeners();
-    
     try {
-      final bool serverState = await _musicApi.toggleLike(musicId, userId);
-      if (serverState != newState) {
-        // Revert if server disagrees
-        _currentTrack = _currentTrack!.copyWith(isLiked: serverState);
-        _playlist = _playlist.map((t) {
-          if (t.musicId == musicId) {
-            return t.copyWith(isLiked: serverState);
-          }
-          return t;
-        }).toList();
-        notifyListeners();
-      }
+      // Use FavoritesManager for centralized state management
+      final newState = await _favoritesManager.toggleFavorite(
+        _currentTrack!.musicId,
+        _currentTrack!,
+        userId,
+      );
+      
+      // State will be updated via the favorites stream listener
+      // No need to manually update here
     } catch (e) {
-      // Revert on error
-      _currentTrack = _currentTrack!.copyWith(isLiked: oldState);
-      _playlist = _playlist.map((t) {
-        if (t.musicId == musicId) {
-          return t.copyWith(isLiked: oldState);
-        }
-        return t;
-      }).toList();
-      notifyListeners();
       rethrow;
     }
   }

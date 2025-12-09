@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../models/music_models.dart';
 import '../../../services/audio_manager.dart';
+import '../../../services/favorites_manager.dart';
 import '../../../services/music_api_service.dart';
 import 'add_music_screen.dart';
 import 'music_player_screen.dart';
@@ -26,6 +29,8 @@ class PlaylistDetailsScreen extends StatefulWidget {
 
 class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
   final MusicApiService _musicApi = const MusicApiService();
+  final FavoritesManager _favoritesManager = FavoritesManager.instance;
+  StreamSubscription<Map<String, bool>>? _favoritesSub;
   UserPlaylist? _playlist;
   final Set<String> _pendingRemoval = <String>{};
   bool _isRefreshing = false;
@@ -33,7 +38,32 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
   @override
   void initState() {
     super.initState();
-    _playlist = widget.playlist;
+    _playlist = _syncPlaylistFavorites(widget.playlist);
+    
+    // Listen for favorite changes
+    _favoritesSub = _favoritesManager.favoritesStream.listen((_) {
+      if (mounted && _playlist != null) {
+        setState(() {
+          _playlist = _syncPlaylistFavorites(_playlist!);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _favoritesSub?.cancel();
+    super.dispose();
+  }
+
+  /// Sync playlist songs with current favorite states
+  UserPlaylist _syncPlaylistFavorites(UserPlaylist playlist) {
+    final syncedSongs = playlist.songs.map((song) {
+      final isLiked = _favoritesManager.isFavorite(song.musicId);
+      return song.copyWith(isLiked: isLiked);
+    }).toList();
+    
+    return playlist.copyWith(songs: syncedSongs);
   }
 
   @override
