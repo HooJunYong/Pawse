@@ -4,9 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/notification_manager.dart';
 import '../../theme/shadows.dart';
 import '../../widgets/bottom_nav.dart';
 import '../auth/login_screen.dart';
+import '../companion/customize_comp_screen.dart';
+import '../companion/manage_companion_screen.dart';
 import 'change_password_screen.dart';
 import 'contact_us_screen.dart';
 import 'edit_profile_screen.dart';
@@ -14,8 +17,6 @@ import 'help_support_screen.dart';
 import 'join_therapist_screen.dart';
 import 'notification_screen.dart';
 import 'privacy_policy_screen.dart';
-import '../companion/customize_comp_screen.dart';
-import '../companion/manage_companion_screen.dart';
 
 class Profile extends StatefulWidget {
   final String userId;
@@ -365,6 +366,9 @@ class _ProfileState extends State<Profile> {
                               ),
                             ),
                             onPressed: () {
+                              // Stop notification polling
+                              NotificationManager.instance.stopPolling();
+                              
                               Navigator.pushReplacement(
                                 context,
                                 MaterialPageRoute(

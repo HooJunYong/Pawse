@@ -9,12 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/booking_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/bottom_nav.dart';
-import '../widgets/rank_badge.dart';
 import 'therapist/find_therapist_screen.dart';
-import '../screens/chat/chat_session_screen.dart';
-import '../screens/driftbottle/drift_bottle_screen.dart';
-import '../services/music_tracking_service.dart';
-import '../services/mood_service.dart';
+
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -25,8 +21,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const String _dismissedSessionsPrefsKey =
-      'dismissed_cancelled_session_ids';
+  static const String _dismissedSessionsPrefsKey = 'dismissed_cancelled_session_ids';
 
   int _currentIndex = 0;
 
@@ -38,7 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userFirstName = 'Friend';
   String _userInitials = 'U';
   ImageProvider? _userAvatarImage;
-  String? _todayMoodLevel;
 
   // Colors extracted from design
   final Color _bgWhite = Colors.white;
@@ -50,11 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    MusicTrackingService.instance.initialize(widget.userId);
     _initDismissedCancelledSessions();
     _loadUpcomingSessions(initialLoad: true, resetToggle: true);
     _loadUserProfile();
-    _loadTodayMood();
   }
 
   @override
@@ -111,6 +103,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final DateTime now = DateTime.now();
+    // Convert session times to local for comparison with local 'now'
     final upcoming =
         sessions
             .where((session) => session.scheduledAt.toLocal().isAfter(now))
@@ -197,18 +190,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _extractInitials(dynamic initialsValue, dynamic fullNameValue) {
     if (initialsValue is String && initialsValue.trim().isNotEmpty) {
       final trimmed = initialsValue.trim();
-      return trimmed.length > 2
-          ? trimmed.substring(0, 2).toUpperCase()
-          : trimmed.toUpperCase();
+      return trimmed.length > 2 ? trimmed.substring(0, 2).toUpperCase() : trimmed.toUpperCase();
     }
     if (fullNameValue is! String) {
       return '';
     }
-    final parts = fullNameValue
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
+    final parts = fullNameValue.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
     if (parts.isEmpty) {
       return '';
     }
@@ -257,55 +244,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _loadTodayMood() async {
-    try {
-      final now = DateTime.now();
-      final response = await MoodService.getMoodByRange(
-        userId: widget.userId,
-        startDate: now,
-        endDate: now,
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        if (data.isNotEmpty) {
-          // Take the last entry as the most recent mood for the day
-          final moodEntry = data.last;
-          if (mounted) {
-            setState(() {
-              _todayMoodLevel = moodEntry['mood_level'];
-            });
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading mood: $e');
-    }
-  }
-
-  String _getHeroMessage() {
-    final name = _userFirstName.isNotEmpty ? _userFirstName : 'Friend';
-
-    if (_todayMoodLevel == null) {
-      return "Hi $name, how are you feeling today? I'm here if you want to chat.";
-    }
-
-    switch (_todayMoodLevel!.toLowerCase()) {
-      case 'very happy':
-        return "Hi $name, wow! You're feeling very happy today! That's amazing. Want to share what made your day so special?";
-      case 'happy':
-        return "Hi $name, I'm glad you're feeling happy today. Did something nice happen, or are you just in a good mood?";
-      case 'neutral':
-        return "Hi $name, feeling neutral today? That's perfectly fine. Sometimes a calm day is just what we need. Want to chat?";
-      case 'sad':
-        return "Hi $name, heard that you are feeling sad today. Want to tell me what is going on?";
-      case 'awful':
-        return "Hi $name, I'm sorry to hear you're feeling awful. I'm here for you if you want to talk about it.";
-      default:
-        return "Hi $name, how are you feeling today? I'm here if you want to chat.";
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -331,17 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildHeroCard(),
                     const SizedBox(height: 24),
                     _buildActionCard(
-                      imagePath: 'assets/images/drift_bottle.png',
+                      imagePath: 'assets/images/Drift_bottle.png',
                       color: Colors.blueAccent,
                       title: "Drift & Heal",
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                DriftBottleScreen(userId: widget.userId),
-                          ),
-                        );
-                      },
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -380,9 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           final status = session.sessionStatus.toLowerCase();
                           final isCancelled = status.contains('cancel');
                           if (isCancelled &&
-                              _dismissedCancelledSessionIds.contains(
-                                session.sessionId,
-                              )) {
+                              _dismissedCancelledSessionIds.contains(session.sessionId)) {
                             return false;
                           }
                           return true;
@@ -415,23 +343,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
                         final List<TherapySession> visibleSessions =
                             _showAllUpcomingSessions
-                            ? filteredSessions
-                            : filteredSessions.take(3).toList();
+                                ? filteredSessions
+                                : filteredSessions.take(3).toList();
 
                         return Column(
                           children: [
                             for (var session in visibleSessions)
                               _buildStyledSessionCard(
                                 session,
-                                onDismissCancelled:
-                                    session.sessionStatus
+                                onDismissCancelled: session.sessionStatus
                                         .toLowerCase()
                                         .contains('cancel')
                                     ? () {
                                         setState(() {
-                                          _dismissedCancelledSessionIds.add(
-                                            session.sessionId,
-                                          );
+                                          _dismissedCancelledSessionIds
+                                              .add(session.sessionId);
                                         });
                                         _persistDismissedCancelledSessions();
                                       }
@@ -440,8 +366,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                             // Show More / Show Less Logic
                             if (!_showAllUpcomingSessions &&
-                                filteredSessions.length >
-                                    visibleSessions.length)
+                                filteredSessions.length > visibleSessions.length)
                               const SizedBox(height: 8),
                             if (filteredSessions.length > 3)
                               Center(
@@ -552,7 +477,17 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        RankBadge(userId: widget.userId),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: _bronzeColor,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            "Bronze",
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
       ],
     );
   }
@@ -581,7 +516,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               Text(
-                _getHeroMessage(),
+                "Hey Jerry. Heard that you are not feeling so well today. It's ok to have a bad day, want to talk with me on what is going on?",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Urbanist',
@@ -594,13 +529,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  // Navigate to ChatSessionScreen
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          ChatSessionScreen(userId: widget.userId),
-                    ),
-                  );
+                  // Navigator.of(context).push(...)
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _btnBrown,
@@ -624,11 +553,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         // The Cat Image
         Positioned(
-          top: -100,
+          top: -120,
           child: Image.asset(
-            'assets/images/americonsh1.png',
-            width: 180,
-            height: 180,
+            'assets/images/defaultcat.png',
+            width: 200,
+            height: 200,
             fit: BoxFit.cover,
           ),
         ),
@@ -642,44 +571,40 @@ class _HomeScreenState extends State<HomeScreen> {
     String? imagePath,
     required Color color,
     required String title,
-    VoidCallback? onTap,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        decoration: BoxDecoration(
-          color: _bgWhite,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.02),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      decoration: BoxDecoration(
+        color: _bgWhite,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          if (imagePath != null)
+            ColorFiltered(
+              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+              child: Image.asset(imagePath, height: 48, width: 48),
+            )
+          else if (icon != null)
+            Icon(icon, size: 32, color: color),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: _textDark,
             ),
-          ],
-        ),
-        child: Column(
-          children: [
-            if (imagePath != null)
-              ColorFiltered(
-                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-                child: Image.asset(imagePath, height: 48, width: 48),
-              )
-            else if (icon != null)
-              Icon(icon, size: 32, color: color),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: _textDark,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -789,12 +714,8 @@ class _HomeScreenState extends State<HomeScreen> {
     TherapySession session, {
     VoidCallback? onDismissCancelled,
   }) {
-    final String timeStr = DateFormat(
-      'h:mm a',
-    ).format(session.scheduledAt.toLocal());
-    final String dateStr = DateFormat(
-      'MMM d',
-    ).format(session.scheduledAt.toLocal());
+    final String timeStr = DateFormat('h:mm a').format(session.scheduledAt.toLocal());
+    final String dateStr = DateFormat('MMM d').format(session.scheduledAt.toLocal());
 
     final nameParts = session.therapistName.trim().split(' ');
     final initials = nameParts.length > 1
@@ -876,12 +797,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                   color: Colors.grey[600],
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  "$dateStr, $timeStr",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[600],
-                                    fontWeight: FontWeight.w500,
+                                Expanded(
+                                  child: Text(
+                                    "$dateStr, $timeStr",
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
@@ -971,7 +896,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  //showSessionDetails METHOD
+//showSessionDetails METHOD
   void _showSessionDetails(TherapySession session) {
     showDialog(
       context: context,
@@ -982,8 +907,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final DateTime start = session.scheduledAt.toLocal();
         final Duration timeUntilStart = start.difference(DateTime.now());
         final bool canCancel =
-            statusLower == 'scheduled' &&
-            timeUntilStart > const Duration(hours: 1);
+            statusLower == 'scheduled' && timeUntilStart > const Duration(hours: 1);
 
         String? cancellationMessage;
         if (!canCancel) {
@@ -998,23 +922,21 @@ class _HomeScreenState extends State<HomeScreen> {
         // 1. Format Data
         final String dayStr = DateFormat('d').format(start);
         final String monthStr = DateFormat('MMM').format(start);
-
-        final String timeStr =
-            (session.startTime.isNotEmpty && session.endTime.isNotEmpty)
+        
+        final String timeStr = (session.startTime.isNotEmpty && session.endTime.isNotEmpty)
             ? '${session.startTime} - ${session.endTime}'
             : DateFormat('h:mm a').format(start);
 
-        final String centerInfo = [
-          session.centerName,
-          session.centerAddress,
-        ].where((s) => s != null && s.trim().isNotEmpty).join(', ');
+        final String centerInfo = [session.centerName, session.centerAddress]
+            .where((s) => s != null && s.trim().isNotEmpty)
+            .join(', ');
 
         return StatefulBuilder(
           builder: (context, setStateDialog) {
             return Dialog(
               backgroundColor: Colors.transparent,
               // Adjust insetPadding to allow the 350px width to fit comfortably
-              insetPadding: const EdgeInsets.symmetric(horizontal: 12),
+              insetPadding: const EdgeInsets.symmetric(horizontal: 12), 
               child: Container(
                 width: 350, // CHANGED: Fixed width to 350px
                 padding: const EdgeInsets.all(24),
@@ -1036,10 +958,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
                             color: const Color(0xFFFFF7ED),
                             borderRadius: BorderRadius.circular(16),
@@ -1050,8 +969,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 dayStr,
                                 style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22, 
+                                  fontWeight: FontWeight.bold, 
                                   color: Color(0xFF9A3412),
                                   height: 1,
                                 ),
@@ -1059,8 +978,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               Text(
                                 monthStr.toUpperCase(),
                                 style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12, 
+                                  fontWeight: FontWeight.bold, 
                                   color: Color(0xFFCD7F32),
                                 ),
                               ),
@@ -1073,8 +992,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   const Text(
                                     "Scheduled Time",
@@ -1101,30 +1019,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-
+                    
                     const SizedBox(height: 24),
                     const Divider(height: 1, color: Color(0xFFEEEEEE)),
                     const SizedBox(height: 24),
 
                     // 3. Details
                     _buildIconDetailRow(
-                      Icons.person_outline,
-                      "Therapist",
-                      session.therapistName.isNotEmpty
-                          ? "Dr. ${session.therapistName}"
-                          : "Unknown",
+                      Icons.person_outline, 
+                      "Therapist", 
+                      session.therapistName.isNotEmpty ? "Dr. ${session.therapistName}" : "Unknown"
                     ),
                     const SizedBox(height: 16),
                     _buildIconDetailRow(
-                      Icons.location_on_outlined,
-                      "Location",
-                      centerInfo.isEmpty ? "Online / Not provided" : centerInfo,
+                      Icons.location_on_outlined, 
+                      "Location", 
+                      centerInfo.isEmpty ? "Online / Not provided" : centerInfo
                     ),
                     const SizedBox(height: 16),
                     _buildIconDetailRow(
-                      Icons.attach_money,
-                      "Session Fee",
-                      "RM ${session.sessionFee.toStringAsFixed(2)}",
+                      Icons.attach_money, 
+                      "Session Fee", 
+                      "RM ${session.sessionFee.toStringAsFixed(2)}"
                     ),
 
                     if (cancellationMessage != null)
@@ -1146,10 +1062,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         errorMessage!,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.redAccent,
-                          fontSize: 13,
-                        ),
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
                       ),
                     ],
 
@@ -1160,84 +1073,56 @@ class _HomeScreenState extends State<HomeScreen> {
                       children: [
                         Expanded(
                           child: TextButton(
-                            onPressed: isProcessing
-                                ? null
-                                : () => Navigator.pop(context),
+                            onPressed: isProcessing ? null : () => Navigator.pop(context),
                             style: TextButton.styleFrom(
                               foregroundColor: Colors.grey[600],
                               // CHANGED: Increased vertical padding to 18
-                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              padding: const EdgeInsets.symmetric(vertical: 18), 
                             ),
-                            child: const Text(
-                              "Close",
-                              style: TextStyle(fontWeight: FontWeight.w600),
-                            ),
+                            child: const Text("Close", style: TextStyle(fontWeight: FontWeight.w600)),
                           ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
                             onPressed: (isProcessing || !canCancel)
-                                ? null
-                                : () async {
-                                    setStateDialog(() => isProcessing = true);
-                                    try {
-                                      await _bookingService.cancelBooking(
-                                        sessionId: session.sessionId,
-                                        clientUserId: widget.userId,
-                                        therapistUserId:
-                                            session.therapistUserId,
-                                      );
-                                      if (!mounted) return;
-                                      Navigator.pop(context);
-                                      ScaffoldMessenger.of(
-                                        context,
-                                      ).showSnackBar(
-                                        const SnackBar(
-                                          content: Text(
-                                            'Booking cancelled successfully.',
-                                          ),
-                                        ),
-                                      );
-                                      _refreshUpcomingSession();
-                                    } catch (e) {
-                                      setStateDialog(() {
-                                        isProcessing = false;
-                                        errorMessage = e
-                                            .toString()
-                                            .replaceFirst('Exception: ', '');
-                                      });
-                                    }
-                                  },
+                              ? null
+                              : () async {
+                                  setStateDialog(() => isProcessing = true);
+                                  try {
+                                    await _bookingService.cancelBooking(
+                                      sessionId: session.sessionId,
+                                      clientUserId: widget.userId,
+                                      therapistUserId: session.therapistUserId,
+                                    );
+                                    if (!mounted) return;
+                                    Navigator.pop(context);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Booking cancelled successfully.')),
+                                    );
+                                    _refreshUpcomingSession();
+                                  } catch(e) {
+                                    setStateDialog(() {
+                                      isProcessing = false;
+                                      errorMessage = e.toString().replaceFirst('Exception: ', '');
+                                    });
+                                  }
+                                },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFEE2E2),
                               foregroundColor: const Color(0xFFEF4444),
                               elevation: 0,
                               // CHANGED: Increased vertical padding to 18
-                              padding: const EdgeInsets.symmetric(vertical: 18),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 18), 
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
-                            child: isProcessing
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.redAccent,
-                                    ),
-                                  )
-                                : const Text(
-                                    "Cancel Booking",
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
+                            child: isProcessing 
+                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent))
+                              : const Text("Cancel Booking", style: TextStyle(fontWeight: FontWeight.bold)),
                           ),
                         ),
                       ],
-                    ),
+                    )
                   ],
                 ),
               ),
@@ -1247,7 +1132,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
-
   // ------------------------------------------------
   // ADD THIS NEW HELPER METHOD TO YOUR CLASS
   // ------------------------------------------------
@@ -1334,15 +1218,12 @@ class _HomeScreenState extends State<HomeScreen> {
     if (lower.isEmpty) {
       return 'Unknown';
     }
-    return lower
-        .split('_')
-        .map((part) {
-          if (part.isEmpty) {
-            return part;
-          }
-          return part[0].toUpperCase() + part.substring(1);
-        })
-        .join(' ');
+    return lower.split('_').map((part) {
+      if (part.isEmpty) {
+        return part;
+      }
+      return part[0].toUpperCase() + part.substring(1);
+    }).join(' ');
   }
 
   ImageProvider? _buildAvatarImage(String? source) {

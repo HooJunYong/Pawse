@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../../theme/shadows.dart';
+import 'login_screen.dart';
 
 class ResetPassword extends StatefulWidget {
   final String email;
@@ -122,7 +123,11 @@ class _ResetPasswordState extends State<ResetPassword> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginWidget()),
+          (route) => false,
+        );
       } else {
         final error = jsonDecode(response.body);
         _showErrorDialog(error['detail'] ?? 'Failed to reset password');

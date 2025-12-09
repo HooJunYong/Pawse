@@ -80,6 +80,7 @@ class UpcomingSessionCard extends StatelessWidget {
     }
 
     final TherapySession upcoming = session!;
+    // Backend returns timezone-aware datetime, convert to local for display
     final DateTime scheduledLocal = upcoming.scheduledAt.toLocal();
     final String scheduleLabel = _formatScheduleLabel(scheduledLocal);
     final String initials = _initialsFromName(upcoming.therapistName);
@@ -126,13 +127,12 @@ class UpcomingSessionCard extends StatelessWidget {
                     fontSize: 16,
                     color: Color(0xFF263238),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
                   scheduleLabel,
                   style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  softWrap: true,
                 ),
                 const SizedBox(height: 2),
                 Text(

@@ -385,6 +385,15 @@ def create_booking(request: BookingRequest) -> BookingResponse:
     except Exception as exc:  # pragma: no cover - best effort notification
         logger.warning("Failed to send booking confirmation chat message: %s", exc)
 
+    # Notify therapist about new booking
+    create_notification(
+        user_id=request.therapist_user_id,
+        type="booking_update",
+        title="New Booking Request",
+        body=f"You have a new booking request from {client_name} for {booking_label}.",
+        data={"session_id": session_id}
+    )
+
     return BookingResponse(
         booking_id=session_id,
         session_id=session_id,

@@ -51,7 +51,24 @@ class AudioPlayerProvider extends ChangeNotifier {
     _playlist = _audioManager.queue;
 
     _trackSub = _audioManager.currentTrackStream.listen((track) {
-      _currentTrack = track;
+      // If track changed (different musicId), update it
+      if (track?.musicId != _currentTrack?.musicId) {
+        _currentTrack = track;
+        
+        // Sync with FavoritesManager for the new track
+        if (_currentTrack != null) {
+          final isFav = _favoritesManager.isFavorite(_currentTrack!.musicId);
+          if (_currentTrack!.isLiked != isFav) {
+            _currentTrack = _currentTrack!.copyWith(isLiked: isFav);
+          }
+        }
+      } else if (_currentTrack != null && track != null) {
+        // Same track, but preserve our local isLiked state (from FavoritesManager)
+        // Don't overwrite with potentially stale data from AudioManager
+        final currentLikedState = _currentTrack!.isLiked;
+        _currentTrack = track.copyWith(isLiked: currentLikedState);
+      }
+
       _playlist = _audioManager.queue;
       notifyListeners();
     });

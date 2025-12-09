@@ -58,6 +58,18 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
 
   /// Sync playlist songs with current favorite states
   UserPlaylist _syncPlaylistFavorites(UserPlaylist playlist) {
+    // If this is the Favorites playlist, filter out unliked songs
+    if (playlist.isFavorite || playlist.playlistName.toLowerCase() == 'favorites') {
+      final likedSongs = playlist.songs.where((song) {
+        return _favoritesManager.isFavorite(song.musicId);
+      }).map((song) {
+        return song.copyWith(isLiked: true);
+      }).toList();
+      
+      return playlist.copyWith(songs: likedSongs);
+    }
+    
+    // For other playlists, just update the isLiked flag without removing songs
     final syncedSongs = playlist.songs.map((song) {
       final isLiked = _favoritesManager.isFavorite(song.musicId);
       return song.copyWith(isLiked: isLiked);
@@ -148,7 +160,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
                 ),
               ),
             ),
-            if (!widget.isReadOnly)
+            if (!widget.isReadOnly && !playlist.isFavorite && playlist.playlistName != 'Favorites')
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_horiz, color: Color(0xFF422006)),
                 onSelected: (value) {
@@ -354,6 +366,7 @@ class _PlaylistDetailsScreenState extends State<PlaylistDetailsScreen> {
           playlist: tracks,
           initialIndex: index != -1 ? index : 0,
           userId: widget.userId,
+          playlistName: widget.playlist.playlistName,
         ),
       ),
     );

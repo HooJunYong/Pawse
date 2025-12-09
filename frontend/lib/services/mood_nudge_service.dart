@@ -58,6 +58,25 @@ class MoodNudgeService {
   static const String _lastMoodKey = 'last_tracked_mood';
   static const String _nudgesEnabledKey = 'mood_nudges_enabled';
 
+  /// Convert DB mood string to MoodType
+  static MoodType? getMoodTypeFromDbValue(String dbValue) {
+    switch (dbValue.toLowerCase()) {
+      case 'very happy':
+      case 'very_happy':
+        return MoodType.veryHappy;
+      case 'happy':
+        return MoodType.happy;
+      case 'neutral':
+        return MoodType.neutral;
+      case 'sad':
+        return MoodType.sad;
+      case 'awful':
+        return MoodType.awful;
+      default:
+        return null;
+    }
+  }
+
   // Predefined nudge messages for each mood (offline fallback)
   static const Map<String, List<Map<String, String>>> _offlineNudges = {
     'very_happy': [

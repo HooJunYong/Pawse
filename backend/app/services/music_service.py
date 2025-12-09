@@ -468,10 +468,25 @@ class MusicService:
         
         # 2. Manage Favorites playlist
         playlists_col = self._db["user_playlists"]
+        # Check by is_favorite flag first, then fallback to name for backwards compatibility
         favorites = playlists_col.find_one({
             "user_id": user_id,
-            "playlist_name": "Favorites"
+            "is_favorite": True
         })
+        
+        if not favorites:
+            # Fallback: check by playlist name
+            favorites = playlists_col.find_one({
+                "user_id": user_id,
+                "playlist_name": "Favorites"
+            })
+            # If found by name, update it to set is_favorite flag
+            if favorites:
+                playlists_col.update_one(
+                    {"_id": favorites["_id"]},
+                    {"$set": {"is_favorite": True}}
+                )
+                favorites["is_favorite"] = True
         
         if new_status:
             # Add to Favorites
@@ -488,6 +503,7 @@ class MusicService:
                     "playlist_name": "Favorites",
                     "custom_tags": [],
                     "is_public": False,
+                    "is_favorite": True,
                     "songs": [song_entry.model_dump()],
                     "created_at": now,
                     "updated_at": now,

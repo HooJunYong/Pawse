@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../../models/music_models.dart';
 import '../../../providers/audio_player_provider.dart';
+import '../../../services/favorites_manager.dart';
 import '../../../services/music_api_service.dart';
 
 class MusicPlayerScreen extends StatelessWidget {
@@ -15,6 +16,7 @@ class MusicPlayerScreen extends StatelessWidget {
   final bool attachToExistingSession;
   final String? userId;
   final VoidCallback? onLikeToggled;
+  final String? playlistName;
 
   const MusicPlayerScreen({
     super.key,
@@ -24,6 +26,7 @@ class MusicPlayerScreen extends StatelessWidget {
     this.attachToExistingSession = false,
     this.userId,
     this.onLikeToggled,
+    this.playlistName,
   });
 
   @override
@@ -37,6 +40,7 @@ class MusicPlayerScreen extends StatelessWidget {
         attachToExistingSession: attachToExistingSession,
         userId: userId,
         onLikeToggled: onLikeToggled,
+        playlistName: playlistName,
       ),
     );
   }
@@ -49,6 +53,7 @@ class _MusicPlayerView extends StatefulWidget {
   final bool attachToExistingSession;
   final String? userId;
   final VoidCallback? onLikeToggled;
+  final String? playlistName;
 
   const _MusicPlayerView({
     this.track,
@@ -57,6 +62,7 @@ class _MusicPlayerView extends StatefulWidget {
     this.attachToExistingSession = false,
     this.userId,
     this.onLikeToggled,
+    this.playlistName,
   });
 
   @override
@@ -224,8 +230,8 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                            // Mood Pill
-                            if (selectedTrack?.moodCategory != null)
+                            // Playlist Name Pill
+                            if (widget.playlistName != null && widget.playlistName!.isNotEmpty)
                               Container(
                                 margin: const EdgeInsets.only(bottom: 20),
                                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -235,7 +241,7 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                                   border: Border.all(color: Colors.white.withOpacity(0.3)),
                                 ),
                                 child: Text(
-                                  selectedTrack!.moodCategory!.toUpperCase(),
+                                  widget.playlistName!.toUpperCase(),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 10,
@@ -314,29 +320,39 @@ class _MusicPlayerViewState extends State<_MusicPlayerView> {
                                       ],
                                     ),
                                   ),
-                                  IconButton(
-                                    icon: Icon(
-                                      selectedTrack?.isLiked == true ? Icons.favorite : Icons.favorite_border,
-                                      color: selectedTrack?.isLiked == true ? Colors.red : Colors.white,
-                                    ),
-                                    onPressed: selectedTrack != null && widget.userId != null
-                                        ? () async {
-                                            try {
-                                              await player.toggleLike(widget.userId!);
-                                              // Notify parent to refresh playlists
-                                              widget.onLikeToggled?.call();
-                                            } catch (e) {
-                                              if (mounted) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: Text('Failed to update favorite: $e'),
-                                                    backgroundColor: Colors.red,
-                                                  ),
-                                                );
+                                  // Heart icon - read from FavoritesManager for real-time state
+                                  StreamBuilder<Map<String, bool>>(
+                                    stream: FavoritesManager.instance.favoritesStream,
+                                    builder: (context, snapshot) {
+                                      final isLiked = selectedTrack != null 
+                                          ? FavoritesManager.instance.isFavorite(selectedTrack.musicId)
+                                          : false;
+                                      
+                                      return IconButton(
+                                        icon: Icon(
+                                          isLiked ? Icons.favorite : Icons.favorite_border,
+                                          color: isLiked ? Colors.red : Colors.white,
+                                        ),
+                                        onPressed: selectedTrack != null && widget.userId != null
+                                            ? () async {
+                                                try {
+                                                  await player.toggleLike(widget.userId!);
+                                                  // Notify parent to refresh playlists
+                                                  widget.onLikeToggled?.call();
+                                                } catch (e) {
+                                                  if (mounted) {
+                                                    ScaffoldMessenger.of(context).showSnackBar(
+                                                      SnackBar(
+                                                        content: Text('Failed to update favorite: $e'),
+                                                        backgroundColor: Colors.red,
+                                                      ),
+                                                    );
+                                                  }
+                                                }
                                               }
-                                            }
-                                          }
-                                        : null,
+                                            : null,
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -562,10 +578,15 @@ class _AddToPlaylistSheetState extends State<_AddToPlaylistSheet> {
     });
 
     try {
-      await widget.musicApi.addSongToPlaylist(
+      final updatedPlaylist = await widget.musicApi.addSongToPlaylist(
         playlistId: playlist.id,
         track: widget.track,
       );
+
+      // If added to Favorites playlist, refresh FavoritesManager
+      if (updatedPlaylist.isFavorite || updatedPlaylist.playlistName.toLowerCase() == 'favorites') {
+        await FavoritesManager.instance.loadFavorites(widget.userId);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

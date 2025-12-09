@@ -297,7 +297,13 @@ class _ChatScreenState extends State<ChatScreen> {
                               itemCount: _messages.length,
                               itemBuilder: (context, index) {
                                 final message = _messages[index];
-                                final isMine = message.isFromCurrentUser(widget.currentUserId);
+                                bool isMine;
+                                if (widget.clientUserId == widget.therapistUserId) {
+                                  final String myRole = widget.isTherapist ? 'therapist' : 'client';
+                                  isMine = message.senderRole == myRole;
+                                } else {
+                                  isMine = message.senderId == widget.currentUserId;
+                                }
 
                                 // Show date header if needed (simplified logic)
                                 final bool showDate = index == 0;

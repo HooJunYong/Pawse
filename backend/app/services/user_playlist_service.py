@@ -20,6 +20,7 @@ from ..models.music_schemas import (
 
 class UserPlaylistService:
     def __init__(self, db: Database):
+        self._db = db
         self.collection: Collection = db["user_playlists"]
 
     def create_playlist(self, payload: UserPlaylistCreate) -> UserPlaylistResponse:
@@ -61,9 +62,23 @@ class UserPlaylistService:
         doc = self.collection.find_one({"user_playlist_id": playlist_id})
         if not doc:
             return None
+        
+        # Check if this is the Favorites playlist
+        is_favorites = doc.get("is_favorite", False) or doc.get("playlist_name") == "Favorites"
+        
         songs: List[dict] = doc.get("songs", [])
         if not any(existing.get("music_id") == song.music_id for existing in songs):
             songs.append(song.model_dump())
+            
+        # If adding to Favorites playlist, also set is_liked flag on the track
+        if is_favorites:
+            music_col = self._db["music_tracks"]
+            music_col.update_one(
+                {"music_id": song.music_id},
+                {"$set": {"is_liked": True}},
+                upsert=False
+            )
+            
         updated = self.collection.find_one_and_update(
             {"user_playlist_id": playlist_id},
             {
@@ -80,8 +95,22 @@ class UserPlaylistService:
         doc = self.collection.find_one({"user_playlist_id": playlist_id})
         if not doc:
             return None
+        
+        # Check if this is the Favorites playlist
+        is_favorites = doc.get("is_favorite", False) or doc.get("playlist_name") == "Favorites"
+        
         songs: List[dict] = doc.get("songs", [])
         songs = [song for song in songs if song.get("music_id") != music_id]
+        
+        # If removing from Favorites playlist, also set is_liked flag to False on the track
+        if is_favorites:
+            music_col = self._db["music_tracks"]
+            music_col.update_one(
+                {"music_id": music_id},
+                {"$set": {"is_liked": False}},
+                upsert=False
+            )
+            
         updated = self.collection.find_one_and_update(
             {"user_playlist_id": playlist_id},
             {

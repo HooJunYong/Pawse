@@ -29,7 +29,7 @@ VALID_USER_TYPES = {"users", "admin"}
 SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", 587))
 SMTP_USER = os.getenv("SMTP_USER", "teampawse@gmail.com")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "blbe thrt syui fvxg")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Pawse Team")
 
 # Jamendo API Configuration
@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     
     # App settings
     app_name: str = "AI Mental Health Companion API"
-    debug: bool = False
+    app_debug: bool = False
     
     # MongoDB settings
     mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017/")

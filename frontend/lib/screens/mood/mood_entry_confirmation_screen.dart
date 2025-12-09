@@ -1,6 +1,9 @@
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
+
 import '../../screens/homepage_screen.dart';
+import '../../services/mood_nudge_service.dart';
 import '../../services/mood_service.dart';
 import '../../utils/helpers.dart';
 import 'note_entry_screen.dart';
@@ -52,6 +55,12 @@ class _MoodEntryConfirmationScreenState extends State<MoodEntryConfirmationScree
       if (!mounted) return;
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Schedule Intelligent Nudge
+        final moodType = MoodNudgeService.getMoodTypeFromDbValue(moodLevel);
+        if (moodType != null) {
+          await MoodNudgeService().scheduleMoodNudge(moodType);
+        }
+
         // Success - navigate to home
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => HomeScreen(userId: widget.userId)),

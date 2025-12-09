@@ -55,13 +55,23 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
             ),
           );
         } else {
-          final error = jsonDecode(response.body);
-          String errorMessage = error['detail'] ?? 'An error occurred';
+          String title = 'Error';
+          String errorMessage = 'Something went wrong. Please try again.';
+
+          if (response.statusCode == 404) {
+            title = 'Account Not Found';
+            errorMessage = 'We couldn\'t find an account associated with this email address.';
+          } else {
+            try {
+              final error = jsonDecode(response.body);
+              errorMessage = error['detail'] ?? errorMessage;
+            } catch (_) {}
+          }
           
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              title: Text(response.statusCode == 404 ? 'Account Not Found' : 'Error'),
+              title: Text(title),
               content: Text(errorMessage),
               actions: [
                 TextButton(
@@ -78,7 +88,7 @@ class _ForgotPasswordWidgetState extends State<ForgotPasswordWidget> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Connection Error'),
-            content: Text('Failed to connect to server: $e'),
+            content: const Text('Unable to connect to server. Please check your internet connection.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),

@@ -102,6 +102,7 @@ class TherapistService {
       centerName: json['office_name']?.toString() ?? 'Holistic Mind Center',
       quote: json['bio']?.toString() ?? 'Here to help you on your journey.',
       price: (json['hourly_rate'] as num?)?.toDouble() ?? 150.0,
+      email: json['email']?.toString() ?? 'contact@example.com',
     );
   }
 

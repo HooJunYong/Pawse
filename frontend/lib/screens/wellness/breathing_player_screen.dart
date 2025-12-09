@@ -361,7 +361,7 @@ class _BreathingPlayerScreenState extends State<BreathingPlayerScreen>
           ),
         ),
         content: const Text(
-          'Your progress so far will be saved as incomplete.',
+          'Your progress will not be saved if you exit now.',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'Nunito',
@@ -406,10 +406,7 @@ class _BreathingPlayerScreenState extends State<BreathingPlayerScreen>
     );
 
     if (shouldExit == true) {
-      await _logSession(
-        cyclesCompleted: min(_currentCycle, _pattern.cycles),
-        completedAt: DateTime.now(),
-      );
+      // Do not log session for incomplete exercises
       return true;
     }
 

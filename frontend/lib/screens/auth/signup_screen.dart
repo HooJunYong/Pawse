@@ -48,11 +48,6 @@ class _SignupWidgetState extends State<SignupWidget> {
       final firstName = _firstNameController.text.trim();
       final lastName = _lastNameController.text.trim();
 
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Creating account...')),
-      );
-
       try {
         final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
         final response = await http.post(
@@ -78,8 +73,18 @@ class _SignupWidgetState extends State<SignupWidget> {
           Navigator.of(context).pop();
         } else if (response.statusCode == 409) {
           // Email already exists
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Email already registered. Please login.')),
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Registration Error'),
+              content: const Text('Email already registered.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
           );
         } else {
           // Other error

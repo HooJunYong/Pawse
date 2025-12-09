@@ -44,4 +44,26 @@ class NotificationModel {
       'data': data,
     };
   }
+
+  NotificationModel copyWith({
+    String? notificationId,
+    String? userId,
+    String? type,
+    String? title,
+    String? body,
+    bool? isRead,
+    String? createdAt,
+    Map<String, dynamic>? data,
+  }) {
+    return NotificationModel(
+      notificationId: notificationId ?? this.notificationId,
+      userId: userId ?? this.userId,
+      type: type ?? this.type,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt ?? this.createdAt,
+      data: data ?? this.data,
+    );
+  }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/notification_manager.dart';
 import '../auth/login_screen.dart';
 import 'admin_therapist_management.dart';
 import 'admin_user_list_screen.dart';
@@ -116,6 +117,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
           TextButton(
             onPressed: () {
+              // Stop notification polling
+              NotificationManager.instance.stopPolling();
+              
               Navigator.pop(context);
               Navigator.pushAndRemoveUntil(
                 context,

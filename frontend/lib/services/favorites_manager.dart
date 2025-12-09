@@ -56,7 +56,21 @@ class FavoritesManager {
       _notifyListeners();
     } catch (e) {
       // Create favorites playlist if it doesn't exist
+      // First check if any playlist exists to avoid duplicates
       try {
+        final playlists = await _musicApi.listPlaylists(userId);
+        _favoritesPlaylist = playlists.firstWhere(
+          (p) => p.isFavorite,
+          orElse: () => throw Exception('No favorites playlist found'),
+        );
+        
+        // Found it on retry
+        for (final song in _favoritesPlaylist!.songs) {
+          _favoriteStates[song.musicId] = true;
+        }
+        _notifyListeners();
+      } catch (retryError) {
+        // Still not found, create it
         _favoritesPlaylist = await _musicApi.createPlaylist(
           userId: userId,
           name: 'Favorites',
@@ -91,23 +105,92 @@ class FavoritesManager {
       final bool serverState = await _musicApi.toggleLike(musicId, userId);
 
       // Ensure favorites playlist exists
-      if (_favoritesPlaylist == null) {
-        await loadFavorites(userId);
+      if (_favoritesPlaylist == null && serverState) {
+        try {
+          // Check if playlist was created by backend first
+          final playlists = await _musicApi.listPlaylists(userId);
+          _favoritesPlaylist = playlists.firstWhere(
+            (p) => p.isFavorite,
+            orElse: () => throw Exception('No favorites playlist found'),
+          );
+        } catch (e) {
+          // Create if it really doesn't exist
+          _favoritesPlaylist = await _musicApi.createPlaylist(
+            userId: userId,
+            name: 'Favorites',
+            icon: 'favorite',
+            isPublic: false,
+          );
+          // Mark as favorite playlist
+          _favoritesPlaylist = await _musicApi.updatePlaylist(
+            playlistId: _favoritesPlaylist!.id,
+            isFavorite: true,
+          );
+        } catch (e) {
+          print('Error creating favorites playlist: $e');
+        }
       }
 
       if (_favoritesPlaylist != null) {
         if (serverState) {
           // Add to favorites playlist
-          _favoritesPlaylist = await _musicApi.addSongToPlaylist(
-            playlistId: _favoritesPlaylist!.id,
-            track: track,
-          );
+          try {
+            _favoritesPlaylist = await _musicApi.addSongToPlaylist(
+              playlistId: _favoritesPlaylist!.id,
+              track: track,
+            );
+          } catch (e) {
+            // If playlist not found (404), it might have been deleted. Recreate it.
+            if (e.toString().contains('404') || e.toString().contains('Playlist not found')) {
+              _favoritesPlaylist = null;
+              
+              // Check if another favorites playlist exists before creating
+              try {
+                final playlists = await _musicApi.listPlaylists(userId);
+                _favoritesPlaylist = playlists.firstWhere(
+                  (p) => p.isFavorite,
+                  orElse: () => throw Exception('No favorites playlist found'),
+                );
+              } catch (checkError) {
+                // Recreate favorites playlist if it really doesn't exist
+                _favoritesPlaylist = await _musicApi.createPlaylist(
+                  userId: userId,
+                  name: 'Favorites',
+                  icon: 'favorite',
+                  isPublic: false,
+                );
+                
+                // Mark as favorite playlist
+                _favoritesPlaylist = await _musicApi.updatePlaylist(
+                  playlistId: _favoritesPlaylist!.id,
+                  isFavorite: true,
+                );
+              }
+              
+              // Retry adding song
+              _favoritesPlaylist = await _musicApi.addSongToPlaylist(
+                playlistId: _favoritesPlaylist!.id,
+                track: track,
+              );
+            } else {
+              rethrow;
+            }
+          }
         } else {
           // Remove from favorites playlist
-          _favoritesPlaylist = await _musicApi.removeSongFromPlaylist(
-            playlistId: _favoritesPlaylist!.id,
-            musicId: musicId,
-          );
+          try {
+            _favoritesPlaylist = await _musicApi.removeSongFromPlaylist(
+              playlistId: _favoritesPlaylist!.id,
+              musicId: musicId,
+            );
+          } catch (e) {
+            // If playlist not found (404), it's already gone, so removal is implicitly successful
+            if (e.toString().contains('404') || e.toString().contains('Playlist not found')) {
+              _favoritesPlaylist = null;
+            } else {
+              rethrow;
+            }
+          }
         }
       }
 

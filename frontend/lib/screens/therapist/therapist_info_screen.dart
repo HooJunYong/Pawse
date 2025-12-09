@@ -75,7 +75,10 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
   DateTime? _parseStartDateTime(TherapistNextAvailability availability) {
     if (availability.startIso != null && availability.startIso!.isNotEmpty) {
       try {
-        return DateTime.parse(availability.startIso!);
+        // Parse ISO string - backend returns timezone-aware datetime
+        final parsed = DateTime.parse(availability.startIso!);
+        // Convert to local time for display
+        return parsed.toLocal();
       } catch (_) {
         // Ignore parsing error and attempt fallback below.
       }
@@ -84,6 +87,7 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
     if (availability.date != null && availability.startTime != null) {
       final raw = '${availability.date} ${availability.startTime}';
       try {
+        // Parse as UTC and convert to local for display
         return DateFormat('yyyy-MM-dd h:mm a').parse(raw, true).toLocal();
       } catch (_) {
         return null;
@@ -103,14 +107,14 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
       return 'Availability details coming soon';
     }
 
-    final DateTime localStart = start.toLocal();
+    // start is already in local time from _parseStartDateTime
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final DateTime slotDay =
-        DateTime(localStart.year, localStart.month, localStart.day);
+        DateTime(start.year, start.month, start.day);
     final int dayDifference = slotDay.difference(today).inDays;
 
-    final String timeLabel = DateFormat('h:mm a').format(localStart);
+    final String timeLabel = DateFormat('h:mm a').format(start);
 
     if (dayDifference == 0) {
       return 'Today, $timeLabel';
@@ -119,11 +123,11 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
       return 'Tomorrow, $timeLabel';
     }
     if (dayDifference > 1 && dayDifference <= 7) {
-      final String weekday = DateFormat('EEEE').format(localStart);
+      final String weekday = DateFormat('EEEE').format(start);
       return '$weekday, $timeLabel';
     }
 
-    final String dateLabel = DateFormat('d MMM yyyy').format(localStart);
+    final String dateLabel = DateFormat('d MMM yyyy').format(start);
     return '$dateLabel · $timeLabel';
   }
 
@@ -471,6 +475,17 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
                         ),
                         child: Column(
                           children: [
+                            ContactRow(
+                              icon: Icons.email_rounded,
+                              text: therapist.email,
+                              iconColor: _accentOrange,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              child: Divider(
+                                  height: 1,
+                                  color: _primaryBrown.withOpacity(0.1)),
+                            ),
                             ContactRow(
                               icon: Icons.phone_rounded,
                               text: "012-345 6789",

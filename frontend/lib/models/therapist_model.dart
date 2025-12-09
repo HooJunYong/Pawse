@@ -14,6 +14,7 @@ class Therapist {
   final String centerName; // Center/Clinic name
   final String quote;
   final double price;
+  final String email;
 
   Therapist({
     required this.id,
@@ -30,6 +31,7 @@ class Therapist {
     required this.centerName,
     required this.quote,
     required this.price,
+    required this.email,
   });
 
   String get displayName {
@@ -77,6 +79,7 @@ class Therapist {
       centerName: json['centerName'] ?? 'Holistic Mind Center',
       quote: json['quote'] ?? 'Here to help you heal.',
       price: (json['price'] as num?)?.toDouble() ?? 150.0,
+      email: json['email'] ?? 'contact@example.com',
     );
   }
 }

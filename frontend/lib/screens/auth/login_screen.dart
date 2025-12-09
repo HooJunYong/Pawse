@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
+import '../../services/notification_manager.dart';
 import '../../theme/shadows.dart';
 import '../admin/admin_dashboard_screen.dart';
-import '../homepage_screen.dart';
-import '../mood/mood_check_in_screen.dart';
+import '../profile/profile_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -72,6 +72,9 @@ class _LoginWidgetState extends State<LoginWidget> {
             return;
           }
           
+          // Initialize notification manager for the logged-in user
+          await NotificationManager.instance.initialize(userId);
+
           // Redirect based on user type
           if (userType == 'admin') {
             Navigator.pushReplacement(
@@ -81,26 +84,12 @@ class _LoginWidgetState extends State<LoginWidget> {
               ),
             );
           } else {
-             // Check mood log status from login response
-            final hasLoggedMoodToday = data['has_logged_mood_today'] as bool? ?? false;
-            
-            if (hasLoggedMoodToday) {
-              // User already logged mood, go to homepage
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => HomeScreen(userId: userId),
-                ),
-              );
-            } else {
-              // User hasn't logged mood, go to mood check-in screen
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => MoodCheckInScreen(userId: userId),
-                ),
-              );
-            }
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Profile(userId: userId),
+              ),
+            );
           }
         } else if (response.statusCode == 401) {
           // Invalid credentials - show popup dialog
