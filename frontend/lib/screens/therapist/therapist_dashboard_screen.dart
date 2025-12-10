@@ -721,8 +721,12 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     final now = _nowInMalaysia();
     final seenSessionIds = <String>{};
     final history = <Map<String, dynamic>>[];
+    
+    // Get today's date string for comparison
+    final todayDateStr =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
-    for (int i = 0; i < lookbackDays && history.length < maxEntries; i++) {
+    for (int i = -1; i < lookbackDays && history.length < maxEntries; i++) {
       final date = now.subtract(Duration(days: i + 1));
       final dateStr =
           '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
@@ -741,7 +745,10 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         for (final session in sessions) {
           final statusRaw =
               (session['session_status'] ?? session['status'] ?? '').toString();
-          if (!_isHistoryStatus(statusRaw)) {
+          
+          // Include all statuses for today, only history statuses for past dates
+          final isToday = dateStr == todayDateStr;
+          if (!isToday && !_isHistoryStatus(statusRaw)) {
             continue;
           }
 

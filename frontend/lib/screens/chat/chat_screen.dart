@@ -279,17 +279,22 @@ class _ChatScreenState extends State<ChatScreen> {
         final String? avatarBase64 = profileData['avatar_base64']?.toString();
         final String? avatarUrl = profileData['avatar_url']?.toString();
         
-        if (avatarBase64 != null && avatarBase64.isNotEmpty && avatarBase64.toLowerCase().startsWith('data:image/')) {
-          final separator = avatarBase64.indexOf(',');
-          if (separator != -1) {
-            final dataPart = avatarBase64.substring(separator + 1).trim();
-            try {
-              final bytes = base64Decode(dataPart);
+        if (avatarBase64 != null && avatarBase64.isNotEmpty) {
+          if (_isDataUri(avatarBase64)) {
+            final bytes = _decodeDataUri(avatarBase64);
+            if (bytes != null && bytes.isNotEmpty) {
               avatarImage = MemoryImage(bytes);
-            } catch (_) {}
+            }
           }
         } else if (avatarUrl != null && avatarUrl.isNotEmpty) {
-          avatarImage = NetworkImage(avatarUrl);
+          if (_isDataUri(avatarUrl)) {
+            final bytes = _decodeDataUri(avatarUrl);
+            if (bytes != null && bytes.isNotEmpty) {
+              avatarImage = MemoryImage(bytes);
+            }
+          } else {
+            avatarImage = NetworkImage(avatarUrl);
+          }
         }
       } else {
         // Client viewing therapist - fetch therapist profile directly
@@ -311,17 +316,30 @@ class _ChatScreenState extends State<ChatScreen> {
         final String? profilePictureBase64 = therapistData['profile_picture_base64']?.toString();
         final String? profilePictureUrl = therapistData['profile_picture_url']?.toString();
         
-        if (profilePictureBase64 != null && profilePictureBase64.isNotEmpty && profilePictureBase64.toLowerCase().startsWith('data:image/')) {
-          final separator = profilePictureBase64.indexOf(',');
-          if (separator != -1) {
-            final dataPart = profilePictureBase64.substring(separator + 1).trim();
-            try {
-              final bytes = base64Decode(dataPart);
+        if (profilePictureBase64 != null && profilePictureBase64.isNotEmpty) {
+          if (_isDataUri(profilePictureBase64)) {
+            final bytes = _decodeDataUri(profilePictureBase64);
+            if (bytes != null && bytes.isNotEmpty) {
               avatarImage = MemoryImage(bytes);
-            } catch (_) {}
+            }
           }
         } else if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
-          avatarImage = NetworkImage(profilePictureUrl);
+          if (_isDataUri(profilePictureUrl)) {
+            final bytes = _decodeDataUri(profilePictureUrl);
+            if (bytes != null && bytes.isNotEmpty) {
+              avatarImage = MemoryImage(bytes);
+            }
+          } else {
+            avatarImage = NetworkImage(profilePictureUrl);
+          }
+        }
+      }
+      
+      // Fallback to the counterpart avatar already loaded in chat
+      if (avatarImage == null) {
+        final fallbackImage = _buildCounterpartAvatarImage();
+        if (fallbackImage != null) {
+          avatarImage = fallbackImage;
         }
       }
       
