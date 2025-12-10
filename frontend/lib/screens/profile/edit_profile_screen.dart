@@ -192,16 +192,33 @@ class _EditProfileState extends State<EditProfile> {
   Future<bool> _checkEmailExists(String email) async {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-      final response = await http.get(
-        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
+      
+      // Check both users and therapist_users collections, excluding current user
+      final userResponse = await http.get(
+        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}&exclude_user_id=${Uri.encodeComponent(widget.userId)}'),
+      );
+      
+      final therapistResponse = await http.get(
+        Uri.parse('$apiUrl/check-therapist-email-exists?email=${Uri.encodeComponent(email)}&exclude_user_id=${Uri.encodeComponent(widget.userId)}'),
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['exists'] == true;
+      bool userExists = false;
+      bool therapistExists = false;
+
+      if (userResponse.statusCode == 200) {
+        final data = jsonDecode(userResponse.body);
+        userExists = data['exists'] == true;
       }
-      return false;
+
+      if (therapistResponse.statusCode == 200) {
+        final data = jsonDecode(therapistResponse.body);
+        therapistExists = data['exists'] == true;
+      }
+
+      // Return true if email exists in either collection (excluding current user)
+      return userExists || therapistExists;
     } catch (e) {
+      print('Error checking email: $e');
       return false;
     }
   }

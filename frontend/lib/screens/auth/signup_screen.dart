@@ -49,6 +49,16 @@ class _SignupWidgetState extends State<SignupWidget> {
       final lastName = _lastNameController.text.trim();
 
       try {
+        // Check if email already exists before attempting signup
+        final emailExists = await _checkEmailExists(email);
+        if (emailExists) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showErrorDialog('This email is already registered. Please use a different email address or login instead.');
+          return;
+        }
+
         final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
         final response = await http.post(
           Uri.parse('$apiUrl/signup'),
@@ -72,20 +82,8 @@ class _SignupWidgetState extends State<SignupWidget> {
           // Navigate back to login
           Navigator.of(context).pop();
         } else if (response.statusCode == 409) {
-          // Email already exists
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Registration Error'),
-              content: const Text('Email already registered.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
+          // Email already exists (backup check)
+          _showErrorDialog('Email already registered.');
         } else {
           // Other error
           final error = jsonDecode(response.body);
@@ -106,6 +104,116 @@ class _SignupWidgetState extends State<SignupWidget> {
         }
       }
     }
+  }
+
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      
+      // Check both users and therapist_users collections
+      final userResponse = await http.get(
+        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
+      );
+      
+      final therapistResponse = await http.get(
+        Uri.parse('$apiUrl/check-therapist-email-exists?email=${Uri.encodeComponent(email)}'),
+      );
+
+      bool userExists = false;
+      bool therapistExists = false;
+
+      if (userResponse.statusCode == 200) {
+        final data = jsonDecode(userResponse.body);
+        userExists = data['exists'] == true;
+      }
+
+      if (therapistResponse.statusCode == 200) {
+        final data = jsonDecode(therapistResponse.body);
+        therapistExists = data['exists'] == true;
+      }
+
+      // Return true if email exists in either collection
+      return userExists || therapistExists;
+    } catch (e) {
+      print('Error checking email: $e');
+      return false;
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Color(0xFFEF4444),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Email Already Exists',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF422006),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF422006),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // Helper widget to build the text fields consistently
