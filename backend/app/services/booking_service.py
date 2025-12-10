@@ -439,19 +439,19 @@ def create_booking(request: BookingRequest) -> BookingResponse:
         data={"session_id": session_id}
     )
 
-    # Schedule 1-hour-before reminder for client if therapy_sessions notification is enabled
-    notification_settings = db.notification_settings.find_one({"user_id": request.client_user_id})
-    if notification_settings and notification_settings.get('therapy_sessions', True):
-        reminder_time = scheduled_datetime - timedelta(hours=1)
+    # Schedule reminders for client (1 hour and 10 minutes before session)
+    client_notification_settings = db.notification_settings.find_one({"user_id": request.client_user_id})
+    if client_notification_settings and client_notification_settings.get('therapy_sessions', True):
+        current_time = now_my()
         
-        # Only schedule if reminder time is in the future
-        if reminder_time > now_my():
-            scheduled_notification_id = secrets.token_hex(32)
+        # 1-hour reminder for client
+        reminder_1h = scheduled_datetime - timedelta(hours=1)
+        if reminder_1h > current_time:
             db.scheduled_notifications.insert_one({
-                "notification_id": scheduled_notification_id,
+                "notification_id": secrets.token_hex(32),
                 "user_id": request.client_user_id,
                 "notification_type": "therapy_session_reminder",
-                "scheduled_time": reminder_time,
+                "scheduled_time": reminder_1h,
                 "is_sent": False,
                 "notification_data": {
                     "session_id": session_id,
@@ -461,7 +461,73 @@ def create_booking(request: BookingRequest) -> BookingResponse:
                 },
                 "created_at": now_ts
             })
-            logger.info(f"Scheduled therapy reminder for user {request.client_user_id} at {reminder_time}")
+            logger.info(f"Scheduled 1-hour reminder for client {request.client_user_id} at {reminder_1h}")
+        
+        # 10-minute reminder for client
+        reminder_10m = scheduled_datetime - timedelta(minutes=10)
+        if reminder_10m > current_time:
+            db.scheduled_notifications.insert_one({
+                "notification_id": secrets.token_hex(32),
+                "user_id": request.client_user_id,
+                "notification_type": "therapy_session_reminder",
+                "scheduled_time": reminder_10m,
+                "is_sent": False,
+                "notification_data": {
+                    "session_id": session_id,
+                    "title": "📅 Therapy Session Starting Soon",
+                    "body": f"Your therapy session with {therapist_name} is starting in 10 minutes at {normalized_start_time}.",
+                    "data": {"session_id": session_id, "action": "open_booking"}
+                },
+                "created_at": now_ts
+            })
+            logger.info(f"Scheduled 10-minute reminder for client {request.client_user_id} at {reminder_10m}")
+    
+    # Schedule reminders for therapist (1 hour and 10 minutes before session)
+    therapist_notification_settings = db.notification_settings.find_one({"user_id": request.therapist_user_id})
+    if therapist_notification_settings and therapist_notification_settings.get('therapy_sessions', True):
+        current_time = now_my()
+        
+        # Get client name for therapist notification
+        client_profile = db.user_profiles.find_one({"user_id": request.client_user_id})
+        client_name_for_therapist = client_profile.get('name', 'A client') if client_profile else 'A client'
+        
+        # 1-hour reminder for therapist
+        reminder_1h = scheduled_datetime - timedelta(hours=1)
+        if reminder_1h > current_time:
+            db.scheduled_notifications.insert_one({
+                "notification_id": secrets.token_hex(32),
+                "user_id": request.therapist_user_id,
+                "notification_type": "therapy_session_reminder",
+                "scheduled_time": reminder_1h,
+                "is_sent": False,
+                "notification_data": {
+                    "session_id": session_id,
+                    "title": "📅 Therapy Session Reminder",
+                    "body": f"Your therapy session with {client_name_for_therapist} is starting in 1 hour at {normalized_start_time}.",
+                    "data": {"session_id": session_id, "action": "open_dashboard"}
+                },
+                "created_at": now_ts
+            })
+            logger.info(f"Scheduled 1-hour reminder for therapist {request.therapist_user_id} at {reminder_1h}")
+        
+        # 10-minute reminder for therapist
+        reminder_10m = scheduled_datetime - timedelta(minutes=10)
+        if reminder_10m > current_time:
+            db.scheduled_notifications.insert_one({
+                "notification_id": secrets.token_hex(32),
+                "user_id": request.therapist_user_id,
+                "notification_type": "therapy_session_reminder",
+                "scheduled_time": reminder_10m,
+                "is_sent": False,
+                "notification_data": {
+                    "session_id": session_id,
+                    "title": "📅 Therapy Session Starting Soon",
+                    "body": f"Your therapy session with {client_name_for_therapist} is starting in 10 minutes at {normalized_start_time}.",
+                    "data": {"session_id": session_id, "action": "open_dashboard"}
+                },
+                "created_at": now_ts
+            })
+            logger.info(f"Scheduled 10-minute reminder for therapist {request.therapist_user_id} at {reminder_10m}")
 
     return BookingResponse(
         booking_id=session_id,
@@ -846,7 +912,7 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     else:
         formatted_datetime = str(scheduled_at)
     
-    # Get names for notifications
+    # Get names for notifications and chat
     therapist_user_id = session.get("therapist_user_id")
     client_user_id = session.get("user_id")
     
@@ -857,6 +923,34 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     # Get client name
     client = db.user_profiles.find_one({"user_id": client_user_id})
     client_name = client.get('name', 'A client') if client else 'A client'
+    
+    # Send chat message about cancellation
+    try:
+        if cancelled_by == "therapist":
+            # Therapist cancelled - send message from therapist to client
+            chat_message = f"I've cancelled our session scheduled for {formatted_datetime}. Please feel free to book another time slot that works for you."
+            send_message(SendChatMessageRequest(
+                sender_id=therapist_user_id,
+                sender_role="therapist",
+                content=chat_message,
+                client_user_id=client_user_id,
+                therapist_user_id=therapist_user_id,
+                conversation_id=None
+            ))
+        else:
+            # Client cancelled - send message from client to therapist
+            chat_message = f"I've cancelled our session scheduled for {formatted_datetime}."
+            send_message(SendChatMessageRequest(
+                sender_id=client_user_id,
+                sender_role="client",
+                content=chat_message,
+                client_user_id=client_user_id,
+                therapist_user_id=therapist_user_id,
+                conversation_id=None
+            ))
+        logger.info(f"Sent cancellation chat message for session {request.session_id}")
+    except Exception as exc:
+        logger.warning(f"Failed to send cancellation chat message: {exc}")
     
     if cancelled_by == "therapist":
         # Notify client that therapist cancelled
