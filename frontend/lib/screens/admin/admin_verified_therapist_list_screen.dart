@@ -51,6 +51,187 @@ class _AdminVerifiedTherapistListScreenState
     }
   }
 
+  void _showTherapistDetails(Map<String, dynamic> therapist) {
+    final firstName = therapist['first_name'] ?? '';
+    final lastName = therapist['last_name'] ?? '';
+    final fullName = 'Dr. $firstName $lastName';
+    final email = therapist['email'] ?? 'N/A';
+    final contactNumber = therapist['contact_number'] ?? 'N/A';
+    final specialization = therapist['specialization'] ?? 'N/A';
+    final languages = therapist['languages'] ?? 'N/A';
+    final centerName = therapist['office_name'] ?? 'N/A';
+    final hourlyRate = therapist['hourly_rate'] != null 
+        ? 'RM ${therapist['hourly_rate']}' 
+        : 'N/A';
+    
+    // Combine address fields
+    final officeAddress = therapist['office_address'] ?? '';
+    final city = therapist['city'] ?? '';
+    final state = therapist['state'] ?? '';
+    final zip = therapist['zip'] ?? '';
+    
+    final addressParts = [officeAddress, city, state, zip]
+        .where((part) => part.isNotEmpty)
+        .toList();
+    final fullAddress = addressParts.isEmpty ? 'N/A' : addressParts.join(', ');
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(32),
+                      ),
+                      child: therapist['profile_picture_url'] != null && therapist['profile_picture_url'].isNotEmpty
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(32),
+                              child: Image.network(
+                                therapist['profile_picture_url'],
+                                width: 64,
+                                height: 64,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return const Icon(
+                                    Icons.verified_user,
+                                    color: Color(0xFF10B981),
+                                    size: 32,
+                                  );
+                                },
+                              ),
+                            )
+                          : const Icon(
+                              Icons.verified_user,
+                              color: Color(0xFF10B981),
+                              size: 32,
+                            ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            fullName,
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF422006),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            email,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontFamily: 'Nunito',
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                _buildDetailRow(Icons.phone, 'Contact Number', contactNumber),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.psychology, 'Specialization', specialization),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.language, 'Languages', languages),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.business, 'Center Name', centerName),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.location_on, 'Address', fullAddress),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.attach_money, 'Hourly Rate', hourlyRate),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF422006),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text(
+                      'Close',
+                      style: TextStyle(
+                        fontFamily: 'Nunito',
+                        fontSize: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: const Color(0xFF6B7280),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF422006),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,20 +287,22 @@ class _AdminVerifiedTherapistListScreenState
                       final centerName = therapist['office_name'] ?? 'N/A';
                       final email = therapist['email'] ?? 'No email';
 
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.06),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
+                      return GestureDetector(
+                        onTap: () => _showTherapistDetails(therapist),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.06),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -206,6 +389,7 @@ class _AdminVerifiedTherapistListScreenState
                               ],
                             ),
                           ],
+                        ),
                         ),
                       );
                     },

@@ -21,6 +21,8 @@ def create_otp(request: CreateOtpRequest):
     try:
         result = otp_service.create_otp(request.email)
         return OtpResponse(**result)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create OTP: {str(e)}")
 

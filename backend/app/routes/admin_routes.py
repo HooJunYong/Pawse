@@ -47,19 +47,40 @@ def get_all_users():
             if user_id:
                 profile = db.user_profile.find_one({"user_id": user_id})
                 if profile:
-                    user["full_name"] = profile.get("full_name", "Unknown User")
+                    # Add all profile fields (note: user_profile uses 'phone_number', not 'contact_number')
+                    user["first_name"] = profile.get("first_name", "")
+                    user["last_name"] = profile.get("last_name", "")
+                    user["full_name"] = profile.get("full_name", f"{user['first_name']} {user['last_name']}".strip()) if profile.get("full_name") else f"{profile.get('first_name', '')} {profile.get('last_name', '')}".strip()
+                    user["contact_number"] = profile.get("phone_number", "")  # user_profile uses 'phone_number'
+                    user["gender"] = profile.get("gender", "")
+                    user["date_of_birth"] = profile.get("date_of_birth", "")
+                    user["home_address"] = profile.get("home_address", "")
+                    user["city"] = profile.get("city", "")
+                    user["state"] = profile.get("state", "")
+                    user["zip"] = str(profile.get("zip", "")) if profile.get("zip") else ""
+                    
                     # Get avatar from avatar_base64 field
                     avatar_base64 = profile.get("avatar_base64")
-                    if avatar_base64:
-                        user["profile_picture"] = f"data:image/png;base64,{avatar_base64}"
+                    if avatar_base64 and isinstance(avatar_base64, str) and avatar_base64.strip():
+                        # Check if it already has the data URI prefix
+                        if not avatar_base64.startswith("data:image"):
+                            user["profile_picture"] = f"data:image/png;base64,{avatar_base64}"
+                        else:
+                            user["profile_picture"] = avatar_base64
                     else:
-                        user["profile_picture"] = None
+                        user["profile_picture"] = ""
                 else:
+                    user["first_name"] = ""
+                    user["last_name"] = ""
                     user["full_name"] = "Unknown User"
-                    user["profile_picture"] = None
+                    user["contact_number"] = ""
+                    user["profile_picture"] = ""
             else:
+                user["first_name"] = ""
+                user["last_name"] = ""
                 user["full_name"] = "Unknown User"
-                user["profile_picture"] = None
+                user["contact_number"] = ""
+                user["profile_picture"] = ""
         
         return users
     except Exception as e:

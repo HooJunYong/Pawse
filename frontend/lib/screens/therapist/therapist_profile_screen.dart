@@ -317,7 +317,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                             );
                           },
                           child: const Text(
-                            'Log Out',
+                            'Leave Therapist Dashboard',
                             style: TextStyle(
                               fontSize: 16,
                               fontFamily: 'Nunito',

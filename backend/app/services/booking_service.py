@@ -568,26 +568,31 @@ def get_client_bookings(client_user_id: str) -> list[BookingResponse]:
         status_enum = _coerce_session_status(session.get("session_status") or session.get("status"))
         type_enum = _coerce_session_type(session.get("session_type"))
 
-        result.append(BookingResponse(
-            booking_id=str(session.get("_id")),
-            session_id=session.get("session_id", ""),
-            client_user_id=session.get("user_id", ""),
-            therapist_user_id=session.get("therapist_user_id", ""),
-            therapist_name=session.get("therapist_name", "Unknown Therapist"),
-            scheduled_at=scheduled_at.isoformat() if scheduled_at else "",
-            start_time=session.get("start_time", ""),
-            end_time=session.get("end_time", ""),
-            duration_minutes=int(session.get("duration_minutes", 50)),
-            price=session_fee,
-            session_fee=session_fee,
-            status=status_enum.value,
-            session_status=status_enum,
-            session_type=type_enum,
-            created_at=created_at.isoformat() if created_at else "",
-            message="",
-            center_name=session.get("center_name"),
-            center_address=session.get("center_address"),
-        ))
+        # Create base response
+        response_dict = {
+            "booking_id": str(session.get("_id")),
+            "session_id": session.get("session_id", ""),
+            "client_user_id": session.get("user_id", ""),
+            "therapist_user_id": session.get("therapist_user_id", ""),
+            "therapist_name": session.get("therapist_name", "Unknown Therapist"),
+            "scheduled_at": scheduled_at.isoformat() if scheduled_at else "",
+            "start_time": session.get("start_time", ""),
+            "end_time": session.get("end_time", ""),
+            "duration_minutes": int(session.get("duration_minutes", 50)),
+            "price": session_fee,
+            "session_fee": session_fee,
+            "status": status_enum.value,
+            "session_status": status_enum,
+            "session_type": type_enum,
+            "created_at": created_at.isoformat() if created_at else "",
+            "message": "",
+            "center_name": session.get("center_name"),
+            "center_address": session.get("center_address"),
+            "user_rating": session.get("user_rating"),
+            "user_feedback": session.get("user_feedback"),
+        }
+
+        result.append(BookingResponse(**response_dict))
 
     return result
 

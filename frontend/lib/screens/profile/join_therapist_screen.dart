@@ -275,46 +275,111 @@ class _JoinTherapistState extends State<JoinTherapist> {
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'Error',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.bold,
-            color: Color.fromRGBO(66, 32, 6, 1),
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Color(0xFFEF4444),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Error',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF422006),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF422006),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-        content: Text(
-          message,
-          style: const TextStyle(
-            fontFamily: 'Nunito',
-            color: Color.fromRGBO(66, 32, 6, 1),
-          ),
-        ),
-        backgroundColor: const Color.fromRGBO(247, 244, 242, 1),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              backgroundColor: const Color.fromRGBO(249, 115, 22, 1),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
       ),
     );
+  }
+
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> _checkLicenseExists(String licenseNumber) async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/therapist/check-license?license_number=${Uri.encodeComponent(licenseNumber)}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
   }
 
   Future<void> _submitApplication() async {
@@ -335,12 +400,35 @@ class _JoinTherapistState extends State<JoinTherapist> {
       _showErrorDialog('Please enter a valid email address');
       return;
     }
+    
+    // Check email uniqueness (both user_profile and therapist_profiles collections)
+    final emailExists = await _checkEmailExists(_emailController.text.trim());
+    if (emailExists) {
+      _showErrorDialog('This email is already registered. Please use a different email address.');
+      return;
+    }
+    
     if (_contactController.text.isEmpty) {
       _showErrorDialog('Please enter your contact number');
       return;
     }
+    
+    // Malaysian phone number validation (01X-XXX XXXX or 01XXXXXXXXX)
+    final cleanedContact = _contactController.text.replaceAll(RegExp(r'[\s-]'), '');
+    if (!RegExp(r'^01[0-9]{8,9}$').hasMatch(cleanedContact)) {
+      _showErrorDialog('Please enter a valid Malaysian contact number (e.g., 012-345 6789 or 0123456789)');
+      return;
+    }
+    
     if (_licenseController.text.isEmpty) {
       _showErrorDialog('Please enter your license number');
+      return;
+    }
+    
+    // Check license number uniqueness (therapist_profiles collection only)
+    final licenseExists = await _checkLicenseExists(_licenseController.text.trim());
+    if (licenseExists) {
+      _showErrorDialog('This license number is already registered. Please verify your license number.');
       return;
     }
     if (_bioController.text.isEmpty) {

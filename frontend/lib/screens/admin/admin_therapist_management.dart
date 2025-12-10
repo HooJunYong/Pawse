@@ -357,24 +357,24 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
                       ),
                       const SizedBox(height: 24),
                       _buildDetailCard('Personal Information', [
-                        _buildDetailRow('Name', '${application['first_name']} ${application['last_name']}'),
-                        _buildDetailRow('Email', application['email'] ?? 'N/A'),
-                        _buildDetailRow('Contact', application['contact_number'] ?? 'N/A'),
-                        _buildDetailRow('License Number', application['license_number'] ?? 'N/A'),
+                        _buildDetailRow('Name', '${application['first_name'] ?? 'N/A'} ${application['last_name'] ?? 'N/A'}'),
+                        _buildDetailRow('Email', application['email']?.toString() ?? 'N/A'),
+                        _buildDetailRow('Contact', application['contact_number']?.toString() ?? 'N/A'),
+                        _buildDetailRow('License Number', application['license_number']?.toString() ?? 'N/A'),
                       ]),
                       const SizedBox(height: 16),
                       _buildDetailCard('Office Information', [
-                        _buildDetailRow('Office Name', application['office_name'] ?? 'N/A'),
-                        _buildDetailRow('Address', application['office_address'] ?? 'N/A'),
-                        _buildDetailRow('City', application['city'] ?? 'N/A'),
-                        _buildDetailRow('State', application['state'] ?? 'N/A'),
+                        _buildDetailRow('Office Name', application['office_name']?.toString() ?? 'N/A'),
+                        _buildDetailRow('Address', application['office_address']?.toString() ?? 'N/A'),
+                        _buildDetailRow('City', application['city']?.toString() ?? 'N/A'),
+                        _buildDetailRow('State', application['state']?.toString() ?? 'N/A'),
                         _buildDetailRow('Zip Code', application['zip']?.toString() ?? 'N/A'),
                       ]),
                       const SizedBox(height: 16),
                       _buildDetailCard('Professional Details', [
                         _buildDetailRow('Hourly Rate', 'RM ${application['hourly_rate']?.toString() ?? '0'}'),
-                        _buildChipRow('Specializations', (application['specializations'] as List?)?.cast<String>() ?? []),
-                        _buildChipRow('Languages', (application['languages_spoken'] as List?)?.cast<String>() ?? []),
+                        _buildChipRow('Specializations', _safeListExtract(application['specializations'])),
+                        _buildChipRow('Languages', _safeListExtract(application['languages_spoken'])),
                       ]),
                       const SizedBox(height: 16),
                       Container(
@@ -489,6 +489,83 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
     );
   }
 
+  Widget _buildProfileAvatar(Map<String, dynamic> app) {
+    Widget buildPlaceholder() {
+      return const Icon(
+        Icons.person,
+        color: Color.fromRGBO(249, 115, 22, 1),
+      );
+    }
+
+    Widget buildNetworkAvatar(String url) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Image.network(
+          url,
+          width: 48,
+          height: 48,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => buildPlaceholder(),
+        ),
+      );
+    }
+
+    Widget? buildMemoryAvatar(String base64Data) {
+      if (base64Data.isEmpty) {
+        return null;
+      }
+      try {
+        final decoded = base64Decode(base64Data);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Image.memory(
+            decoded,
+            width: 48,
+            height: 48,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Safe string extraction helper
+    String? _safeString(dynamic value) {
+      if (value == null) return null;
+      if (value is! String) return null;
+      final trimmed = value.trim();
+      if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') return null;
+      return trimmed;
+    }
+
+    final profileUrl = _safeString(app['profile_picture_url']);
+    final profileBase64 = _safeString(app['profile_picture_base64']);
+
+    if (profileUrl != null) {
+      if (profileUrl.startsWith('data:image')) {
+        final parts = profileUrl.split(',');
+        if (parts.length == 2) {
+          final memoryAvatar = buildMemoryAvatar(parts[1]);
+          if (memoryAvatar != null) {
+            return memoryAvatar;
+          }
+        }
+      } else {
+        return buildNetworkAvatar(profileUrl);
+      }
+    }
+
+    if (profileBase64 != null) {
+      final memoryAvatar = buildMemoryAvatar(profileBase64);
+      if (memoryAvatar != null) {
+        return memoryAvatar;
+      }
+    }
+
+    return buildPlaceholder();
+  }
+
   Widget _buildDetailCard(String title, List<Widget> children) {
     return Container(
       width: double.infinity,
@@ -556,6 +633,14 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
     );
   }
 
+  List<String> _safeListExtract(dynamic value) {
+    if (value == null) return [];
+    if (value is List) {
+      return value.map((item) => item?.toString() ?? '').where((item) => item.isNotEmpty).toList();
+    }
+    return [];
+  }
+
   Widget _buildChipRow(String label, List<String> items) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -571,29 +656,39 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
             ),
           ),
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: items.map((item) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color.fromRGBO(254, 243, 199, 1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: const Color.fromRGBO(249, 115, 22, 0.3),
+          items.isEmpty
+              ? Text(
+                  'None specified',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontFamily: 'Nunito',
+                    color: Colors.grey[500],
+                    fontStyle: FontStyle.italic,
+                  ),
+                )
+              : Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: items.map((item) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color.fromRGBO(254, 243, 199, 1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color.fromRGBO(249, 115, 22, 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      item,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontFamily: 'Nunito',
+                        fontWeight: FontWeight.w600,
+                        color: Color.fromRGBO(146, 64, 14, 1),
+                      ),
+                    ),
+                  )).toList(),
                 ),
-              ),
-              child: Text(
-                item,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.w600,
-                  color: Color.fromRGBO(146, 64, 14, 1),
-                ),
-              ),
-            )).toList(),
-          ),
         ],
       ),
     );
@@ -701,26 +796,7 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
                                       color: const Color.fromRGBO(254, 243, 199, 1),
                                       borderRadius: BorderRadius.circular(24),
                                     ),
-                                    child: app['profile_picture_url'] != null && app['profile_picture_url'].isNotEmpty
-                                        ? ClipRRect(
-                                            borderRadius: BorderRadius.circular(24),
-                                            child: Image.network(
-                                              app['profile_picture_url'],
-                                              width: 48,
-                                              height: 48,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (context, error, stackTrace) {
-                                                return const Icon(
-                                                  Icons.person,
-                                                  color: Color.fromRGBO(249, 115, 22, 1),
-                                                );
-                                              },
-                                            ),
-                                          )
-                                        : const Icon(
-                                            Icons.person,
-                                            color: Color.fromRGBO(249, 115, 22, 1),
-                                          ),
+                                    child: _buildProfileAvatar(app),
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(

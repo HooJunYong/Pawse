@@ -773,6 +773,8 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
           final String? cancellationReason =
               session['cancellation_reason']?.toString() ??
                   session['cancel_reason']?.toString();
+          final dynamic userRating = session['user_rating'];
+          final String? userFeedback = session['user_feedback']?.toString();
 
           history.add({
             'session_id': sessionId,
@@ -785,6 +787,8 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
             'session_notes': sessionNotes,
             'therapist_notes': therapistNotes,
             'cancellation_reason': cancellationReason,
+            'user_rating': userRating,
+            'user_feedback': userFeedback,
           });
           seenSessionIds.add(sessionId);
 
@@ -933,14 +937,35 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                         color: _textGrey,
                                       ),
                                     ),
-                                  Text(
-                                    statusLabel,
-                                    style: TextStyle(
-                                      fontFamily: 'Nunito',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: statusColor,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Text(
+                                        statusLabel,
+                                        style: TextStyle(
+                                          fontFamily: 'Nunito',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: statusColor,
+                                        ),
+                                      ),
+                                      if (status == 'completed' && record['user_rating'] != null && record['user_rating'] > 0) ...[
+                                        const SizedBox(width: 8),
+                                        const Text('·', style: TextStyle(color: _textGrey)),
+                                        const SizedBox(width: 6),
+                                        ...List.generate(5, (index) {
+                                          final ratingValue = record['user_rating'] is int
+                                              ? (record['user_rating'] as int).toDouble()
+                                              : (record['user_rating'] as double);
+                                          return Icon(
+                                            index < ratingValue.round()
+                                                ? Icons.star
+                                                : Icons.star_border,
+                                            size: 14,
+                                            color: _accentOrange,
+                                          );
+                                        }),
+                                      ],
+                                    ],
                                   ),
                                 ],
                               ),
@@ -978,6 +1003,8 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     final String? notes = record['notes']?.toString();
     final String? sessionNotes = record['session_notes']?.toString();
     final String? therapistNotes = record['therapist_notes']?.toString();
+    final dynamic userRating = record['user_rating'];
+    final String? userFeedback = record['user_feedback']?.toString();
 
     showDialog<void>(
       context: context,
@@ -1083,6 +1110,101 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                             therapistNotes,
                             icon: Icons.edit_note,
                           ),
+                        
+                        // Client Rating Section
+                        if (status == 'completed') ...[
+                          const SizedBox(height: 8),
+                          const Divider(),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Client Rating',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Nunito',
+                              color: _textDark,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          if (userRating != null && userRating > 0) ...[
+                            Row(
+                              children: [
+                                ...List.generate(5, (index) {
+                                  final ratingValue = userRating is int
+                                      ? userRating.toDouble()
+                                      : (userRating as double);
+                                  return Icon(
+                                    index < ratingValue.round()
+                                        ? Icons.star
+                                        : Icons.star_border,
+                                    size: 28,
+                                    color: _accentOrange,
+                                  );
+                                }),
+                              ],
+                            ),
+                            if (userFeedback != null && userFeedback.trim().isNotEmpty) ...[
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _surfaceWhite,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Client Feedback',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontFamily: 'Nunito',
+                                        fontWeight: FontWeight.w600,
+                                        color: _textGrey,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      userFeedback,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontFamily: 'Nunito',
+                                        color: _textDark,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ] else ...[
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _textGrey.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.star_border,
+                                    color: _textGrey,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Not rated yet',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontFamily: 'Nunito',
+                                      color: _textGrey,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ],
                     ),
                   ),

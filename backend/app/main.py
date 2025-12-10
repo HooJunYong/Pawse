@@ -67,10 +67,18 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS Configuration
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+import json
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", '["*"]')
+try:
+    # Try to parse as JSON array first
+    allowed_origins = json.loads(allowed_origins_env)
+except json.JSONDecodeError:
+    # Fallback to comma-separated string
+    allowed_origins = allowed_origins_env.split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins != ["*"] else ["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

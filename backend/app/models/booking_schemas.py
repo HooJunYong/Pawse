@@ -71,6 +71,8 @@ class BookingResponse(BaseModel):
     message: str
     center_name: Optional[str] = None
     center_address: Optional[str] = None
+    user_rating: Optional[float] = None
+    user_feedback: Optional[str] = None
 
 
 class UpcomingSessionResponse(BaseModel):

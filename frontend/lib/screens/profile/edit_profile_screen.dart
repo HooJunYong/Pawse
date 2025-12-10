@@ -35,6 +35,7 @@ class _EditProfileState extends State<EditProfile> {
   String _selectedState = 'Select';
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
+  String _originalEmail = '';
 
   @override
   void initState() {
@@ -67,6 +68,7 @@ class _EditProfileState extends State<EditProfile> {
           _firstNameController.text = (data['first_name'] as String?) ?? '';
           _lastNameController.text = (data['last_name'] as String?) ?? '';
           _emailController.text = (data['email'] as String?) ?? '';
+          _originalEmail = _emailController.text;
           _phoneController.text = (data['phone_number'] as String?) ?? '';
           _dobController.text = (data['date_of_birth'] as String?) ?? '';
           _selectedGender = (data['gender'] as String?) ?? 'Select';
@@ -187,6 +189,99 @@ class _EditProfileState extends State<EditProfile> {
     });
   }
 
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Color(0xFFEF4444),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Error',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF422006),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF422006),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveChanges() async {
     if (_formKey.currentState?.validate() ?? false) {
       if (_selectedGender == 'Select') {
@@ -201,6 +296,16 @@ class _EditProfileState extends State<EditProfile> {
           const SnackBar(content: Text('Please select a state')),
         );
         return;
+      }
+
+      // Check email uniqueness if email changed
+      final newEmail = _emailController.text.trim();
+      if (newEmail != _originalEmail) {
+        final emailExists = await _checkEmailExists(newEmail);
+        if (emailExists) {
+          _showErrorDialog('This email is already registered. Please use a different email address.');
+          return;
+        }
       }
 
       try {
@@ -724,14 +829,16 @@ class _EditProfileState extends State<EditProfile> {
                           _buildTextField(
                             controller: _phoneController,
                             label: 'Phone Number',
-                            hintText: 'e.g., +60123456789',
+                            hintText: 'e.g., 012-345 6789 or 0123456789',
                             keyboardType: TextInputType.phone,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Phone number is required';
                               }
-                              if (!RegExp(r'^\+?[0-9]{10,15}$').hasMatch(value.trim())) {
-                                return 'Enter valid phone number';
+                              // Malaysian phone number validation (01X-XXX XXXX or 01XXXXXXXXX)
+                              final cleanedPhone = value.replaceAll(RegExp(r'[\s-]'), '');
+                              if (!RegExp(r'^01[0-9]{8,9}$').hasMatch(cleanedPhone)) {
+                                return 'Enter valid Malaysian number (e.g., 012-345 6789)';
                               }
                               return null;
                             },

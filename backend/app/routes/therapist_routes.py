@@ -10,8 +10,15 @@ from ..services.therapist_service import (
     get_therapist_dashboard_data,
     update_therapist_profile
 )
+from ..models.database import db
 
 router = APIRouter()
+
+@router.get("/therapist/check-license")
+def check_license_exists(license_number: str):
+    """Check if a license number already exists in therapist_profiles collection"""
+    existing = db.therapist_profiles.find_one({"license_number": license_number})
+    return {"exists": existing is not None}
 
 @router.post("/therapist/application", response_model=TherapistApplicationResponse)
 def create_therapist_application(request: TherapistApplicationRequest):

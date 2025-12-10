@@ -33,6 +33,7 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
   String _selectedState = 'Select';
   Uint8List? _imageBytes;
   final ImagePicker _picker = ImagePicker();
+  String _originalEmail = '';
   
   // Specializations and Languages
   final List<String> _specializations = [
@@ -82,6 +83,7 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
           _firstNameController.text = (data['first_name'] as String?) ?? '';
           _lastNameController.text = (data['last_name'] as String?) ?? '';
           _emailController.text = (data['email'] as String?) ?? '';
+          _originalEmail = (data['email'] as String?) ?? '';
           _contactNumberController.text = (data['contact_number'] as String?) ?? '';
           _bioController.text = (data['bio'] as String?) ?? '';
           _officeNameController.text = (data['office_name'] as String?) ?? '';
@@ -212,8 +214,108 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
     });
   }
 
+  Future<bool> _checkEmailExists(String email) async {
+    try {
+      final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      final response = await http.get(
+        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<void> _saveChanges() async {
     if (_formKey.currentState?.validate() ?? false) {
+      // Check if email changed and if it already exists
+      final newEmail = _emailController.text.trim();
+      if (newEmail != _originalEmail) {
+        final emailExists = await _checkEmailExists(newEmail);
+        if (emailExists) {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                backgroundColor: const Color(0xFFF7F4F2),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Color(0xFFFEE2E2),
+                        ),
+                        child: const Icon(
+                          Icons.error_outline,
+                          color: Color(0xFFEF4444),
+                          size: 32,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Email Already Exists',
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF422006),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'This email is already registered. Please use a different email address.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Nunito',
+                          fontSize: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF422006),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'OK',
+                            style: TextStyle(
+                              fontFamily: 'Nunito',
+                              fontSize: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+          return;
+        }
+      }
+
       try {
         showDialog(
           context: context,
@@ -564,6 +666,7 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
             return FilterChip(
               label: Text(spec),
               selected: isSelected,
+              showCheckmark: false,
               onSelected: canSelect ? (selected) {
                 setState(() {
                   if (selected) {
@@ -621,6 +724,7 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
             return FilterChip(
               label: Text(lang),
               selected: isSelected,
+              showCheckmark: false,
               onSelected: (selected) {
                 setState(() {
                   if (selected) {
@@ -802,11 +906,17 @@ class _TherapistEditProfileScreenState extends State<TherapistEditProfileScreen>
                           _buildTextField(
                             controller: _contactNumberController,
                             label: 'Contact Number',
-                            hintText: '012-345 6789',
+                            hintText: '012-345 6789 or 0123456789',
                             keyboardType: TextInputType.phone,
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Contact number is required';
+                              }
+                              // Remove spaces and hyphens for validation
+                              final cleaned = value.trim().replaceAll(RegExp(r'[\s-]'), '');
+                              // Malaysian format: starts with 01 and has 10-11 digits
+                              if (!RegExp(r'^01[0-9]{8,9}$').hasMatch(cleaned)) {
+                                return 'Invalid format (e.g., 012-345 6789)';
                               }
                               return null;
                             },
