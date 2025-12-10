@@ -65,6 +65,76 @@ class TherapistAvailability {
   }
 }
 
+DateTime _parseBackendDateTime(dynamic rawValue) {
+  if (rawValue is DateTime) {
+    return rawValue;
+  }
+  if (rawValue == null) {
+    return DateTime.now();
+  }
+
+  final isoString = rawValue.toString().trim();
+  if (isoString.isEmpty) {
+    return DateTime.now();
+  }
+
+  final tzMatch = RegExp(r'([+-]\d{2}:?\d{2}|Z)$').firstMatch(isoString);
+  if (tzMatch != null) {
+    final tzPart = tzMatch.group(0)!;
+    final core = isoString.substring(0, tzMatch.start);
+
+    if (tzPart == 'Z') {
+      final utc = DateTime.parse(isoString).toUtc();
+      final myTime = utc.add(const Duration(hours: 8));
+      return DateTime(
+        myTime.year,
+        myTime.month,
+        myTime.day,
+        myTime.hour,
+        myTime.minute,
+        myTime.second,
+        myTime.millisecond,
+        myTime.microsecond,
+      );
+    }
+
+    final parsed = DateTime.parse(core);
+    return DateTime(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
+  }
+
+  final parsed = DateTime.parse(isoString);
+  final utc = DateTime.utc(
+    parsed.year,
+    parsed.month,
+    parsed.day,
+    parsed.hour,
+    parsed.minute,
+    parsed.second,
+    parsed.millisecond,
+    parsed.microsecond,
+  );
+  final myTime = utc.add(const Duration(hours: 8));
+  return DateTime(
+    myTime.year,
+    myTime.month,
+    myTime.day,
+    myTime.hour,
+    myTime.minute,
+    myTime.second,
+    myTime.millisecond,
+    myTime.microsecond,
+  );
+}
+
 class TherapySession {
   final String sessionId;
   final String therapistUserId;
@@ -99,17 +169,7 @@ class TherapySession {
   factory TherapySession.fromJson(Map<String, dynamic> json) {
     final scheduledAtRaw = json['scheduled_at'];
     DateTime scheduledAt;
-    if (scheduledAtRaw == null || (scheduledAtRaw is String && scheduledAtRaw.isEmpty)) {
-      scheduledAt = DateTime.now();
-    } else if (scheduledAtRaw is DateTime) {
-      scheduledAt = scheduledAtRaw;
-    } else {
-      try {
-        scheduledAt = DateTime.parse(scheduledAtRaw.toString());
-      } catch (_) {
-        scheduledAt = DateTime.now();
-      }
-    }
+    scheduledAt = _parseBackendDateTime(scheduledAtRaw);
 
     final rawFee = json['session_fee'] ?? json['price'];
     double sessionFee;
@@ -366,6 +426,7 @@ class BookingService {
     required String clientUserId,
     String? therapistUserId,
     String? reason,
+    String? cancelledBy,
   }) async {
     try {
       final response = await http.post(
@@ -375,6 +436,7 @@ class BookingService {
           'session_id': sessionId,
           'client_user_id': clientUserId,
           if (reason != null && reason.isNotEmpty) 'reason': reason,
+          if (cancelledBy != null) 'cancelled_by': cancelledBy,
         }),
       );
 

@@ -104,14 +104,16 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
   // Format time logic: "10:30 AM" for today, "Oct 24" for older
   String _getFormattedTime(DateTime? time) {
     if (time == null) return '';
+    // Time is already in Malaysia time (treated as local)
+    final displayTime = time;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final dateToCheck = DateTime(time.year, time.month, time.day);
+    final dateToCheck = DateTime(displayTime.year, displayTime.month, displayTime.day);
 
     if (dateToCheck == today) {
-      return _dateFormat.format(time);
+      return _dateFormat.format(displayTime);
     } else {
-      return _dayFormat.format(time);
+      return _dayFormat.format(displayTime);
     }
   }
 
@@ -128,17 +130,11 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         backgroundColor: _bgCream,
         elevation: 0,
         centerTitle: true,
-        leading: Container(
-          margin: const EdgeInsets.only(left: 16, top: 8, bottom: 8),
-          decoration: BoxDecoration(
-            color: _surfaceWhite,
-            shape: BoxShape.circle,
-            boxShadow: _cardShadow,
-          ),
-          child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: _primaryBrown, size: 20),
-            onPressed: () => Navigator.pop(context),
-          ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: _textDark),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
         ),
         title: const Text(
           'Messages',

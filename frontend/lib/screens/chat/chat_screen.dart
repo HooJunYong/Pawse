@@ -9,7 +9,10 @@ import 'package:intl/intl.dart';
 
 import '../../models/chat_conversation.dart';
 import '../../models/chat_message.dart';
+import '../../services/api_service.dart';
+import '../../services/chat_notification_service.dart';
 import '../../services/chat_service.dart';
+import '../../services/profile_service.dart';
 
 // --- Theme Constants ---
 const Color _bgCream = Color(0xFFF7F4F2);
@@ -175,6 +178,22 @@ class _ChatScreenState extends State<ChatScreen> {
       if (messages.length != _messages.length ||
           (messages.isNotEmpty && _messages.isNotEmpty &&
               messages.last.messageId != _messages.last.messageId)) {
+        // Check for new messages from the counterpart
+        final newMessages = messages.where((msg) => 
+          !_messages.any((existing) => existing.messageId == msg.messageId) &&
+          msg.senderId != widget.currentUserId
+        ).toList();
+        
+        // Show notification for each new message from counterpart
+        for (final newMsg in newMessages) {
+          await ChatNotificationService.showMessageNotification(
+            message: newMsg,
+            currentUserId: widget.currentUserId,
+            senderName: widget.counterpartName,
+            isTherapist: widget.isTherapist,
+          );
+        }
+        
         setState(() => _messages = messages);
         await _markConversationAsRead();
         _scrollToBottom();
@@ -226,6 +245,226 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _showProfileInfoDialog() async {
+    try {
+      // Determine whose profile to fetch (the counterpart's profile)
+      final String counterpartUserId = widget.isTherapist 
+          ? widget.clientUserId 
+          : widget.therapistUserId;
+      
+      String firstName = '';
+      String lastName = '';
+      String email = '';
+      String phoneNumber = '';
+      ImageProvider? avatarImage;
+      String? centerName;
+      String? therapistContactNumber;
+      
+      if (widget.isTherapist) {
+        // Therapist viewing client - get client profile
+        final response = await ProfileService.getProfileDetails(counterpartUserId);
+        
+        if (response.statusCode != 200) {
+          throw Exception('Failed to load profile');
+        }
+        
+        final profileData = jsonDecode(response.body);
+        
+        firstName = profileData['first_name']?.toString() ?? '';
+        lastName = profileData['last_name']?.toString() ?? '';
+        email = profileData['email']?.toString() ?? '';
+        phoneNumber = profileData['phone_number']?.toString() ?? '';
+        
+        // Get client avatar from user_profile (avatar_base64)
+        final String? avatarBase64 = profileData['avatar_base64']?.toString();
+        final String? avatarUrl = profileData['avatar_url']?.toString();
+        
+        if (avatarBase64 != null && avatarBase64.isNotEmpty && avatarBase64.toLowerCase().startsWith('data:image/')) {
+          final separator = avatarBase64.indexOf(',');
+          if (separator != -1) {
+            final dataPart = avatarBase64.substring(separator + 1).trim();
+            try {
+              final bytes = base64Decode(dataPart);
+              avatarImage = MemoryImage(bytes);
+            } catch (_) {}
+          }
+        } else if (avatarUrl != null && avatarUrl.isNotEmpty) {
+          avatarImage = NetworkImage(avatarUrl);
+        }
+      } else {
+        // Client viewing therapist - fetch therapist profile directly
+        final therapistResponse = await ApiService.get('/therapist/profile/$counterpartUserId');
+        
+        if (therapistResponse.statusCode != 200) {
+          throw Exception('Failed to load therapist profile');
+        }
+        
+        final therapistData = jsonDecode(therapistResponse.body);
+        
+        firstName = therapistData['first_name']?.toString() ?? '';
+        lastName = therapistData['last_name']?.toString() ?? '';
+        email = therapistData['email']?.toString() ?? '';
+        centerName = therapistData['office_name']?.toString() ?? 'Holistic Mind Center';
+        therapistContactNumber = therapistData['contact_number']?.toString();
+        
+        // Get therapist profile picture from profile_picture_base64
+        final String? profilePictureBase64 = therapistData['profile_picture_base64']?.toString();
+        final String? profilePictureUrl = therapistData['profile_picture_url']?.toString();
+        
+        if (profilePictureBase64 != null && profilePictureBase64.isNotEmpty && profilePictureBase64.toLowerCase().startsWith('data:image/')) {
+          final separator = profilePictureBase64.indexOf(',');
+          if (separator != -1) {
+            final dataPart = profilePictureBase64.substring(separator + 1).trim();
+            try {
+              final bytes = base64Decode(dataPart);
+              avatarImage = MemoryImage(bytes);
+            } catch (_) {}
+          }
+        } else if (profilePictureUrl != null && profilePictureUrl.isNotEmpty) {
+          avatarImage = NetworkImage(profilePictureUrl);
+        }
+      }
+      
+      // Build full name
+      final String fullName = (firstName.isNotEmpty || lastName.isNotEmpty)
+          ? '$firstName $lastName'.trim()
+          : widget.counterpartName;
+      
+      if (!mounted) return;
+      
+      // Show dialog
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: _surfaceWhite,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Avatar
+                  CircleAvatar(
+                    radius: 50,
+                    backgroundColor: _bgCream,
+                    backgroundImage: avatarImage,
+                    child: avatarImage == null
+                        ? Icon(
+                            Icons.person,
+                            size: 50,
+                            color: _primaryBrown,
+                          )
+                        : null,
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Name (with Dr. prefix for therapists if client is viewing)
+                  Text(
+                    widget.isTherapist 
+                        ? fullName 
+                        : (fullName.toLowerCase().startsWith('dr.') 
+                            ? fullName 
+                            : 'Dr. $fullName'),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Nunito',
+                      color: _textDark,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Email
+                  if (email.isNotEmpty)
+                    _buildInfoRow(Icons.email_outlined, email),
+                  
+                  // Phone number (show user profile phone_number if available, or therapist contact_number for therapists)
+                  if (widget.isTherapist && phoneNumber.isNotEmpty)
+                    _buildInfoRow(Icons.phone_outlined, phoneNumber),
+                  
+                  if (!widget.isTherapist && therapistContactNumber != null && therapistContactNumber.isNotEmpty)
+                    _buildInfoRow(Icons.phone_outlined, therapistContactNumber),
+                  
+                  // Center name (only for therapists when client is viewing)
+                  if (!widget.isTherapist && centerName != null)
+                    _buildInfoRow(Icons.location_city_outlined, centerName),
+                  
+                  const SizedBox(height: 20),
+                  
+                  // Close button
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryBrown,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Close',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Nunito',
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to load profile: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+  
+  Widget _buildInfoRow(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: _primaryBrown,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 15,
+                fontFamily: 'Nunito',
+                color: _textDark,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final avatarImage = _buildCounterpartAvatarImage();
@@ -264,7 +503,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert, color: _textGrey),
-            onPressed: () {},
+            onPressed: () => _showProfileInfoDialog(),
           ),
         ],
       ),
@@ -339,7 +578,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildChatBubble(ChatMessage message, bool isMine) {
-    final timeStr = DateFormat('h:mm a').format(message.createdAt.toLocal());
+    // Format time - the datetime from backend is already in Malaysia time (UTC+8)
+    // Don't use toLocal() as it would convert again
+    final timeStr = DateFormat('h:mm a').format(message.createdAt);
 
     return LayoutBuilder(
       builder: (context, constraints) {

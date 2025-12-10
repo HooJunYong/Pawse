@@ -152,22 +152,34 @@ class NotificationManager {
 
   /// Show local notification
   Future<void> _showLocalNotification(NotificationModel notification) async {
-    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'pawse_notifications',
       'Pawse Notifications',
       channelDescription: 'Notifications from Pawse app',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
+      styleInformation: BigTextStyleInformation(
+        notification.body,
+        htmlFormatBigText: true,
+        contentTitle: notification.title,
+        htmlFormatContentTitle: true,
+        summaryText: 'Pawse',
+        htmlFormatSummaryText: true,
+      ),
+      enableLights: true,
+      enableVibration: true,
+      playSound: true,
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      subtitle: null,
     );
 
-    const NotificationDetails platformDetails = NotificationDetails(
+    final NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );

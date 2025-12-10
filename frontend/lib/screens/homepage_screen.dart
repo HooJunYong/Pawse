@@ -714,8 +714,8 @@ class _HomeScreenState extends State<HomeScreen> {
     TherapySession session, {
     VoidCallback? onDismissCancelled,
   }) {
-    final String timeStr = DateFormat('h:mm a').format(session.scheduledAt.toLocal());
-    final String dateStr = DateFormat('MMM d').format(session.scheduledAt.toLocal());
+    final String timeStr = DateFormat('h:mm a').format(session.scheduledAt);
+    final String dateStr = DateFormat('MMM d').format(session.scheduledAt);
 
     final nameParts = session.therapistName.trim().split(' ');
     final initials = nameParts.length > 1
@@ -904,7 +904,7 @@ class _HomeScreenState extends State<HomeScreen> {
         bool isProcessing = false;
         String? errorMessage;
         final statusLower = session.sessionStatus.toLowerCase();
-        final DateTime start = session.scheduledAt.toLocal();
+        final DateTime start = session.scheduledAt;
         final Duration timeUntilStart = start.difference(DateTime.now());
         final bool canCancel =
             statusLower == 'scheduled' && timeUntilStart > const Duration(hours: 1);
@@ -1094,6 +1094,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       sessionId: session.sessionId,
                                       clientUserId: widget.userId,
                                       therapistUserId: session.therapistUserId,
+                                      cancelledBy: 'client',
                                     );
                                     if (!mounted) return;
                                     Navigator.pop(context);

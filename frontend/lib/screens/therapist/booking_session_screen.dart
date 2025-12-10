@@ -116,11 +116,8 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
         setState(() {
           _isLoading = false;
         });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error loading availability: $e')),
-          );
-        }
+        // Don't show error snackbar for silent refreshes
+        // User can still see the error in logs if needed
       }
     }
   }

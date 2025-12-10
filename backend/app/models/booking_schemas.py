@@ -96,6 +96,7 @@ class CancelBookingRequest(BaseModel):
     session_id: str
     client_user_id: str
     reason: Optional[str] = None
+    cancelled_by: Optional[str] = "client"  # "client" or "therapist"
 
 
 class CancelBookingResponse(BaseModel):

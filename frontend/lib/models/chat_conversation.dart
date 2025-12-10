@@ -27,7 +27,29 @@ class ChatConversation {
     DateTime? lastMessageAt;
     final rawLast = json['last_message_at'];
     if (rawLast is String && rawLast.isNotEmpty) {
-      lastMessageAt = DateTime.tryParse(rawLast);
+      // Manual parsing to ignore timezone offset or adjust UTC to MYT
+      String isoString = rawLast;
+      if (isoString.endsWith('Z')) {
+        final utc = DateTime.parse(isoString);
+        final myTime = utc.add(const Duration(hours: 8));
+        lastMessageAt = DateTime(myTime.year, myTime.month, myTime.day, myTime.hour, myTime.minute, myTime.second);
+      } else {
+        final tzMatch = RegExp(r'([+-]\d{2}:?\d{2})$').firstMatch(isoString);
+        if (tzMatch != null) {
+          final core = isoString.substring(0, tzMatch.start);
+          final parsed = DateTime.tryParse(core);
+          if (parsed != null) {
+            lastMessageAt = DateTime(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second, parsed.millisecond, parsed.microsecond);
+          }
+        } else {
+          final parsed = DateTime.tryParse(isoString);
+          if (parsed != null) {
+            final utc = DateTime.utc(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, parsed.second, parsed.millisecond, parsed.microsecond);
+            final myTime = utc.add(const Duration(hours: 8));
+            lastMessageAt = DateTime(myTime.year, myTime.month, myTime.day, myTime.hour, myTime.minute, myTime.second, myTime.millisecond, myTime.microsecond);
+          }
+        }
+      }
     } else if (rawLast is DateTime) {
       lastMessageAt = rawLast;
     }

@@ -280,7 +280,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
       return false;
     }
 
-    final difference = sessionDateTime.difference(DateTime.now());
+    final difference = sessionDateTime.difference(_nowInMalaysia());
     return difference.inDays >= 5;
   }
 
@@ -317,8 +317,10 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   bool _isLoading = true;
   String? _activeCancelSessionId;
   String? _activeCancelledTodaySessionId;
+  String? _activeTodayCancelSessionId;
   String? _activeUpcomingReleaseSessionId;
   Timer? _cancelButtonTimer;
+  Timer? _todayCancelTimer;
   Timer? _upcomingRefreshTimer;
   Timer? _upcomingReleaseTimer;
   String? _statusUpdatingSessionId;
@@ -355,6 +357,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
   @override
   void dispose() {
     _cancelButtonTimer?.cancel();
+    _todayCancelTimer?.cancel();
     _upcomingRefreshTimer?.cancel();
     _upcomingReleaseTimer?.cancel();
     _chatUnreadTimer?.cancel();
@@ -390,7 +393,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
 
   Future<void> _loadTodaysAppointments() async {
     final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-    final today = DateTime.now();
+    final today = _nowInMalaysia();
     final dateStr =
         '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
@@ -401,7 +404,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
         final data = jsonDecode(response.body);
         final sessions = List<Map<String, dynamic>>.from(data['sessions'] ?? []);
         final todays = sessions.map((session) {
-          final scheduledAt = DateTime.parse(session['scheduled_at']);
+          final scheduledAt = _parseDateTimeIgnoreOffset(session['scheduled_at']);
           final statusRaw =
               (session['session_status'] ?? session['status'] ?? 'scheduled')
                   .toString();
@@ -410,11 +413,12 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
           final endAt = scheduledAt.add(Duration(minutes: durationMinutes));
           return {
             'session_id': session['session_id']?.toString() ?? '',
-            'scheduled_at': scheduledAt.toIso8601String(),
-            'end_at': endAt.toIso8601String(),
+            'scheduled_at': scheduledAt,
+            'end_at': endAt,
             'time': DateFormat('h:mm').format(scheduledAt),
             'period': DateFormat('a').format(scheduledAt),
             'client_name': session['client_name'] ?? 'Client',
+            'client_user_id': session['user_id']?.toString() ?? '',
             'status': statusRaw,
             'slot_released': session['slot_released'] == true,
           };
@@ -448,7 +452,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     _isUpcomingLoading = true;
     final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
     final List<Map<String, dynamic>> scheduleData = [];
-    final now = DateTime.now();
+    final now = _nowInMalaysia();
 
     try {
       for (int i = 1; i <= 5; i++) {
@@ -472,7 +476,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
               Map<String, dynamic>? matchedSession;
 
               for (final session in sessions) {
-                final sessionTime = DateTime.parse(session['scheduled_at']);
+                final sessionTime = _parseDateTimeIgnoreOffset(session['scheduled_at']);
                 final slotStart =
                     _parseTimeWithDate(dateStr, slot['start_time']);
                 if (sessionTime.isAtSameMomentAs(slotStart)) {
@@ -615,13 +619,78 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     return lower == 'completed' || lower == 'no_show' || lower.contains('cancel');
   }
 
+  DateTime _parseDateTimeIgnoreOffset(String isoString) {
+    final trimmed = isoString.trim();
+    if (trimmed.isEmpty) {
+      return _nowInMalaysia();
+    }
+
+    final tzMatch = RegExp(r'([+-]\d{2}:?\d{2}|Z)$').firstMatch(trimmed);
+    if (tzMatch != null) {
+      final tzPart = tzMatch.group(0)!;
+      final core = trimmed.substring(0, tzMatch.start);
+
+      if (tzPart == 'Z') {
+        final utc = DateTime.parse(trimmed).toUtc();
+        final myTime = utc.add(const Duration(hours: 8));
+        return DateTime(
+          myTime.year,
+          myTime.month,
+          myTime.day,
+          myTime.hour,
+          myTime.minute,
+          myTime.second,
+          myTime.millisecond,
+          myTime.microsecond,
+        );
+      }
+
+      // If offset is provided (e.g. +08:00), treat the face value as the intended local time.
+      final parsed = DateTime.parse(core);
+      return DateTime(
+        parsed.year,
+        parsed.month,
+        parsed.day,
+        parsed.hour,
+        parsed.minute,
+        parsed.second,
+        parsed.millisecond,
+        parsed.microsecond,
+      );
+    }
+
+    // No timezone info provided: treat as UTC and convert to Malaysia time (+8).
+    final parsed = DateTime.parse(trimmed);
+    final utc = DateTime.utc(
+      parsed.year,
+      parsed.month,
+      parsed.day,
+      parsed.hour,
+      parsed.minute,
+      parsed.second,
+      parsed.millisecond,
+      parsed.microsecond,
+    );
+    final myTime = utc.add(const Duration(hours: 8));
+    return DateTime(
+      myTime.year,
+      myTime.month,
+      myTime.day,
+      myTime.hour,
+      myTime.minute,
+      myTime.second,
+      myTime.millisecond,
+      myTime.microsecond,
+    );
+  }
+
   DateTime? _tryParseDateTime(dynamic value) {
     if (value is DateTime) {
       return value;
     }
     if (value is String && value.isNotEmpty) {
       try {
-        return DateTime.parse(value);
+        return _parseDateTimeIgnoreOffset(value);
       } catch (_) {
         return null;
       }
@@ -629,12 +698,27 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
     return null;
   }
 
+  DateTime _nowInMalaysia() {
+    final utcNow = DateTime.now().toUtc();
+    final myTime = utcNow.add(const Duration(hours: 8));
+    return DateTime(
+      myTime.year,
+      myTime.month,
+      myTime.day,
+      myTime.hour,
+      myTime.minute,
+      myTime.second,
+      myTime.millisecond,
+      myTime.microsecond,
+    );
+  }
+
   Future<List<Map<String, dynamic>>> _fetchSessionHistory({
     int lookbackDays = 30,
     int maxEntries = 20,
   }) async {
     final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-    final now = DateTime.now();
+    final now = _nowInMalaysia();
     final seenSessionIds = <String>{};
     final history = <Map<String, dynamic>>[];
 
@@ -835,7 +919,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                   if (scheduledAt != null)
                                     Text(
                                       DateFormat('MMM d, yyyy · h:mm a')
-                                          .format(scheduledAt.toLocal()),
+                                          .format(scheduledAt),
                                       style: const TextStyle(
                                         fontFamily: 'Nunito',
                                         fontSize: 13,
@@ -950,14 +1034,14 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                           _historyDetailRow(
                             'Scheduled At',
                             DateFormat('MMM d, yyyy · h:mm a')
-                                .format(scheduledAt.toLocal()),
+                                .format(scheduledAt),
                             icon: Icons.calendar_today_outlined,
                           ),
                         if (endAt != null)
                           _historyDetailRow(
                             'Ended At',
                             DateFormat('MMM d, yyyy · h:mm a')
-                                .format(endAt.toLocal()),
+                                .format(endAt),
                             icon: Icons.access_time,
                           ),
                         if (duration != null)
@@ -1111,6 +1195,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                   sessionId: sessionId,
                   clientUserId: clientUserId,
                   therapistUserId: widget.userId,
+                  cancelledBy: 'therapist',
                 );
 
                 if (!mounted) {
@@ -1395,29 +1480,22 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                 _formatStatusLabel(status);
                             final Color statusColor = _statusColor(status);
                             final DateTime? endAt =
-                                appointment['end_at'] != null
-                                    ? DateTime.tryParse(
-                                        appointment['end_at'] as String)
-                                    : null;
+                              appointment['end_at'] as DateTime?;
                             final DateTime? startAt =
-                                appointment['scheduled_at'] != null
-                                    ? DateTime.tryParse(
-                                        appointment['scheduled_at'] as String)
-                                    : null;
+                              appointment['scheduled_at'] as DateTime?;
+                            final DateTime nowMy = _nowInMalaysia();
                             final int minutesUntilStart = startAt != null
-                                ? startAt.difference(DateTime.now()).inMinutes
-                                : -1;
+                              ? startAt.difference(nowMy).inMinutes
+                              : -1;
                             final bool isCancelled =
                                 statusLower.contains('cancel');
                             final bool slotReleased =
                                 appointment['slot_released'] == true;
-                            final bool meetsReleaseWindow = startAt != null
-                                ? minutesUntilStart >= 120
-                                : false;
+                            final bool meetsReleaseWindow = true; // Allow release at any time
                             final bool isScheduled = statusLower == 'scheduled';
                             final bool canUpdate = isScheduled &&
-                                endAt != null &&
-                                DateTime.now().isAfter(endAt);
+                              endAt != null &&
+                              nowMy.isAfter(endAt);
                             final bool isUpdating =
                                 _statusUpdatingSessionId == sessionId;
                             final bool revealRelease = isCancelled &&
@@ -1427,6 +1505,10 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                             final bool canRelease = isCancelled &&
                                 !slotReleased &&
                                 meetsReleaseWindow;
+                            final bool canCancelBooking = isScheduled &&
+                                minutesUntilStart >= 30;
+                            final bool revealTodayCancel = isScheduled &&
+                                _activeTodayCancelSessionId == sessionId;
 
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
@@ -1442,7 +1524,30 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                         }
                                       });
                                     }
-                                  : null,
+                                  : canCancelBooking
+                                      ? () {
+                                          setState(() {
+                                            if (_activeTodayCancelSessionId ==
+                                                sessionId) {
+                                              _activeTodayCancelSessionId = null;
+                                              _todayCancelTimer?.cancel();
+                                            } else {
+                                              _activeTodayCancelSessionId = sessionId;
+                                              _todayCancelTimer?.cancel();
+                                              _todayCancelTimer = Timer(
+                                                const Duration(seconds: 5),
+                                                () {
+                                                  if (mounted) {
+                                                    setState(() {
+                                                      _activeTodayCancelSessionId = null;
+                                                    });
+                                                  }
+                                                },
+                                              );
+                                            }
+                                          });
+                                        }
+                                      : null,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 16),
                                 padding: const EdgeInsets.all(20),
@@ -1534,6 +1639,83 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                         ),
                                       ],
                                     ),
+                                    // Cancel Booking Button or Info Message
+                                    if (isScheduled && minutesUntilStart < 30 && minutesUntilStart >= 0) ...[
+                                      const SizedBox(height: 16),
+                                      const Divider(height: 1, color: _bgCream),
+                                      const SizedBox(height: 16),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.amber.shade50,
+                                          borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(
+                                            color: Colors.amber.shade200,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.info_outline,
+                                              size: 20,
+                                              color: Colors.amber.shade700,
+                                            ),
+                                            const SizedBox(width: 10),
+                                            Expanded(
+                                              child: Text(
+                                                'You are not able to cancel booking within 30 minutes before the session starts.',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  fontFamily: 'Nunito',
+                                                  fontWeight: FontWeight.w600,
+                                                  color: Colors.amber.shade900,
+                                                  height: 1.3,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ] else if (canCancelBooking) ...[
+                                      AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 200),
+                                        child: revealTodayCancel
+                                            ? Column(
+                                                key: ValueKey('cancel-today-$sessionId'),
+                                                children: [
+                                                  const SizedBox(height: 16),
+                                                  const Divider(height: 1, color: _bgCream),
+                                                  const SizedBox(height: 16),
+                                                  SizedBox(
+                                                    width: double.infinity,
+                                                    child: ElevatedButton(
+                                                      onPressed: () {
+                                                        _todayCancelTimer?.cancel();
+                                                        _showCancelBookingDialog({
+                                                          'session_id': sessionId,
+                                                          'client_user_id': appointment['client_user_id'],
+                                                          'date': DateFormat('yyyy-MM-dd').format(startAt ?? nowMy),
+                                                          'start_time': appointment['time'] ?? '',
+                                                        });
+                                                      },
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor: _accentOrange,
+                                                        foregroundColor: Colors.white,
+                                                        elevation: 0,
+                                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius: BorderRadius.circular(12),
+                                                        ),
+                                                      ),
+                                                      child: const Text('Cancel Booking'),
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : const SizedBox.shrink(),
+                                      ),
+                                    ],
                                     if (isCancelled) ...[
                                       const SizedBox(height: 16),
                                       AnimatedSwitcher(
@@ -1563,18 +1745,6 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                                   if (slotReleased)
                                                     Text(
                                                       'Slot already available for rebooking.',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                        fontFamily: 'Nunito',
-                                                        color:
-                                                            Colors.grey[500],
-                                                        fontStyle:
-                                                            FontStyle.italic,
-                                                      ),
-                                                    )
-                                                  else if (!meetsReleaseWindow)
-                                                    Text(
-                                                      'Too close to the start time to reopen this slot (2h rule).',
                                                       style: TextStyle(
                                                         fontSize: 12,
                                                         fontFamily: 'Nunito',
@@ -1816,7 +1986,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                               return const SizedBox.shrink();
                             }
 
-                            DateTime parsedDate = DateTime.now();
+                            DateTime parsedDate = _nowInMalaysia();
                             String normalizedSourceDate = '';
                             final dynamic dateValue = schedule['date'];
                             if (dateValue is DateTime) {
@@ -1837,11 +2007,12 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                             final String startTimeLabel =
                                 schedule['start_time']?.toString() ?? '';
                             final DateTime sessionDateTime = startTimeLabel.isNotEmpty
-                                ? _parseTimeWithDate(normalizedSourceDate, startTimeLabel)
-                                : parsedDate;
+                              ? _parseTimeWithDate(normalizedSourceDate, startTimeLabel)
+                              : parsedDate;
+                            final DateTime nowMy = _nowInMalaysia();
                             final int minutesUntilSession = sessionDateTime
-                                .difference(DateTime.now())
-                                .inMinutes;
+                              .difference(nowMy)
+                              .inMinutes;
 
                             final String statusRaw =
                                 schedule['session_status']?.toString() ??
@@ -1857,8 +2028,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                 !isCancelled && minutesUntilSession >= 720;
                             final bool revealUpcomingRelease = isCancelled &&
                               _activeUpcomingReleaseSessionId == sessionId;
-                            final bool meetsReleaseWindow =
-                              minutesUntilSession >= 120;
+                            final bool meetsReleaseWindow = true; // Allow release at any time
                             final bool canReleaseSlot = isCancelled &&
                               !slotReleased &&
                               meetsReleaseWindow;
@@ -2068,15 +2238,6 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                                         ),
                                                       )
                                                     : const Text('Set Available'),
-                                              ),
-                                            )
-                                          else if (showReleaseLockoutMessage)
-                                            Text(
-                                              'Too close to start time to reopen this slot (2h window).',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                color: Colors.grey[500],
-                                                fontStyle: FontStyle.italic,
                                               ),
                                             ),
                                         ],

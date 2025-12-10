@@ -1,6 +1,6 @@
 import uuid
 import logging
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 from fastapi import HTTPException
 from ..models.database import db
@@ -9,7 +9,7 @@ from ..models.schemas import (
     DashboardAppointment, TherapistDashboardResponse, UpcomingAvailability,
     EditAvailabilityRequest, NextAvailabilityResponse
 )
-from ..config.timezone import now_my
+from ..config.timezone import now_my, get_malaysia_tz, make_aware_malaysia
 
 logger = logging.getLogger(__name__)
 
@@ -187,6 +187,8 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
     # Get day of week
     day_name = target_date.strftime("%A").lower()
     
+    malaysia_tz = get_malaysia_tz()
+
     # Get sessions for this date
     start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -211,9 +213,17 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
         scheduled_dt: Optional[datetime] = None
         if isinstance(scheduled_value, datetime):
             scheduled_dt = scheduled_value
+            if scheduled_dt.tzinfo is None:
+                # Treat naive values as UTC before shifting to Malaysia time
+                scheduled_dt = scheduled_dt.replace(tzinfo=timezone.utc).astimezone(malaysia_tz)
+            else:
+                scheduled_dt = scheduled_dt.astimezone(malaysia_tz)
         elif isinstance(scheduled_value, str):
             try:
                 scheduled_dt = datetime.fromisoformat(scheduled_value.replace("Z", "+00:00"))
+                if scheduled_dt.tzinfo is None:
+                    scheduled_dt = scheduled_dt.replace(tzinfo=timezone.utc)
+                scheduled_dt = scheduled_dt.astimezone(malaysia_tz)
             except ValueError:
                 scheduled_dt = None
 
@@ -226,6 +236,7 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
             start_minutes = _time_string_to_minutes(session.get("start_time"))
             if start_minutes is not None:
                 scheduled_dt = start_of_day + timedelta(minutes=start_minutes)
+                scheduled_dt = make_aware_malaysia(scheduled_dt)
 
         if scheduled_dt is not None and start_minutes is not None:
             normalized_start = scheduled_dt.strftime("%I:%M %p")
@@ -262,6 +273,7 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
 
         is_booked = False
         booked_status = None
+        booked_client_name = None
         if slot_start is not None and slot_end is not None and slot_end > slot_start:
             for window in session_windows:
                 window_start = window.get("start")
@@ -271,8 +283,18 @@ def get_therapist_schedule(user_id: str, date: str) -> TherapistScheduleResponse
                 if not (slot_end <= window_start or slot_start >= window_end):
                     booked_status = window.get("status")
                     is_booked = booked_status in {"scheduled", "confirmed"}
-                    slot["booked_session_id"] = window.get("session_id")
+                    booked_session_id = window.get("session_id")
+                    slot["booked_session_id"] = booked_session_id
                     slot["booked_session_status"] = booked_status
+                    
+                    # Find the matching session to get client name
+                    if booked_session_id:
+                        for session in sessions:
+                            if session.get("session_id") == booked_session_id:
+                                booked_client_name = session.get("client_name")
+                                break
+                    if booked_client_name:
+                        slot["booked_client_name"] = booked_client_name
                     break
 
         slot["is_booked"] = is_booked

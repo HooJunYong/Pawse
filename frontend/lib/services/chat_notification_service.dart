@@ -16,6 +16,51 @@ class ChatNotificationService {
   static const String _channelDescription =
       'Notifications for new chat messages';
 
+  /// Initialize the chat notification service
+  /// Call this in main.dart during app startup
+  static Future<void> initialize() async {
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
+
+    await _notifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
+
+    // Create notification channel for Android
+    const androidChannel = AndroidNotificationChannel(
+      _channelId,
+      _channelName,
+      description: _channelDescription,
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
+    );
+
+    await _notifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(androidChannel);
+
+    print('ChatNotificationService initialized');
+  }
+
+  /// Handle notification tap - navigate to chat screen
+  static void _onNotificationTapped(NotificationResponse response) {
+    // TODO: Navigate to chat screen with the conversation ID
+    // You can parse response.payload to get the conversation ID
+    print('Chat notification tapped: ${response.payload}');
+  }
+
   /// Show notification for a new chat message
   /// 
   /// Parameters:
@@ -43,10 +88,8 @@ class ChatNotificationService {
               ? senderName 
               : 'Dr. $senderName'; // Add Dr. prefix for therapist
 
-      // Truncate message if too long
-      final messagePreview = message.content.length > 100
-          ? '${message.content.substring(0, 97)}...'
-          : message.content;
+      // Use full message content - BigTextStyleInformation will handle display
+      final messageContent = message.content;
 
       // Generate unique notification ID from message ID
       final notificationId = message.messageId.hashCode.abs() % 2147483647;
@@ -61,8 +104,10 @@ class ChatNotificationService {
         playSound: true,
         enableVibration: true,
         styleInformation: BigTextStyleInformation(
-          messagePreview,
+          messageContent,
+          htmlFormatBigText: true,
           contentTitle: formattedSenderName,
+          htmlFormatContentTitle: true,
           summaryText: 'New message',
         ),
         icon: '@mipmap/ic_launcher',
@@ -83,12 +128,12 @@ class ChatNotificationService {
       await _notifications.show(
         notificationId,
         formattedSenderName,
-        messagePreview,
+        messageContent,
         notificationDetails,
         payload: message.conversationId, // For navigation when tapped
       );
 
-      print('Chat notification sent: $formattedSenderName -> $messagePreview');
+      print('Chat notification sent: $formattedSenderName -> ${messageContent.length > 50 ? messageContent.substring(0, 47) + "..." : messageContent}');
     } catch (e) {
       print('Error showing chat notification: $e');
     }
@@ -119,10 +164,8 @@ class ChatNotificationService {
               ? senderName 
               : 'Dr. $senderName'; // Add Dr. prefix for therapist
 
-      // Truncate message if too long
-      final messagePreview = messageContent.length > 100
-          ? '${messageContent.substring(0, 97)}...'
-          : messageContent;
+      // Use full message content - BigTextStyleInformation will handle display
+      final fullMessageContent = messageContent;
 
       // Generate unique notification ID from message ID
       final notificationId = messageId.hashCode.abs() % 2147483647;
@@ -137,8 +180,10 @@ class ChatNotificationService {
         playSound: true,
         enableVibration: true,
         styleInformation: BigTextStyleInformation(
-          messagePreview,
+          fullMessageContent,
+          htmlFormatBigText: true,
           contentTitle: formattedSenderName,
+          htmlFormatContentTitle: true,
           summaryText: 'New message',
         ),
         icon: '@mipmap/ic_launcher',
@@ -159,12 +204,12 @@ class ChatNotificationService {
       await _notifications.show(
         notificationId,
         formattedSenderName,
-        messagePreview,
+        fullMessageContent,
         notificationDetails,
         payload: conversationId, // For navigation when tapped
       );
 
-      print('Chat notification sent: $formattedSenderName -> $messagePreview');
+      print('Chat notification sent: $formattedSenderName -> ${fullMessageContent.length > 50 ? fullMessageContent.substring(0, 47) + "..." : fullMessageContent}');
     } catch (e) {
       print('Error showing chat notification: $e');
     }

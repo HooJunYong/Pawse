@@ -9,6 +9,7 @@ import '../../services/booking_service.dart';
 import '../../services/chat_service.dart';
 import '../../widgets/therapist_bottom_navigation.dart';
 import 'set_availability_screen.dart';
+import 'therapist_dashboard_screen.dart';
 
 class ManageScheduleScreen extends StatefulWidget {
   final String userId;
@@ -522,7 +523,16 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
                           Icons.arrow_back,
                           color: Color.fromRGBO(66, 32, 6, 1),
                         ),
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => TherapistDashboardScreen(
+                                userId: widget.userId,
+                              ),
+                            ),
+                          );
+                        },
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
@@ -873,6 +883,25 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
     final bool isBooked =
       slot['is_booked'] == true && !isCancelled && !slotReleased;
     final bool awaitingRelease = isCancelled && !slotReleased;
+    final String? clientName = slot['booked_client_name']?.toString();
+    final bool isTodaySelected = DateUtils.isSameDay(_selectedDate, DateTime.now());
+    final bool isPastDate = _isBeforeToday(_selectedDate);
+    bool isPastSlot = false;
+    if (!isBooked && !awaitingRelease && !slotReleased) {
+      if (isPastDate) {
+        isPastSlot = true;
+      } else if (isTodaySelected) {
+        final String? startLabel = slot['start_time']?.toString();
+        if (startLabel != null && startLabel.isNotEmpty) {
+          final TimeOfDay startTime = _parseTimeString(startLabel);
+          final int startMinutes = startTime.hour * 60 + startTime.minute;
+          final int nowMinutes = TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
+          if (startMinutes < nowMinutes) {
+            isPastSlot = true;
+          }
+        }
+      }
+    }
 
     final Color backgroundColor;
     final Color borderColor;
@@ -900,7 +929,18 @@ class _ManageScheduleScreenState extends State<ManageScheduleScreen> {
       labelTextColor = const Color.fromRGBO(30, 64, 175, 1);
       statusIcon = Icons.event_busy;
       statusLabel = 'Booked';
-      subtitleText = 'Slot no longer available';
+      subtitleText = clientName != null && clientName.isNotEmpty 
+        ? 'Booked by $clientName'
+        : 'Slot no longer available';
+    } else if (isPastSlot) {
+      backgroundColor = const Color.fromRGBO(229, 231, 235, 0.5);
+      borderColor = const Color.fromRGBO(209, 213, 219, 1);
+      labelBackground = const Color.fromRGBO(243, 244, 246, 1);
+      labelBorder = const Color.fromRGBO(209, 213, 219, 1);
+      labelTextColor = const Color.fromRGBO(75, 85, 99, 1);
+      statusIcon = Icons.history;
+      statusLabel = 'Past Slot';
+      subtitleText = 'This slot has passed.';
     } else {
       backgroundColor = const Color.fromRGBO(249, 115, 22, 0.1);
       borderColor = const Color.fromRGBO(249, 115, 22, 0.3);

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../screens/chat/chat_session_screen.dart';
+import '../screens/gamification_and_reward/activity_screen.dart';
 import '../screens/homepage_screen.dart';
+import '../screens/mood/mood_tracking_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/wellness/wellness_screen.dart';
-import '../screens/chat/chat_session_screen.dart';
-import '../screens/mood/mood_tracking_screen.dart';
-import '../screens/gamification_and_reward/activity_screen.dart';
 // import '../screens/chat/chat_session_screen.dart';
 
 class BottomNavBar extends StatelessWidget {

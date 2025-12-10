@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 try:
     from zoneinfo import ZoneInfo
 except ImportError:  # pragma: no cover
@@ -6,17 +6,29 @@ except ImportError:  # pragma: no cover
 
 _MALAYSIA_TZ_NAME = "Asia/Kuala_Lumpur"
 
+def get_malaysia_tz():
+    """Get Malaysia timezone object."""
+    if ZoneInfo is not None:
+        try:
+            return ZoneInfo(_MALAYSIA_TZ_NAME)
+        except Exception:
+            pass
+    # Fallback: UTC+8
+    return timezone(timedelta(hours=8))
+
 def now_my() -> datetime:
     """Return current Malaysia time as timezone-aware datetime.
 
     Falls back to naive UTC+8 offset if ZoneInfo not available.
     """
-    if ZoneInfo is not None:
-        try:
-            return datetime.now(ZoneInfo(_MALAYSIA_TZ_NAME))
-        except Exception:
-            # ZoneInfo available but timezone data missing
-            pass
-    # Fallback: manual offset (UTC+8)
-    from datetime import timezone, timedelta
-    return datetime.utcnow().replace(tzinfo=timezone.utc) + timedelta(hours=8)
+    return datetime.now(get_malaysia_tz())
+
+def make_aware_malaysia(dt: datetime) -> datetime:
+    """Convert naive datetime to timezone-aware Malaysia time.
+    
+    If datetime is already aware, returns as-is.
+    If naive, assumes it represents Malaysia local time.
+    """
+    if dt.tzinfo is not None:
+        return dt
+    return dt.replace(tzinfo=get_malaysia_tz())

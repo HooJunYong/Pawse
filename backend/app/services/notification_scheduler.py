@@ -1,11 +1,12 @@
 """
 Notification Scheduler Service
-Handles scheduled notifications for journaling, hydration, and breathing reminders
+Handles scheduled notifications for journaling, hydration, breathing reminders, and therapy sessions
 """
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from app.models.database import db
 from app.config.timezone import now_my
+from app.services.notification_service import create_notification
 import logging
 
 logger = logging.getLogger(__name__)
@@ -124,8 +125,54 @@ class NotificationScheduler:
         return None
     
     @staticmethod
+    def process_therapy_session_reminders():
+        """Process scheduled therapy session reminders that are due"""
+        current_time = now_my()
+        
+        # Find all pending therapy session reminders that should be sent now
+        # Check for reminders scheduled within the last 5 minutes to handle timing variations
+        time_window_start = current_time - timedelta(minutes=5)
+        
+        pending_reminders = db.scheduled_notifications.find({
+            "notification_type": "therapy_session_reminder",
+            "is_sent": False,
+            "scheduled_time": {"$lte": current_time, "$gte": time_window_start}
+        })
+        
+        sent_count = 0
+        for reminder in pending_reminders:
+            try:
+                notification_data = reminder.get("notification_data", {})
+                notification = create_notification(
+                    user_id=reminder["user_id"],
+                    type="therapy_session_reminder",
+                    title=notification_data.get("title", "Therapy Session Reminder"),
+                    body=notification_data.get("body", "Your therapy session is starting soon."),
+                    data=notification_data.get("data")
+                )
+                
+                if notification:
+                    # Mark as sent
+                    db.scheduled_notifications.update_one(
+                        {"notification_id": reminder["notification_id"]},
+                        {"$set": {"is_sent": True, "sent_at": current_time}}
+                    )
+                    sent_count += 1
+                    logger.info(f"Sent therapy session reminder to user {reminder['user_id']}")
+            except Exception as e:
+                logger.error(f"Failed to send therapy reminder {reminder.get('notification_id')}: {e}")
+        
+        if sent_count > 0:
+            logger.info(f"Sent {sent_count} therapy session reminders")
+        
+        return sent_count
+    
+    @staticmethod
     def process_scheduled_notifications():
         """Process all scheduled notifications for all users"""
+        # First process therapy session reminders
+        NotificationScheduler.process_therapy_session_reminders()
+        
         # Get all users with notification settings enabled
         settings_cursor = db.notification_settings.find({
             'all_notifications_enabled': True,

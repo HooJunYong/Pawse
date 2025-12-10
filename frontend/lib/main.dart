@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 
-import 'services/booking_status_notification_service.dart';
+import 'screens/splash_screen.dart';
 import 'services/chat_notification_service.dart';
 import 'services/custom_reminder_service.dart';
 import 'services/local_notification_service.dart';
 import 'services/mood_nudge_service.dart';
 import 'services/session_reminder_service.dart';
 import 'services/therapist_application_notification_service.dart';
-import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +29,8 @@ Future<void> main() async {
   // Initialize custom reminder service (journaling, hydration, breathing)
   await CustomReminderService.initialize();
   
+  // Initialize chat notification service
+  await ChatNotificationService.initialize();
   
   runApp(MyApp());
 }

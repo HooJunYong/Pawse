@@ -56,6 +56,8 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
     return '${from.hour}:${from.minute}-${to.hour}:${to.minute}';
   }
 
+  int _timeToMinutes(TimeOfDay time) => time.hour * 60 + time.minute;
+
   Map<String, dynamic>? _buildRecommendedSlot(
     Set<String> usedKeys,
     bool isToday,
@@ -184,6 +186,11 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         final availabilitySlots = data['availability_slots'] as List? ?? [];
 
         if (availabilitySlots.isNotEmpty) {
+          final DateTime today = DateUtils.dateOnly(DateTime.now());
+          final DateTime selectedDateOnly = DateUtils.dateOnly(widget.selectedDate);
+          final bool isToday = DateUtils.isSameDay(selectedDateOnly, today);
+          final bool isPastDate = selectedDateOnly.isBefore(today);
+          final int nowMinutes = TimeOfDay.now().hour * 60 + TimeOfDay.now().minute;
           setState(() {
             _timeSlots.clear();
             bool isRecurring = false;
@@ -204,27 +211,31 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
               final String statusLower = rawStatusValue.toString().toLowerCase();
               final bool isReleased =
                   slot['slot_released'] == true || slot['is_released'] == true;
-                final bool isExplicitlyBooked =
-                  statusLower.contains('book');
+              final bool isExplicitlyBooked = statusLower.contains('book');
               final bool apiBookedFlag = slot['is_booked'] == true;
               final bool isBooked =
                 !isReleased && !statusLower.contains('cancel') &&
                 (apiBookedFlag || isExplicitlyBooked);
               final bool awaitingRelease =
                   statusLower.contains('cancel') && !isReleased;
+              final bool isPastSlot = !isBooked && !awaitingRelease && !isReleased && (
+                isPastDate || (isToday && _timeToMinutes(startTime) < nowMinutes)
+              );
               final bool isLocked = isBooked || awaitingRelease || isReleased;
 
               _timeSlots.add({
                 'from': startTime,
                 'to': endTime,
-                'locked': isLocked,
+                'locked': isLocked || isPastSlot,
                 'lockReason': isBooked
                     ? 'booked'
                     : isReleased
                         ? 'released'
                         : awaitingRelease
                             ? 'cancelled'
-                            : null,
+                            : isPastSlot
+                                ? 'past'
+                                : null,
               });
               // Check if it's a recurring availability (availability_date is null)
               if (slot['availability_date'] == null) {
@@ -539,6 +550,9 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
         break;
       case 'cancelled':
         helperText = 'Cancelled slots awaiting release cannot be edited.';
+        break;
+      case 'past':
+        helperText = 'Past slots are locked automatically and cannot be edited.';
         break;
       default:
         helperText = 'This slot is managed automatically and cannot be edited.';
@@ -967,7 +981,7 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
           child: SingleChildScrollView(
             child: Container(
               width: 375,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1092,6 +1106,9 @@ class _SetAvailabilityScreenState extends State<SetAvailabilityScreen> {
                       case 'cancelled':
                         lockMessage =
                             'Cancelled slot – use "Set Available" on the dashboard.';
+                        break;
+                      case 'past':
+                        lockMessage = 'Past slot – edits disabled';
                         break;
                       default:
                         lockMessage = 'Managed slot – edits disabled';

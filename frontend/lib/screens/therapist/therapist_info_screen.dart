@@ -75,10 +75,63 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
   DateTime? _parseStartDateTime(TherapistNextAvailability availability) {
     if (availability.startIso != null && availability.startIso!.isNotEmpty) {
       try {
-        // Parse ISO string - backend returns timezone-aware datetime
-        final parsed = DateTime.parse(availability.startIso!);
-        // Convert to local time for display
-        return parsed.toLocal();
+        final isoString = availability.startIso!.trim();
+        final tzMatch = RegExp(r'([+-]\d{2}:?\d{2}|Z)$').firstMatch(isoString);
+
+        if (tzMatch != null) {
+          final tzPart = tzMatch.group(0)!;
+          final core = isoString.substring(0, tzMatch.start);
+
+          if (tzPart == 'Z') {
+            final utc = DateTime.parse(isoString).toUtc();
+            final myTime = utc.add(const Duration(hours: 8));
+            return DateTime(
+              myTime.year,
+              myTime.month,
+              myTime.day,
+              myTime.hour,
+              myTime.minute,
+              myTime.second,
+              myTime.millisecond,
+              myTime.microsecond,
+            );
+          }
+
+          final parsed = DateTime.parse(core);
+          return DateTime(
+            parsed.year,
+            parsed.month,
+            parsed.day,
+            parsed.hour,
+            parsed.minute,
+            parsed.second,
+            parsed.millisecond,
+            parsed.microsecond,
+          );
+        }
+
+        final parsed = DateTime.parse(isoString);
+        final utc = DateTime.utc(
+          parsed.year,
+          parsed.month,
+          parsed.day,
+          parsed.hour,
+          parsed.minute,
+          parsed.second,
+          parsed.millisecond,
+          parsed.microsecond,
+        );
+        final myTime = utc.add(const Duration(hours: 8));
+        return DateTime(
+          myTime.year,
+          myTime.month,
+          myTime.day,
+          myTime.hour,
+          myTime.minute,
+          myTime.second,
+          myTime.millisecond,
+          myTime.microsecond,
+        );
       } catch (_) {
         // Ignore parsing error and attempt fallback below.
       }
@@ -87,8 +140,8 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
     if (availability.date != null && availability.startTime != null) {
       final raw = '${availability.date} ${availability.startTime}';
       try {
-        // Parse as UTC and convert to local for display
-        return DateFormat('yyyy-MM-dd h:mm a').parse(raw, true).toLocal();
+        // Backend sends Malaysia time - parse without timezone conversion
+        return DateFormat('yyyy-MM-dd h:mm a').parse(raw);
       } catch (_) {
         return null;
       }
@@ -107,7 +160,7 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
       return 'Availability details coming soon';
     }
 
-    // start is already in local time from _parseStartDateTime
+    // start is already in Malaysia time (UTC+8) from backend
     final DateTime now = DateTime.now();
     final DateTime today = DateTime(now.year, now.month, now.day);
     final DateTime slotDay =
@@ -140,21 +193,26 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
                 !snapshot.hasData;
         final TherapistNextAvailability? availability = snapshot.data;
 
-        String highlightText;
-        Color highlightColor = _textGrey;
+        String displayText;
+        Color textColor = _textGrey;
+        bool showPrefix = true;
 
         if (isLoading) {
-          highlightText = 'Checking availability...';
+          displayText = 'Checking availability...';
+          showPrefix = false;
         } else if (snapshot.hasError) {
-          highlightText = 'Unable to load availability';
+          displayText = 'Unable to load availability';
+          showPrefix = false;
         } else if (availability == null) {
-          highlightText = 'No upcoming availability found';
+          displayText = 'No upcoming availability found';
+          showPrefix = false;
         } else if (!availability.hasAvailability) {
-          highlightText =
-              availability.message ?? 'No upcoming availability found';
+          displayText = availability.message ?? 'No upcoming availability found';
+          showPrefix = false;
         } else {
-          highlightText = _formatAvailabilityLabel(availability);
-          highlightColor = const Color(0xFFD84315);
+          displayText = _formatAvailabilityLabel(availability);
+          textColor = const Color(0xFFD84315);
+          showPrefix = true;
         }
 
         return Container(
@@ -171,26 +229,37 @@ class _TherapistInfoScreenState extends State<TherapistInfoScreen> {
               const Icon(Icons.event_available, color: _primaryBrown, size: 20),
               const SizedBox(width: 8),
               Expanded(
-                child: Text.rich(
-                  TextSpan(
-                    style: const TextStyle(
-                      color: _textDark,
-                      fontSize: 14,
-                      fontFamily: 'Nunito',
-                    ),
-                    children: [
-                      const TextSpan(text: 'Next available: '),
-                      TextSpan(
-                        text: highlightText,
+                child: showPrefix
+                    ? Text.rich(
+                        TextSpan(
+                          style: const TextStyle(
+                            color: _textDark,
+                            fontSize: 14,
+                            fontFamily: 'Nunito',
+                          ),
+                          children: [
+                            const TextSpan(text: 'Next available: '),
+                            TextSpan(
+                              text: displayText,
+                              style: TextStyle(
+                                color: textColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      )
+                    : Text(
+                        displayText,
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: highlightColor,
-                          fontWeight: FontWeight.bold,
+                          color: textColor,
+                          fontSize: 14,
+                          fontFamily: 'Nunito',
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                  textAlign: TextAlign.center,
-                ),
               ),
             ],
           ),

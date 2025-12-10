@@ -23,7 +23,7 @@ from ..models.booking_schemas import (
     ReleaseSessionSlotRequest,
     ReleaseSessionSlotResponse,
 )
-from ..config.timezone import now_my
+from ..config.timezone import now_my, make_aware_malaysia
 from ..models.chat_schemas import SendChatMessageRequest
 from ..services.chat_service import send_message
 from ..services.notification_service import create_notification
@@ -55,9 +55,27 @@ def _coerce_session_type(value: Optional[str]) -> SessionType:
 
 def _combine_date_with_time(date_value: datetime, time_str: str) -> datetime:
     """Return a datetime by combining a date with a 'HH:MM AM/PM' label."""
-
+    
     time_str_clean = time_str.strip().upper()
-    dt_time = datetime.strptime(time_str_clean, "%I:%M %p")
+    
+    # Try different time formats
+    formats_to_try = [
+        "%I:%M %p",      # 2:00 PM
+        "%I:%M%p",       # 2:00PM (no space)
+        "%H:%M",         # 14:00 (24-hour)
+    ]
+    
+    dt_time = None
+    for fmt in formats_to_try:
+        try:
+            dt_time = datetime.strptime(time_str_clean, fmt)
+            break
+        except ValueError:
+            continue
+    
+    if dt_time is None:
+        raise ValueError(f"Unable to parse time string: '{time_str}'. Expected format like '2:00 PM' or '14:00'")
+    
     return date_value.replace(hour=dt_time.hour, minute=dt_time.minute, second=0, microsecond=0)
 
 
@@ -82,6 +100,7 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
     # Parse date
     try:
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
+        target_date = make_aware_malaysia(target_date)
     except ValueError:
         raise ValueError("Invalid date format. Use YYYY-MM-DD")
     
@@ -127,18 +146,14 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
     start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_day = target_date.replace(hour=23, minute=59, second=59, microsecond=999999)
     
+    # Find all sessions for this date (scheduled or cancelled without slot_released)
+    # We'll filter out released cancelled slots later
     existing_sessions = list(db.therapy_sessions.find({
         "therapist_user_id": therapist_user_id,
         "scheduled_at": {
             "$gte": start_of_day,
             "$lte": end_of_day
-        },
-        "$or": [
-            {"session_status": {"$in": [SessionStatus.scheduled.value]}},
-            {"status": {"$in": [SessionStatus.scheduled.value]}},
-            {"session_status": {"$regex": "cancel", "$options": "i"}},
-            {"status": {"$regex": "cancel", "$options": "i"}}
-        ]
+        }
     }))
     
     session_windows: list[tuple[datetime, datetime]] = []
@@ -147,9 +162,29 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
         scheduled_dt: Optional[datetime] = None
         if isinstance(scheduled_value, datetime):
             scheduled_dt = scheduled_value
+            # MongoDB stores UTC timezone-naive datetimes - convert to Malaysia time
+            if scheduled_dt.tzinfo is None:
+                # Treat as UTC and convert to Malaysia time (+8 hours)
+                scheduled_dt = scheduled_dt + timedelta(hours=8)
+                scheduled_dt = make_aware_malaysia(scheduled_dt)
+            else:
+                # Already has timezone - ensure it's Malaysia time
+                if scheduled_dt.tzinfo.utcoffset(scheduled_dt) != timedelta(hours=8):
+                    utc_dt = scheduled_dt.astimezone(None).replace(tzinfo=None)
+                    my_dt = utc_dt + timedelta(hours=8)
+                    scheduled_dt = make_aware_malaysia(my_dt)
         elif isinstance(scheduled_value, str):
             try:
                 scheduled_dt = datetime.fromisoformat(scheduled_value.replace("Z", "+00:00"))
+                # Convert to Malaysia time
+                if scheduled_dt.tzinfo is not None:
+                    utc_dt = scheduled_dt.astimezone(None).replace(tzinfo=None)
+                    my_dt = utc_dt + timedelta(hours=8)
+                    scheduled_dt = make_aware_malaysia(my_dt)
+                else:
+                    # Assume UTC if no timezone
+                    my_dt = scheduled_dt + timedelta(hours=8)
+                    scheduled_dt = make_aware_malaysia(my_dt)
             except ValueError:
                 scheduled_dt = None
 
@@ -158,6 +193,9 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
             if start_label:
                 try:
                     scheduled_dt = _combine_date_with_time(target_date, start_label)
+                    # Ensure timezone-aware
+                    if scheduled_dt.tzinfo is None:
+                        scheduled_dt = make_aware_malaysia(scheduled_dt)
                 except ValueError:
                     continue
         if scheduled_dt is None:
@@ -184,6 +222,11 @@ def get_therapist_availability_for_booking(therapist_user_id: str, date_str: str
         try:
             slot_start_dt = _combine_date_with_time(target_date, start_time_label)
             slot_end_dt = _combine_date_with_time(target_date, end_time_label)
+            # Ensure timezone-aware (target_date should already be aware, but make sure)
+            if slot_start_dt.tzinfo is None:
+                slot_start_dt = make_aware_malaysia(slot_start_dt)
+            if slot_end_dt.tzinfo is None:
+                slot_end_dt = make_aware_malaysia(slot_end_dt)
         except ValueError:
             continue
 
@@ -260,7 +303,9 @@ def create_booking(request: BookingRequest) -> BookingResponse:
         elif period == "AM" and hour == 12:
             hour = 0
         
+        # Create naive datetime first, then make it timezone-aware as Malaysia time
         scheduled_datetime = date_obj.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        scheduled_datetime = make_aware_malaysia(scheduled_datetime)
     except (ValueError, IndexError):
         raise ValueError("Invalid time format. Use format like '9:00 AM'")
     
@@ -393,6 +438,30 @@ def create_booking(request: BookingRequest) -> BookingResponse:
         body=f"You have a new booking request from {client_name} for {booking_label}.",
         data={"session_id": session_id}
     )
+
+    # Schedule 1-hour-before reminder for client if therapy_sessions notification is enabled
+    notification_settings = db.notification_settings.find_one({"user_id": request.client_user_id})
+    if notification_settings and notification_settings.get('therapy_sessions', True):
+        reminder_time = scheduled_datetime - timedelta(hours=1)
+        
+        # Only schedule if reminder time is in the future
+        if reminder_time > now_my():
+            scheduled_notification_id = secrets.token_hex(32)
+            db.scheduled_notifications.insert_one({
+                "notification_id": scheduled_notification_id,
+                "user_id": request.client_user_id,
+                "notification_type": "therapy_session_reminder",
+                "scheduled_time": reminder_time,
+                "is_sent": False,
+                "notification_data": {
+                    "session_id": session_id,
+                    "title": "📅 Therapy Session Reminder",
+                    "body": f"Your therapy session with {therapist_name} is starting in 1 hour at {normalized_start_time}.",
+                    "data": {"session_id": session_id, "action": "open_booking"}
+                },
+                "created_at": now_ts
+            })
+            logger.info(f"Scheduled therapy reminder for user {request.client_user_id} at {reminder_time}")
 
     return BookingResponse(
         booking_id=session_id,
@@ -750,6 +819,7 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
         raise ValueError("Booking not found")
 
     now_ts = now_my()
+    cancelled_by = request.cancelled_by or "client"
 
     db.therapy_sessions.update_one(
         {"session_id": request.session_id, "user_id": request.client_user_id},
@@ -760,18 +830,61 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
                 "updated_at": now_ts,
                 "cancellation_reason": request.reason or "",
                 "slot_released": False,
+                "cancelled_by": cancelled_by,
             }
         }
     )
     
-    # Notify therapist about cancellation
-    create_notification(
-        user_id=session.get("therapist_user_id"),
-        type="booking_update",
-        title="Booking Cancelled",
-        body=f"A client has cancelled their session scheduled for {session.get('scheduled_at')}.",
-        data={"session_id": request.session_id}
-    )
+    # Format scheduled date/time
+    scheduled_at = session.get('scheduled_at')
+    if isinstance(scheduled_at, str):
+        try:
+            scheduled_dt = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
+            formatted_datetime = scheduled_dt.strftime('%B %d, %Y at %I:%M %p')
+        except:
+            formatted_datetime = str(scheduled_at)
+    else:
+        formatted_datetime = str(scheduled_at)
+    
+    # Get names for notifications
+    therapist_user_id = session.get("therapist_user_id")
+    client_user_id = session.get("user_id")
+    
+    # Get therapist name
+    therapist = db.therapist_profiles.find_one({"user_id": therapist_user_id})
+    therapist_name = f"Dr. {therapist.get('first_name', '')} {therapist.get('last_name', '')}" if therapist else "Your therapist"
+    
+    # Get client name
+    client = db.user_profiles.find_one({"user_id": client_user_id})
+    client_name = client.get('name', 'A client') if client else 'A client'
+    
+    if cancelled_by == "therapist":
+        # Notify client that therapist cancelled
+        create_notification(
+            user_id=client_user_id,
+            type="booking_update",
+            title="Booking Cancelled",
+            body=f"{therapist_name} cancelled the booking on {formatted_datetime}.",
+            data={"session_id": request.session_id}
+        )
+    else:
+        # Notify therapist that client cancelled
+        create_notification(
+            user_id=therapist_user_id,
+            type="booking_update",
+            title="Booking Cancelled",
+            body=f"{client_name} cancelled the booking on {formatted_datetime}.",
+            data={"session_id": request.session_id}
+        )
+
+    # Delete scheduled reminder notification for this session
+    db.scheduled_notifications.delete_many({
+        "user_id": request.client_user_id,
+        "notification_type": "therapy_session_reminder",
+        "notification_data.session_id": request.session_id,
+        "is_sent": False
+    })
+    logger.info(f"Deleted scheduled reminder for cancelled session {request.session_id}")
 
     return CancelBookingResponse(
         success=True,

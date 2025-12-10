@@ -585,7 +585,7 @@ class _FindTherapistScreenState extends State<FindTherapistScreen> {
     }
 
     final String scheduledLabel = _sessionFormatter.format(
-      pending.scheduledAt.toLocal(),
+      pending.scheduledAt,
     );
 
     final nameParts = pending.therapistName.trim().split(' ');

@@ -116,6 +116,13 @@ db.mood_tracking.create_index("mood_id", unique=True)
 db.mood_tracking.create_index("user_id")
 db.mood_tracking.create_index([("user_id", 1), ("date", -1)])
 
+# Scheduled notifications collection
+db.scheduled_notifications.create_index("notification_id", unique=True)
+db.scheduled_notifications.create_index("user_id")
+db.scheduled_notifications.create_index("scheduled_time")
+db.scheduled_notifications.create_index("is_sent")
+db.scheduled_notifications.create_index([("scheduled_time", ASCENDING), ("is_sent", ASCENDING)])
+
 
 def get_database():
     """Get database instance"""
