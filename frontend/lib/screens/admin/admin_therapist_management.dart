@@ -314,6 +314,13 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
   }
 
   void _showApplicationDetails(Map<String, dynamic> application) {
+    // Debug: Print the application data to see what we're working with
+    print('Application details: $application');
+    print('Specializations type: ${application['specializations']?.runtimeType ?? 'null'}');
+    print('Specializations value: ${application['specializations']}');
+    print('Languages type: ${application['languages_spoken']?.runtimeType ?? 'null'}');
+    print('Languages value: ${application['languages_spoken']}');
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -634,11 +641,58 @@ class _AdminTherapistManagementState extends State<AdminTherapistManagement> {
   }
 
   List<String> _safeListExtract(dynamic value) {
-    if (value == null) return [];
-    if (value is List) {
-      return value.map((item) => item?.toString() ?? '').where((item) => item.isNotEmpty).toList();
+    try {
+      if (value == null) {
+        return [];
+      }
+
+      if (value is List) {
+        final result = <String>[];
+        for (final item in value) {
+          if (item == null) {
+            continue;
+          }
+          // Handle both String and non-String items
+          String text;
+          if (item is String) {
+            text = item.trim();
+          } else if (item is Map) {
+            // If it's a map, try to get a 'name' or 'value' field
+            text = (item['name'] ?? item['value'] ?? item.toString()).toString().trim();
+          } else {
+            text = item.toString().trim();
+          }
+          
+          if (text.isEmpty || text.toLowerCase() == 'null') {
+            continue;
+          }
+          result.add(text);
+        }
+        return result;
+      }
+
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty || trimmed.toLowerCase() == 'null') {
+          return [];
+        }
+        // Handle comma-separated strings
+        final result = <String>[];
+        for (final part in trimmed.split(',')) {
+          final text = part.trim();
+          if (text.isEmpty || text.toLowerCase() == 'null') {
+            continue;
+          }
+          result.add(text);
+        }
+        return result;
+      }
+
+      return [];
+    } catch (e) {
+      print('Error in _safeListExtract: $e, value: $value, type: ${value.runtimeType}');
+      return [];
     }
-    return [];
   }
 
   Widget _buildChipRow(String label, List<String> items) {

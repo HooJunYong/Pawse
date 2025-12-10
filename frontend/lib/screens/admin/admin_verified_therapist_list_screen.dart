@@ -57,23 +57,50 @@ class _AdminVerifiedTherapistListScreenState
     final fullName = 'Dr. $firstName $lastName';
     final email = therapist['email'] ?? 'N/A';
     final contactNumber = therapist['contact_number'] ?? 'N/A';
-    final specialization = therapist['specialization'] ?? 'N/A';
-    final languages = therapist['languages'] ?? 'N/A';
+    
+    // Handle specializations (array)
+    final specializationData = therapist['specializations'] ?? therapist['specialization'];
+    String specialization = 'N/A';
+    if (specializationData != null) {
+      if (specializationData is List && specializationData.isNotEmpty) {
+        specialization = specializationData.join(', ');
+      } else if (specializationData is String && specializationData.isNotEmpty) {
+        specialization = specializationData;
+      }
+    }
+    
+    // Handle languages (array)
+    final languagesData = therapist['languages_spoken'] ?? therapist['languages'];
+    String languages = 'N/A';
+    if (languagesData != null) {
+      if (languagesData is List && languagesData.isNotEmpty) {
+        languages = languagesData.join(', ');
+      } else if (languagesData is String && languagesData.isNotEmpty) {
+        languages = languagesData;
+      }
+    }
+    
     final centerName = therapist['office_name'] ?? 'N/A';
     final hourlyRate = therapist['hourly_rate'] != null 
         ? 'RM ${therapist['hourly_rate']}' 
         : 'N/A';
     
     // Combine address fields
-    final officeAddress = therapist['office_address'] ?? '';
-    final city = therapist['city'] ?? '';
-    final state = therapist['state'] ?? '';
-    final zip = therapist['zip'] ?? '';
+    final officeAddress = therapist['office_address']?.toString() ?? '';
+    final city = therapist['city']?.toString() ?? '';
+    final state = therapist['state']?.toString() ?? '';
+    final zip = therapist['zip']?.toString() ?? '';
     
     final addressParts = [officeAddress, city, state, zip]
         .where((part) => part.isNotEmpty)
         .toList();
     final fullAddress = addressParts.isEmpty ? 'N/A' : addressParts.join(', ');
+
+    // Safe profile picture URL check
+    final profilePictureUrl = therapist['profile_picture_url'];
+    final hasValidProfilePicture = profilePictureUrl != null && 
+                                   profilePictureUrl is String && 
+                                   profilePictureUrl.isNotEmpty;
 
     showDialog(
       context: context,
@@ -98,11 +125,11 @@ class _AdminVerifiedTherapistListScreenState
                         color: const Color(0xFF10B981).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(32),
                       ),
-                      child: therapist['profile_picture_url'] != null && therapist['profile_picture_url'].isNotEmpty
+                      child: hasValidProfilePicture
                           ? ClipRRect(
                               borderRadius: BorderRadius.circular(32),
                               child: Image.network(
-                                therapist['profile_picture_url'],
+                                profilePictureUrl,
                                 width: 64,
                                 height: 64,
                                 fit: BoxFit.cover,
