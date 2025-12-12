@@ -37,6 +37,8 @@ def verify_otp(request: VerifyOtpRequest):
     try:
         result = otp_service.verify_otp(request.email, request.otp)
         return VerifyOtpResponse(**result)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -57,6 +59,8 @@ def reset_password(request: ResetPasswordRequest):
             request.new_password
         )
         return VerifyOtpResponse(**result)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

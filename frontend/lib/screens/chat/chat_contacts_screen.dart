@@ -7,8 +7,6 @@ import 'package:intl/intl.dart';
 import '../../models/chat_conversation.dart';
 import '../../services/chat_service.dart';
 import '../../widgets/therapist_bottom_navigation.dart';
-import '../therapist/find_therapist_screen.dart';
-import '../therapist/therapist_dashboard_screen.dart';
 import 'chat_screen.dart';
 
 // --- Theme Constants ---
@@ -132,28 +130,13 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         backgroundColor: _bgCream,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textDark),
-          onPressed: () {
-            if (widget.isTherapist) {
-              // Navigate to therapist dashboard
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => TherapistDashboardScreen(userId: widget.currentUserId),
-                ),
-              );
-            } else {
-              // Navigate to find therapist screen (client dashboard)
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FindTherapistScreen(userId: widget.currentUserId),
-                ),
-              );
-            }
-          },
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.isTherapist
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: _textDark),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: const Text(
           'Messages',
           style: TextStyle(
