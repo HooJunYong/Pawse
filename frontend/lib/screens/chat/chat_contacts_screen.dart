@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../models/chat_conversation.dart';
 import '../../services/chat_service.dart';
 import '../../widgets/therapist_bottom_navigation.dart';
+import '../therapist/find_therapist_screen.dart';
+import '../therapist/therapist_dashboard_screen.dart';
 import 'chat_screen.dart';
 
 // --- Theme Constants ---
@@ -133,7 +135,23 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: _textDark),
           onPressed: () {
-            Navigator.of(context).pop();
+            if (widget.isTherapist) {
+              // Navigate to therapist dashboard
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TherapistDashboardScreen(userId: widget.currentUserId),
+                ),
+              );
+            } else {
+              // Navigate to find therapist screen (client dashboard)
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => FindTherapistScreen(userId: widget.currentUserId),
+                ),
+              );
+            }
           },
         ),
         title: const Text(
