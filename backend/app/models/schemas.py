@@ -158,7 +158,7 @@ class TherapistProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     average_rating: Optional[float] = None
-    rating_count: int = 0
+    total_ratings: int = 0
 
 class TherapistApplicationResponse(BaseModel):
     success: bool

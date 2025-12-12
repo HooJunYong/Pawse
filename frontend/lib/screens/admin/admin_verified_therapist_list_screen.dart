@@ -34,6 +34,14 @@ class _AdminVerifiedTherapistListScreenState
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        
+        // Debug: Print first therapist data to check rating fields
+        if (data.isNotEmpty) {
+          print('First therapist data: ${data[0]}');
+          print('Average rating: ${data[0]['average_rating']}');
+          print('Total ratings: ${data[0]['total_ratings']}');
+        }
+        
         setState(() {
           _therapists = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -84,6 +92,13 @@ class _AdminVerifiedTherapistListScreenState
     final hourlyRate = therapist['hourly_rate'] != null 
         ? 'RM ${therapist['hourly_rate']}' 
         : 'N/A';
+    
+    // Get rating information
+    final averageRating = therapist['average_rating'] ?? 0.0;
+    final totalRatings = therapist['total_ratings'] ?? 0;
+    final ratingText = averageRating > 0 
+        ? '${averageRating.toStringAsFixed(1)} ⭐ ($totalRatings ${totalRatings == 1 ? 'rating' : 'ratings'})'
+        : 'No ratings yet';
     
     // Combine address fields
     final officeAddress = therapist['office_address']?.toString() ?? '';
@@ -190,6 +205,8 @@ class _AdminVerifiedTherapistListScreenState
                 _buildDetailRow(Icons.location_on, 'Address', fullAddress),
                 const SizedBox(height: 12),
                 _buildDetailRow(Icons.attach_money, 'Hourly Rate', hourlyRate),
+                const SizedBox(height: 12),
+                _buildDetailRow(Icons.star, 'Rating', ratingText),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -411,6 +428,31 @@ class _AdminVerifiedTherapistListScreenState
                                       fontWeight: FontWeight.w600,
                                       color: Color(0xFF422006),
                                     ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.star,
+                                  size: 16,
+                                  color: Color(0xFFFB923C),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  () {
+                                    final avgRating = therapist['average_rating'] ?? 0.0;
+                                    final ratings = therapist['total_ratings'] ?? 0;
+                                    return avgRating > 0 
+                                        ? '${avgRating.toStringAsFixed(1)} ($ratings ${ratings == 1 ? 'rating' : 'ratings'})'
+                                        : 'No ratings yet';
+                                  }(),
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontFamily: 'Nunito',
+                                    color: Color(0xFF6B7280),
                                   ),
                                 ),
                               ],

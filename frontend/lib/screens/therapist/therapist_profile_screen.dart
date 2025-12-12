@@ -7,8 +7,11 @@ import 'package:http/http.dart' as http;
 
 import '../../services/chat_service.dart';
 import '../../widgets/therapist_bottom_navigation.dart';
+import '../profile/contact_us_screen.dart';
+import '../profile/privacy_policy_screen.dart';
 import '../profile/profile_screen.dart';
 import 'therapist_edit_profile_screen.dart';
+import 'therapist_help_support_screen.dart';
 
 class TherapistProfileScreen extends StatefulWidget {
   final String userId;
@@ -283,17 +286,38 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                       _buildMenuItem(
                         icon: Icons.help_outline,
                         title: 'Help & Support',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TherapistHelpSupportScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildMenuItem(
                         icon: Icons.email_outlined,
                         title: 'Contact Us',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ContactUsScreen(),
+                            ),
+                          );
+                        },
                       ),
                       _buildMenuItem(
                         icon: Icons.privacy_tip_outlined,
                         title: 'Privacy Policy',
-                        onTap: () {},
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacyPolicyScreen(),
+                            ),
+                          );
+                        },
                       ),
                       const SizedBox(height: 24),
                       

@@ -88,6 +88,8 @@ def _compute_rating_summary(therapist_ids: List[str]) -> dict[str, dict[str, flo
     if not therapist_ids:
         return {}
 
+    logger.info(f"Computing ratings for therapist IDs: {therapist_ids}")
+    
     summary: dict[str, list[float]] = {}
     cursor = db.therapy_sessions.find(
         {
@@ -97,11 +99,17 @@ def _compute_rating_summary(therapist_ids: List[str]) -> dict[str, dict[str, flo
         {"therapist_user_id": 1, "user_rating": 1},
     )
 
+    doc_count = 0
     for doc in cursor:
+        doc_count += 1
         rating_value = doc.get("user_rating")
         therapist_id = doc.get("therapist_user_id")
+        logger.info(f"Found session: therapist_id={therapist_id}, rating={rating_value}")
         if therapist_id and isinstance(rating_value, (int, float)):
             summary.setdefault(therapist_id, []).append(float(rating_value))
+
+    logger.info(f"Total sessions found: {doc_count}")
+    logger.info(f"Rating summary: {summary}")
 
     aggregates: dict[str, dict[str, float | int]] = {}
     for therapist_id, ratings in summary.items():
@@ -110,9 +118,10 @@ def _compute_rating_summary(therapist_ids: List[str]) -> dict[str, dict[str, flo
         average = round(sum(ratings) / len(ratings), 1)
         aggregates[therapist_id] = {
             "average_rating": average,
-            "rating_count": len(ratings),
+            "total_ratings": len(ratings),
         }
 
+    logger.info(f"Final aggregates: {aggregates}")
     return aggregates
 
 def submit_therapist_application(payload: TherapistApplicationRequest) -> TherapistApplicationResponse:
@@ -238,10 +247,10 @@ def get_therapist_profile(user_id: str) -> TherapistProfileResponse:
     rating_info = rating_map.get(user_id)
     if rating_info:
         therapist["average_rating"] = rating_info["average_rating"]
-        therapist["rating_count"] = rating_info["rating_count"]
+        therapist["total_ratings"] = rating_info["total_ratings"]
     else:
         therapist["average_rating"] = None
-        therapist["rating_count"] = 0
+        therapist["total_ratings"] = 0
     
     return TherapistProfileResponse(**therapist)
 
@@ -285,7 +294,7 @@ def get_all_verified_therapists(search_text: Optional[str] = None) -> list[Thera
         therapist_id = therapist.get("user_id")
         rating_info = rating_map.get(therapist_id, {}) if therapist_id else {}
         therapist["average_rating"] = rating_info.get("average_rating")
-        therapist["rating_count"] = rating_info.get("rating_count", 0)
+        therapist["total_ratings"] = rating_info.get("total_ratings", 0)
 
     return [TherapistProfileResponse(**t) for t in therapists]
 

@@ -262,41 +262,6 @@ class TherapistVerificationStatus extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
-                
-                // Info Message
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color.fromRGBO(239, 246, 255, 1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: const Color.fromRGBO(191, 219, 254, 1),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.info_outline,
-                        color: Color.fromRGBO(59, 130, 246, 1),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          'We will notify you via email once your application has been reviewed.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontFamily: 'Nunito',
-                            color: Color.fromRGBO(30, 64, 175, 1),
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
                 const SizedBox(height: 32),
                 
                 // Action Buttons based on status
