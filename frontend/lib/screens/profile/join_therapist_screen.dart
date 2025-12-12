@@ -155,12 +155,22 @@ class _JoinTherapistState extends State<JoinTherapist> {
         }
       }
       // Pre-fill profile picture if exists
-      if (data['profile_picture'] != null &&
+      // Backend returns profile_picture_base64 field
+      if (data['profile_picture_base64'] != null &&
+          data['profile_picture_base64'].toString().isNotEmpty) {
+        try {
+          _imageBytes = base64Decode(data['profile_picture_base64']);
+        } catch (e) {
+          print('Error decoding profile picture: $e');
+          // If decoding fails, leave it empty
+        }
+      } else if (data['profile_picture'] != null &&
           data['profile_picture'].toString().isNotEmpty) {
+        // Fallback to old field name for backwards compatibility
         try {
           _imageBytes = base64Decode(data['profile_picture']);
         } catch (e) {
-          // If decoding fails, leave it empty
+          print('Error decoding profile picture: $e');
         }
       }
     });
@@ -272,7 +282,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
     });
   }
 
-  void _showErrorDialog(String message) {
+  void _showErrorDialog(List<String> errors) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -299,9 +309,9 @@ class _JoinTherapistState extends State<JoinTherapist> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Error',
-                style: TextStyle(
+              Text(
+                errors.length == 1 ? 'Error' : 'Errors Found',
+                style: const TextStyle(
                   fontSize: 20,
                   fontFamily: 'Nunito',
                   fontWeight: FontWeight.bold,
@@ -310,12 +320,64 @@ class _JoinTherapistState extends State<JoinTherapist> {
               ),
               const SizedBox(height: 8),
               Text(
-                message,
+                errors.length == 1 
+                  ? 'Please fix the following issue:'
+                  : 'Please fix the following ${errors.length} issues:',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
                   fontFamily: 'Nunito',
                   color: Color(0xFF6B7280),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: errors.asMap().entries.map((entry) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(top: 2),
+                              width: 24,
+                              height: 24,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEF4444),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${entry.key + 1}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontFamily: 'Nunito',
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                entry.value,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontFamily: 'Nunito',
+                                  color: Color(0xFF422006),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -351,31 +413,20 @@ class _JoinTherapistState extends State<JoinTherapist> {
   Future<bool> _checkEmailExists(String email) async {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
+      var url = '$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}';
       
-      // Check both users and therapist_users collections
-      final userResponse = await http.get(
-        Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
-      );
+      // During resubmission, pass user_id to exclude own record
+      if (widget.isResubmission) {
+        url += '&user_id=${Uri.encodeComponent(widget.userId)}';
+      }
       
-      final therapistResponse = await http.get(
-        Uri.parse('$apiUrl/check-therapist-email-exists?email=${Uri.encodeComponent(email)}'),
-      );
+      final response = await http.get(Uri.parse(url));
 
-      bool userExists = false;
-      bool therapistExists = false;
-
-      if (userResponse.statusCode == 200) {
-        final data = jsonDecode(userResponse.body);
-        userExists = data['exists'] == true;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
       }
-
-      if (therapistResponse.statusCode == 200) {
-        final data = jsonDecode(therapistResponse.body);
-        therapistExists = data['exists'] == true;
-      }
-
-      // Return true if email exists in either collection
-      return userExists || therapistExists;
+      return false;
     } catch (e) {
       print('Error checking email: $e');
       return false;
@@ -385,9 +436,14 @@ class _JoinTherapistState extends State<JoinTherapist> {
   Future<bool> _checkLicenseExists(String licenseNumber) async {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
-      final response = await http.get(
-        Uri.parse('$apiUrl/therapist/check-license?license_number=${Uri.encodeComponent(licenseNumber)}'),
-      );
+      var url = '$apiUrl/therapist/check-license?license_number=${Uri.encodeComponent(licenseNumber)}';
+      
+      // During resubmission, pass user_id to exclude own record
+      if (widget.isResubmission) {
+        url += '&user_id=${Uri.encodeComponent(widget.userId)}';
+      }
+      
+      final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -400,100 +456,96 @@ class _JoinTherapistState extends State<JoinTherapist> {
   }
 
   Future<void> _submitApplication() async {
-    // Validation
+    // Collect all validation errors
+    List<String> errors = [];
+    
+    // Basic field validations
     if (_firstNameController.text.isEmpty) {
-      _showErrorDialog('Please enter your first name');
-      return;
+      errors.add('Please enter your first name');
     }
     if (_lastNameController.text.isEmpty) {
-      _showErrorDialog('Please enter your last name');
-      return;
+      errors.add('Please enter your last name');
     }
     if (_emailController.text.isEmpty) {
-      _showErrorDialog('Please enter your official email');
-      return;
-    }
-    if (!RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(_emailController.text.trim())) {
-      _showErrorDialog('Please enter a valid email address');
-      return;
-    }
-    
-    // Check email uniqueness (both user_profile and therapist_profiles collections)
-    final emailExists = await _checkEmailExists(_emailController.text.trim());
-    if (emailExists) {
-      _showErrorDialog('This email is already registered. Please use a different email address.');
-      return;
+      errors.add('Please enter your official email');
+    } else if (!RegExp(r"^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}").hasMatch(_emailController.text.trim())) {
+      errors.add('Please enter a valid email address');
     }
     
     if (_contactController.text.isEmpty) {
-      _showErrorDialog('Please enter your contact number');
-      return;
-    }
-    
-    // Malaysian phone number validation (01X-XXX XXXX or 01XXXXXXXXX)
-    final cleanedContact = _contactController.text.replaceAll(RegExp(r'[\s-]'), '');
-    if (!RegExp(r'^01[0-9]{8,9}$').hasMatch(cleanedContact)) {
-      _showErrorDialog('Please enter a valid Malaysian contact number (e.g., 012-345 6789 or 0123456789)');
-      return;
+      errors.add('Please enter your contact number');
+    } else {
+      // Malaysian phone number validation (mobile: 01X-XXXX XXXX or landline: 0X-XXXX XXXX)
+      final cleanedContact = _contactController.text.replaceAll(RegExp(r'[\s-]'), '');
+      // Mobile: 01X-XXXX XXXX (10-11 digits starting with 01)
+      // Landline: 0X-XXXX XXXX (9-10 digits starting with 0 but not 01)
+      final isMobile = RegExp(r'^01[0-9]{8,9}$').hasMatch(cleanedContact);
+      final isLandline = RegExp(r'^0[2-9][0-9]{7,8}$').hasMatch(cleanedContact);
+      
+      if (!isMobile && !isLandline) {
+        errors.add('Please enter a valid Malaysian number (Mobile: 012-345 6789 or Landline: 03-1234 5678)');
+      }
     }
     
     if (_licenseController.text.isEmpty) {
-      _showErrorDialog('Please enter your license number');
-      return;
-    }
-    
-    // Check license number uniqueness (therapist_profiles collection only)
-    final licenseExists = await _checkLicenseExists(_licenseController.text.trim());
-    if (licenseExists) {
-      _showErrorDialog('This license number is already registered. Please verify your license number.');
-      return;
+      errors.add('Please enter your license number');
     }
     if (_bioController.text.isEmpty) {
-      _showErrorDialog('Please enter your bio');
-      return;
+      errors.add('Please enter your bio');
     }
     if (_officeNameController.text.isEmpty) {
-      _showErrorDialog('Please enter your office name');
-      return;
+      errors.add('Please enter your office name');
     }
     if (_addressController.text.isEmpty) {
-      _showErrorDialog('Please enter your therapy center address');
-      return;
+      errors.add('Please enter your therapy center address');
     }
     if (_cityController.text.isEmpty) {
-      _showErrorDialog('Please enter your city');
-      return;
+      errors.add('Please enter your city');
     }
     if (_selectedState == 'Select') {
-      _showErrorDialog('Please select your state');
-      return;
+      errors.add('Please select your state');
     }
     if (_zipController.text.isEmpty) {
-      _showErrorDialog('Please enter your zip code');
-      return;
-    }
-    if (_zipController.text.length != 5) {
-      _showErrorDialog('Zip code must be exactly 5 digits');
-      return;
-    }
-    if (!RegExp(r'^\d{5}$').hasMatch(_zipController.text)) {
-      _showErrorDialog('Zip code must contain only numbers');
-      return;
+      errors.add('Please enter your zip code');
+    } else if (_zipController.text.length != 5) {
+      errors.add('Zip code must be exactly 5 digits');
+    } else if (!RegExp(r'^\d{5}$').hasMatch(_zipController.text)) {
+      errors.add('Zip code must contain only numbers');
     }
     if (_selectedSpecializations.isEmpty) {
-      _showErrorDialog('Please select at least one specialization');
-      return;
+      errors.add('Please select at least one specialization');
     }
     if (_selectedLanguages.isEmpty) {
-      _showErrorDialog('Please select at least one language');
-      return;
+      errors.add('Please select at least one language');
     }
     if (_hourlyRateController.text.isEmpty) {
-      _showErrorDialog('Please enter your hourly rate');
-      return;
+      errors.add('Please enter your hourly rate');
     }
     if (_imageBytes == null) {
-      _showErrorDialog('Please upload a profile picture');
+      errors.add('Please upload a profile picture');
+    }
+    
+    // Don't return early - continue to check duplicates even if basic validations fail
+    // This way user sees ALL errors at once
+    
+    // Check for duplicates (async validations) - only if fields are not empty
+    if (_emailController.text.isNotEmpty) {
+      final emailExists = await _checkEmailExists(_emailController.text.trim());
+      if (emailExists) {
+        errors.add('This email is already registered. Please use a different email address.');
+      }
+    }
+    
+    if (_licenseController.text.isNotEmpty) {
+      final licenseExists = await _checkLicenseExists(_licenseController.text.trim());
+      if (licenseExists) {
+        errors.add('This license number is already registered. Please verify your license number.');
+      }
+    }
+    
+    // Show all errors together (basic + duplicate checks)
+    if (errors.isNotEmpty) {
+      _showErrorDialog(errors);
       return;
     }
 
@@ -548,13 +600,13 @@ class _JoinTherapistState extends State<JoinTherapist> {
           );
         } else {
           final error = jsonDecode(response.body);
-          _showErrorDialog(error['detail'] ?? 'Failed to submit application');
+          _showErrorDialog([error['detail'] ?? 'Failed to submit application']);
         }
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading dialog
-        _showErrorDialog('Error: $e');
+        _showErrorDialog(['Error: $e']);
       }
     }
   }
@@ -980,7 +1032,7 @@ class _JoinTherapistState extends State<JoinTherapist> {
                     _buildTextField(
                       label: 'Contact Number',
                       controller: _contactController,
-                      placeholder: 'e.g., 012-345 6789',
+                      placeholder: 'e.g., 012-345 6789 or 03-1234 5678',
                       keyboardType: TextInputType.phone,
                     ),
                     const SizedBox(height: 16),

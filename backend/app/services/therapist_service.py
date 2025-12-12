@@ -143,10 +143,9 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
             normalized_url, base64_payload = _normalize_profile_picture_input(payload.profile_picture)
 
             update_doc = {
-                "license_number": payload.license_number,
                 "first_name": payload.first_name,
                 "last_name": payload.last_name,
-                "email": payload.email,
+                "email": payload.email.lower(),
                 "contact_number": payload.contact_number,
                 "bio": payload.bio,
                 "office_name": payload.office_name,
@@ -164,6 +163,37 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
                 "rejection_reason": None,  # Clear rejection reason
                 "updated_at": now,
             }
+            
+            # Only update license_number if it's different to avoid unique index conflict
+            if existing_therapist.get("license_number") != payload.license_number:
+                # Check if new license number is already used by another approved therapist
+                existing_license = db.therapist_profile.find_one({
+                    "license_number": payload.license_number,
+                    "user_id": {"$ne": payload.user_id},
+                    "verification_status": "approved"
+                })
+                if existing_license:
+                    raise HTTPException(status_code=409, detail="License number already registered")
+                update_doc["license_number"] = payload.license_number
+            
+            # Check if email is already used by another user or approved therapist
+            if existing_therapist.get("email") != payload.email.lower():
+                # Check in users collection
+                existing_user_email = db.users.find_one({
+                    "email": payload.email.lower(),
+                    "user_id": {"$ne": payload.user_id}
+                })
+                if existing_user_email:
+                    raise HTTPException(status_code=409, detail="Email already registered")
+                
+                # Check in approved therapist_profile
+                existing_therapist_email = db.therapist_profile.find_one({
+                    "email": payload.email.lower(),
+                    "user_id": {"$ne": payload.user_id},
+                    "verification_status": "approved"
+                })
+                if existing_therapist_email:
+                    raise HTTPException(status_code=409, detail="Email already registered")
             
             try:
                 db.therapist_profile.update_one(
@@ -184,13 +214,32 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
             # Application exists and is not rejected
             raise HTTPException(status_code=409, detail="Therapist application already exists")
     
-    # Check if license number is already registered by another user
+    # Check if license number is already registered by another approved therapist
     existing_license = db.therapist_profile.find_one({
         "license_number": payload.license_number,
-        "user_id": {"$ne": payload.user_id}
+        "user_id": {"$ne": payload.user_id},
+        "verification_status": "approved"
     })
     if existing_license:
         raise HTTPException(status_code=409, detail="License number already registered")
+    
+    # Check if email is already registered by another user or approved therapist
+    # Check in users collection
+    existing_user_email = db.users.find_one({
+        "email": payload.email.lower(),
+        "user_id": {"$ne": payload.user_id}
+    })
+    if existing_user_email:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    
+    # Check in approved therapist_profile
+    existing_therapist_email = db.therapist_profile.find_one({
+        "email": payload.email.lower(),
+        "user_id": {"$ne": payload.user_id},
+        "verification_status": "approved"
+    })
+    if existing_therapist_email:
+        raise HTTPException(status_code=409, detail="Email already registered")
     
     now = now_my()
     
@@ -201,7 +250,7 @@ def submit_therapist_application(payload: TherapistApplicationRequest) -> Therap
         "license_number": payload.license_number,
         "first_name": payload.first_name,
         "last_name": payload.last_name,
-        "email": payload.email,
+        "email": payload.email.lower(),
         "contact_number": payload.contact_number,
         "bio": payload.bio,
         "office_name": payload.office_name,
