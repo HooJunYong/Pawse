@@ -5,9 +5,9 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/notification_manager.dart';
-import '../../theme/shadows.dart';
-import '../admin/admin_dashboard_screen.dart';
-import '../profile/profile_screen.dart';
+import '../admin/admin_therapist_management.dart';
+import '../homepage_screen.dart';
+import '../mood/mood_check_in_screen.dart';
 import 'forgot_password_screen.dart';
 import 'signup_screen.dart';
 
@@ -37,8 +37,8 @@ class _LoginWidgetState extends State<LoginWidget> {
       final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      // Show loading indicator
-      ScaffoldMessenger.of(context).showSnackBar(
+      // Show loading indicator and get its controller to hide it later
+      final snackBarController = ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Logging in...')),
       );
 
@@ -55,6 +55,9 @@ class _LoginWidgetState extends State<LoginWidget> {
 
         if (!mounted) return;
 
+        // Hide the SnackBar before navigating
+        snackBarController.close();
+
         if (response.statusCode == 200) {
           // Success - parse user_id and user_type, navigate accordingly
           final data = jsonDecode(response.body);
@@ -64,401 +67,118 @@ class _LoginWidgetState extends State<LoginWidget> {
           if (userId == null || userId.isEmpty) {
             showDialog(
               context: context,
-              builder: (context) => Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                backgroundColor: const Color(0xFFF7F4F2),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFEE2E2),
-                        ),
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Color(0xFFEF4444),
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Login Error',
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF422006),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Missing user ID in response.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF422006),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'OK',
-                            style: TextStyle(
-                              fontFamily: 'Nunito',
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+              builder: (context) => const AlertDialog(
+                title: Text('Login Error'),
+                content: Text('Missing user ID in response.'),
               ),
             );
             return;
           }
-          
+
           // Initialize notification manager for the logged-in user
           await NotificationManager.instance.initialize(userId);
-
+          
           // Redirect based on user type
           if (userType == 'admin') {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => AdminDashboardScreen(adminUserId: userId),
+                builder: (context) => AdminTherapistManagement(adminUserId: userId),
               ),
             );
           } else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Profile(userId: userId),
-              ),
-            );
+            // Check mood log status from login response
+            final hasLoggedMoodToday = data['has_logged_mood_today'] as bool? ?? false;
+            
+            if (hasLoggedMoodToday) {
+              // User already logged mood, go to homepage
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HomeScreen(userId: userId),
+                ),
+              );
+            } else {
+              // User hasn't logged mood, go to mood check-in screen
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MoodCheckInScreen(userId: userId),
+                ),
+              );
+            }
           }
         } else if (response.statusCode == 401) {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // Invalid credentials - show popup dialog
           showDialog(
             context: context,
             builder: (BuildContext context) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                backgroundColor: const Color(0xFFF7F4F2),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFEE2E2),
-                        ),
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Color(0xFFEF4444),
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Login Failed',
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF422006),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Invalid email or password. Please try again.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF422006),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'OK',
-                            style: TextStyle(
-                              fontFamily: 'Nunito',
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+              return AlertDialog(
+                title: const Text('Login Failed'),
+                content: const Text('Invalid email or password. Please try again.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
                   ),
-                ),
+                ],
               );
             },
           );
         } else if (response.statusCode == 403) {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // User inactive - show popup dialog
           showDialog(
             context: context,
             builder: (BuildContext context) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                backgroundColor: const Color(0xFFF7F4F2),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFEE2E2),
-                        ),
-                        child: const Icon(
-                          Icons.block,
-                          color: Color(0xFFEF4444),
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Account Inactive',
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF422006),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Your account is inactive. Please contact support.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF422006),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'OK',
-                            style: TextStyle(
-                              fontFamily: 'Nunito',
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+              return AlertDialog(
+                title: const Text('Account Inactive'),
+                content: const Text('Your account is inactive. Please contact support.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
                   ),
-                ),
+                ],
               );
             },
           );
         } else {
+          snackBarController.close(); // Ensure SnackBar is closed on error
           // Other error - show popup dialog
           final error = jsonDecode(response.body);
           showDialog(
             context: context,
             builder: (BuildContext context) {
-              return Dialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                backgroundColor: const Color(0xFFF7F4F2),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Color(0xFFFEE2E2),
-                        ),
-                        child: const Icon(
-                          Icons.error_outline,
-                          color: Color(0xFFEF4444),
-                          size: 32,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Login Error',
-                        style: TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF422006),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        error['detail'] ?? 'An unknown error occurred.',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontFamily: 'Nunito',
-                          fontSize: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF422006),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text(
-                            'OK',
-                            style: TextStyle(
-                              fontFamily: 'Nunito',
-                              fontSize: 16,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+              return AlertDialog(
+                title: const Text('Login Error'),
+                content: Text(error['detail'] ?? 'An unknown error occurred.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('OK'),
                   ),
-                ),
+                ],
               );
             },
           );
         }
       } catch (e) {
         if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar(); // Hide on exception
         showDialog(
           context: context,
           builder: (BuildContext context) {
-            return Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              backgroundColor: const Color(0xFFF7F4F2),
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Color(0xFFFEE2E2),
-                      ),
-                      child: const Icon(
-                        Icons.wifi_off_rounded,
-                        color: Color(0xFFEF4444),
-                        size: 32,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Connection Error',
-                      style: TextStyle(
-                        fontFamily: 'Nunito',
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF422006),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Failed to connect to server:\n$e',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontFamily: 'Nunito',
-                        fontSize: 16,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF422006),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text(
-                          'OK',
-                          style: TextStyle(
-                            fontFamily: 'Nunito',
-                            fontSize: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+            return AlertDialog(
+              title: const Text('Connection Error'),
+              content: Text('Failed to connect to server:\n$e'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
                 ),
-              ),
+              ],
             );
           },
         );
@@ -559,7 +279,13 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: kPillShadow,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color.fromRGBO(0, 0, 0, 0.06),
+                                offset: Offset(0, 2),
+                                blurRadius: 4,
+                              )
+                            ],
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -606,7 +332,13 @@ class _LoginWidgetState extends State<LoginWidget> {
                         Container(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: kPillShadow,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color.fromRGBO(0, 0, 0, 0.06),
+                                offset: Offset(0, 2),
+                                blurRadius: 4,
+                              )
+                            ],
                             color: const Color.fromRGBO(255, 255, 255, 1),
                             border: Border.all(
                               color: const Color.fromRGBO(229, 231, 235, 1),
@@ -644,29 +376,22 @@ class _LoginWidgetState extends State<LoginWidget> {
                   ),
                   const SizedBox(height: 24),
                   // Log In button
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(9999),
-                      boxShadow: kButtonShadow,
-                    ),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          elevation: 0,
-                          backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9999)),
-                        ),
-                        onPressed: _submit,
-                        child: const Text(
-                          'Log In',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontFamily: 'Nunito',
-                            color: Colors.white,
-                          ),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromRGBO(66, 32, 6, 1),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(9999)),
+                      ),
+                      onPressed: _submit,
+                      child: const Text(
+                        'Log In',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontFamily: 'Nunito',
+                          color: Colors.white,
                         ),
                       ),
                     ),

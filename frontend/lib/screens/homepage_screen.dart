@@ -269,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildHeroCard(),
                     const SizedBox(height: 24),
                     _buildActionCard(
-                      imagePath: 'assets/images/Drift_bottle.png',
+                      imagePath: 'assets/images/drift_bottle.png',
                       color: Colors.blueAccent,
                       title: "Drift & Heal",
                     ),
