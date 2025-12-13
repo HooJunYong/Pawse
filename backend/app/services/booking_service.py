@@ -372,7 +372,15 @@ def create_booking(request: BookingRequest) -> BookingResponse:
         therapist.get('state'),
     ]
     center_address = ", ".join([part for part in address_parts if part]) or therapist.get('office_address') or ""
-    client_name = client.get('full_name') or client.get('email', '').split('@')[0]
+    
+    # Get client name from user_profiles
+    client_profile = db.user_profiles.find_one({"user_id": request.client_user_id})
+    if client_profile:
+        first_name = client_profile.get('first_name', '')
+        last_name = client_profile.get('last_name', '')
+        client_name = f"{first_name} {last_name}".strip() or client.get('full_name') or client.get('email', '').split('@')[0]
+    else:
+        client_name = client.get('full_name') or client.get('email', '').split('@')[0]
     
     # Calculate session fee based on hourly rate and duration
     hourly_rate = float(therapist.get('hourly_rate', 150.0))
@@ -945,12 +953,17 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     client_user_id = session.get("user_id")
     
     # Get therapist name
-    therapist = db.therapist_profiles.find_one({"user_id": therapist_user_id})
+    therapist = db.therapist_profile.find_one({"user_id": therapist_user_id})
     therapist_name = f"Dr. {therapist.get('first_name', '')} {therapist.get('last_name', '')}" if therapist else "Your therapist"
     
-    # Get client name
+    # Get client name from user_profiles first_name and last_name
     client = db.user_profiles.find_one({"user_id": client_user_id})
-    client_name = client.get('name', 'A client') if client else 'A client'
+    if client:
+        first_name = client.get('first_name', '')
+        last_name = client.get('last_name', '')
+        client_name = f"{first_name} {last_name}".strip() or 'A client'
+    else:
+        client_name = 'A client'
     
     # Send chat message about cancellation
     try:
