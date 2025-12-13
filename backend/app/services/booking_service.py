@@ -906,16 +906,39 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
         }
     )
     
-    # Format scheduled date/time
+    # Format scheduled date/time - convert from UTC to Malaysia time
     scheduled_at = session.get('scheduled_at')
+    formatted_datetime = str(scheduled_at)
+    
     if isinstance(scheduled_at, str):
         try:
             scheduled_dt = datetime.fromisoformat(scheduled_at.replace('Z', '+00:00'))
-            formatted_datetime = scheduled_dt.strftime('%B %d, %Y at %I:%M %p')
+            # Convert to Malaysia time if it has timezone info
+            if scheduled_dt.tzinfo is not None:
+                utc_dt = scheduled_dt.astimezone(None).replace(tzinfo=None)
+                my_dt = utc_dt + timedelta(hours=8)
+                formatted_datetime = my_dt.strftime('%B %d, %Y at %I:%M %p')
+            else:
+                # Assume UTC and convert to Malaysia time
+                my_dt = scheduled_dt + timedelta(hours=8)
+                formatted_datetime = my_dt.strftime('%B %d, %Y at %I:%M %p')
         except:
-            formatted_datetime = str(scheduled_at)
-    else:
-        formatted_datetime = str(scheduled_at)
+            pass
+    elif isinstance(scheduled_at, datetime):
+        # MongoDB stores UTC timezone-naive datetimes - convert to Malaysia time
+        if scheduled_at.tzinfo is None:
+            # Treat as UTC and convert to Malaysia time (+8 hours)
+            my_dt = scheduled_at + timedelta(hours=8)
+            formatted_datetime = my_dt.strftime('%B %d, %Y at %I:%M %p')
+        else:
+            # Has timezone - convert to Malaysia time
+            utc_dt = scheduled_at.astimezone(None).replace(tzinfo=None)
+            my_dt = utc_dt + timedelta(hours=8)
+            formatted_datetime = my_dt.strftime('%B %d, %Y at %I:%M %p')
+    
+    booking_label = formatted_datetime
+    duration_minutes = session.get('duration_minutes', 60)
+    duration_label = f"{duration_minutes} mins"
     
     # Get names for notifications and chat
     therapist_user_id = session.get("therapist_user_id")
@@ -931,9 +954,14 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     
     # Send chat message about cancellation
     try:
+        chat_message = "\n".join([
+            "Booking cancelled ❌",
+            f"Date & Time: {booking_label}",
+            f"Duration: {duration_label}",
+        ])
+
         if cancelled_by == "therapist":
             # Therapist cancelled - send message from therapist to client
-            chat_message = f"I've cancelled our session scheduled for {formatted_datetime}. Please feel free to book another time slot that works for you."
             send_message(SendChatMessageRequest(
                 sender_id=therapist_user_id,
                 sender_role="therapist",
@@ -944,7 +972,6 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
             ))
         else:
             # Client cancelled - send message from client to therapist
-            chat_message = f"I've cancelled our session scheduled for {formatted_datetime}."
             send_message(SendChatMessageRequest(
                 sender_id=client_user_id,
                 sender_role="client",
