@@ -643,41 +643,131 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (BuildContext context) {
-        return AlertDialog(
+        return Dialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
           ),
-          title: const Text(
-            'Confirm Booking',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontFamily: 'Nunito',
-              color: _textPrimary,
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to book a session with ${widget.therapist.displayName} on ${_getMonthName(_selectedDate.month)} ${_selectedDate.day}, ${_selectedDate.year} from ${slot.startTime} to ${slot.endTime}?',
-            style: TextStyle(
-              color: _textSecondary,
-              fontFamily: 'Nunito',
-              fontSize: 14,
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: _textSecondary,
-                  fontFamily: 'Nunito',
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () async {
+          backgroundColor: Colors.white,
+          elevation: 8,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icon
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: _primaryMuted,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.event_available,
+                      color: _primaryColor,
+                      size: 36,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Title
+                  const Text(
+                    'Confirm Booking',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Nunito',
+                      color: _textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // Subtitle
+                  const Text(
+                    'Please review your booking details',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontFamily: 'Nunito',
+                      color: _textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Booking Details Card
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _backgroundColor,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _primaryMuted,
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildDetailRow(
+                          Icons.person_outline,
+                          'Therapist',
+                          widget.therapist.displayName,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDetailRow(
+                          Icons.calendar_today,
+                          'Date',
+                          '${_getMonthName(_selectedDate.month)} ${_selectedDate.day}, ${_selectedDate.year}',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDetailRow(
+                          Icons.access_time,
+                          'Time',
+                          '${slot.startTime} - ${slot.endTime}',
+                        ),
+                        const SizedBox(height: 16),
+                        _buildDetailRow(
+                          Icons.payments_outlined,
+                          'Total Price',
+                          'RM ${_calculateSlotPrice(slot).toStringAsFixed(0)}',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  
+                  // Buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            side: BorderSide(
+                              color: _textSecondary.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: _textSecondary,
+                              fontFamily: 'Nunito',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
                 Navigator.pop(context); // Close dialog first
 
                 final messenger = ScaffoldMessenger.of(this.context);
@@ -737,10 +827,12 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: _primaryColor,
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                elevation: 2,
+                shadowColor: _primaryColor.withOpacity(0.4),
               ),
               child: const Text(
                 'Confirm',
@@ -748,12 +840,68 @@ class _BookingSessionScreenState extends State<BookingSessionScreen> {
                   color: Colors.white,
                   fontFamily: 'Nunito',
                   fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
             ),
-          ],
+          ),
+        ],
+      ),
+      const SizedBox(height: 28),
+    ],
+  ),
+            ),
+          ),
         );
       },
     );
   }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: _primaryColor,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontFamily: 'Nunito',
+                  color: _textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontFamily: 'Nunito',
+                  color: _textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
+  
