@@ -10,7 +10,11 @@ import '../services/booking_service.dart';
 import '../services/profile_service.dart';
 import '../widgets/bottom_nav.dart';
 import 'therapist/find_therapist_screen.dart';
-
+import '../widgets/rank_badge.dart';
+import '../screens/chat/chat_session_screen.dart';
+import '../screens/driftbottle/drift_bottle_screen.dart';
+import '../services/music_tracking_service.dart';
+import '../services/mood_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userId;
@@ -33,6 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _userFirstName = 'Friend';
   String _userInitials = 'U';
   ImageProvider? _userAvatarImage;
+  String? _todayMoodLevel;
 
   // Colors extracted from design
   final Color _bgWhite = Colors.white;
@@ -44,9 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    MusicTrackingService.instance.initialize(widget.userId);
     _initDismissedCancelledSessions();
     _loadUpcomingSessions(initialLoad: true, resetToggle: true);
     _loadUserProfile();
+    _loadTodayMood();
   }
 
   @override
@@ -244,6 +251,55 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _loadTodayMood() async {
+    try {
+      final now = DateTime.now();
+      final response = await MoodService.getMoodByRange(
+        userId: widget.userId,
+        startDate: now,
+        endDate: now,
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          // Take the last entry as the most recent mood for the day
+          final moodEntry = data.last;
+          if (mounted) {
+            setState(() {
+              _todayMoodLevel = moodEntry['mood_level'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading mood: $e');
+    }
+  }
+
+  String _getHeroMessage() {
+    final name = _userFirstName.isNotEmpty ? _userFirstName : 'Friend';
+
+    if (_todayMoodLevel == null) {
+      return "Hi $name, how are you feeling today? I'm here if you want to chat.";
+    }
+
+    switch (_todayMoodLevel!.toLowerCase()) {
+      case 'very happy':
+        return "Hi $name, wow! You're feeling very happy today! That's amazing. Want to share what made your day so special?";
+      case 'happy':
+        return "Hi $name, I'm glad you're feeling happy today. Did something nice happen, or are you just in a good mood?";
+      case 'neutral':
+        return "Hi $name, feeling neutral today? That's perfectly fine. Sometimes a calm day is just what we need. Want to chat?";
+      case 'sad':
+        return "Hi $name, heard that you are feeling sad today. Want to tell me what is going on?";
+      case 'awful':
+        return "Hi $name, I'm sorry to hear you're feeling awful. I'm here for you if you want to talk about it.";
+      default:
+        return "Hi $name, how are you feeling today? I'm here if you want to chat.";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -272,6 +328,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       imagePath: 'assets/images/drift_bottle.png',
                       color: Colors.blueAccent,
                       title: "Drift & Heal",
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                DriftBottleScreen(userId: widget.userId),
+                          ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 24),
                     Text(
@@ -477,17 +541,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: _bronzeColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: const Text(
-            "Bronze",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-          ),
-        ),
+        RankBadge(userId: widget.userId),
       ],
     );
   }
@@ -516,7 +570,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             children: [
               Text(
-                "Hey Jerry. Heard that you are not feeling so well today. It's ok to have a bad day, want to talk with me on what is going on?",
+                _getHeroMessage(),
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'Urbanist',
@@ -529,7 +583,13 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {
-                  // Navigator.of(context).push(...)
+                  // Navigate to ChatSessionScreen
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          ChatSessionScreen(userId: widget.userId),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _btnBrown,
@@ -553,11 +613,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         // The Cat Image
         Positioned(
-          top: -120,
+          top: -100,
           child: Image.asset(
-            'assets/images/defaultcat.png',
-            width: 200,
-            height: 200,
+            'assets/images/americonsh1.png',
+            width: 180,
+            height: 180,
             fit: BoxFit.cover,
           ),
         ),
@@ -571,40 +631,44 @@ class _HomeScreenState extends State<HomeScreen> {
     String? imagePath,
     required Color color,
     required String title,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      decoration: BoxDecoration(
-        color: _bgWhite,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          if (imagePath != null)
-            ColorFiltered(
-              colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
-              child: Image.asset(imagePath, height: 48, width: 48),
-            )
-          else if (icon != null)
-            Icon(icon, size: 32, color: color),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _textDark,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        decoration: BoxDecoration(
+          color: _bgWhite,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          children: [
+            if (imagePath != null)
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+                child: Image.asset(imagePath, height: 48, width: 48),
+              )
+            else if (icon != null)
+              Icon(icon, size: 32, color: color),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: _textDark,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
