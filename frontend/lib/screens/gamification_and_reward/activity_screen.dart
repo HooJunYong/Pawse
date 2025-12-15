@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav.dart';
 import '../../widgets/rank_badge.dart';
-import '../../services/activity_service.dart';
-import '../../services/profile_service.dart';
 import 'reward_screen.dart';
-import 'dart:convert';
-import 'dart:typed_data';
+import 'controllers/activity_controller.dart';
 
 class ActivityScreen extends StatefulWidget {
   final String userId;
@@ -18,6 +15,7 @@ class ActivityScreen extends StatefulWidget {
 
 class _ActivityScreenState extends State<ActivityScreen> {
   int _currentIndex = 3; // Set to 3 for activity/medal icon
+  late ActivityController _controller;
 
   // Define Colors from design
   final Color kBackgroundColor = const Color(0xFFF7F4F2);
@@ -25,209 +23,28 @@ class _ActivityScreenState extends State<ActivityScreen> {
   final Color kRewardsButtonColor = const Color(0xFF5D2D05);
   final Color kTextColor = const Color(0xFF1A1A1A);
 
-  // State variables
-  bool _isLoading = true;
-  String? _errorMessage;
-  String _userFirstName = 'Friend';
-  String _userInitials = 'U';
-  ImageProvider? _userAvatarImage;
-  String _rankName = "Bronze";
-  int _currentPoints = 0;
-  int _nextRankPoints = 0;
-  int _pointsNeeded = 0;
-  double _progressPercentage = 0.0;
-  List<Map<String, dynamic>> _activities = [];
-  int _completedCount = 0;
-
   @override
   void initState() {
     super.initState();
-    _loadActivityData();
+    _controller = ActivityController(userId: widget.userId);
+    _controller.addListener(_onControllerUpdate);
+    _controller.loadActivityData();
   }
 
-  Future<void> _loadActivityData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
 
-    try {
-      // Load user profile
-      await _loadUserProfile();
-
-      // Load rank progress
-      final rankProgress = await ActivityService.getRankProgress(widget.userId);
-      if (rankProgress != null) {
-        setState(() {
-          _rankName = rankProgress['current_rank_name'] ?? 'Bronze';
-          _currentPoints = rankProgress['lifetime_points'] ?? 0;
-          _nextRankPoints = rankProgress['next_rank_min_points'] ?? 0;
-          _pointsNeeded = rankProgress['points_needed'] ?? 0;
-          _progressPercentage = (rankProgress['progress_percentage'] ?? 0).toDouble();
-        });
-      }
-
-      // Load daily activities
-      final activitiesData = await ActivityService.getDailyActivities(widget.userId);
-      if (activitiesData != null) {
-        setState(() {
-          _activities = List<Map<String, dynamic>>.from(activitiesData['activities'] ?? []);
-          _completedCount = activitiesData['completed_count'] ?? 0;
-        });
-      }
-
-      setState(() {
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load activity data: $e';
-      });
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  Future<void> _loadUserProfile() async {
-    try {
-      final response = await ProfileService.getProfile(widget.userId);
-      if (response.statusCode != 200) {
-        return;
-      }
-      final dynamic decoded = jsonDecode(response.body);
-      if (!mounted) {
-        return;
-      }
-      if (decoded is Map<String, dynamic>) {
-        final String firstName = _extractFirstName(decoded['full_name']);
-        final String initials = _extractInitials(
-          decoded['initials'],
-          decoded['full_name'],
-        );
-        final ImageProvider? avatar = _resolveProfileAvatar(
-          decoded['avatar_base64']?.toString(),
-          decoded['avatar_url']?.toString(),
-        );
 
-        setState(() {
-          if (firstName.isNotEmpty) {
-            _userFirstName = firstName;
-          }
-          if (initials.isNotEmpty) {
-            _userInitials = initials;
-          }
-          _userAvatarImage = avatar;
-        });
-      }
-    } catch (_) {
-      // Silently ignore profile load failures; keep friendly fallback.
-    }
-  }
-
-  String _extractFirstName(dynamic fullNameValue) {
-    if (fullNameValue is! String) {
-      return '';
-    }
-    final String trimmed = fullNameValue.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-    final List<String> parts = trimmed.split(RegExp(r'\s+'));
-    if (parts.isEmpty) {
-      return '';
-    }
-    final String first = parts.first.trim();
-    if (first.isEmpty) {
-      return '';
-    }
-    if (first.length == 1) {
-      return first.toUpperCase();
-    }
-    return first[0].toUpperCase() + first.substring(1);
-  }
-
-  String _extractInitials(dynamic initialsValue, dynamic fullNameValue) {
-    if (initialsValue is String && initialsValue.trim().isNotEmpty) {
-      final trimmed = initialsValue.trim();
-      return trimmed.length > 2
-          ? trimmed.substring(0, 2).toUpperCase()
-          : trimmed.toUpperCase();
-    }
-    if (fullNameValue is! String) {
-      return '';
-    }
-    final parts = fullNameValue
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) {
-      return '';
-    }
-    if (parts.length == 1) {
-      return parts.first[0].toUpperCase();
-    }
-    final firstInitial = parts[0][0].toUpperCase();
-    final secondInitial = parts[1][0].toUpperCase();
-    return '$firstInitial$secondInitial';
-  }
-
-  ImageProvider? _resolveProfileAvatar(String? base64Value, String? urlValue) {
-    final ImageProvider? fromBase64 = _decodeAvatarBase64(base64Value);
-    if (fromBase64 != null) {
-      return fromBase64;
-    }
-
-    final String? trimmedUrl = urlValue?.trim();
-    if (trimmedUrl == null || trimmedUrl.isEmpty) {
-      return null;
-    }
-    if (_isDataUri(trimmedUrl)) {
-      final bytes = _decodeDataUri(trimmedUrl);
-      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
-    }
-    return NetworkImage(trimmedUrl);
-  }
-
-  ImageProvider? _decodeAvatarBase64(String? value) {
-    if (value == null) {
-      return null;
-    }
-    final String trimmed = value.trim();
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    if (_isDataUri(trimmed)) {
-      final bytes = _decodeDataUri(trimmed);
-      return bytes != null && bytes.isNotEmpty ? MemoryImage(bytes) : null;
-    }
-    try {
-      final bytes = base64Decode(trimmed);
-      return bytes.isNotEmpty ? MemoryImage(bytes) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  bool _isDataUri(String? value) {
-    if (value == null) {
-      return false;
-    }
-    final lower = value.toLowerCase();
-    return lower.startsWith('data:image/');
-  }
-
-  Uint8List? _decodeDataUri(String dataUri) {
-    final separator = dataUri.indexOf(',');
-    if (separator == -1 || separator == dataUri.length - 1) {
-      return null;
-    }
-    final payload = dataUri.substring(separator + 1).trim();
-    try {
-      return base64Decode(payload);
-    } catch (_) {
-      return null;
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,21 +57,21 @@ class _ActivityScreenState extends State<ActivityScreen> {
             bottom: false, // Let content go behind the nav bar
             child: LayoutBuilder(
               builder: (context, constraints) {
-                return _isLoading
+                return _controller.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
+                    : _controller.errorMessage != null
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  _errorMessage!,
+                                  _controller.errorMessage!,
                                   style: const TextStyle(color: Colors.red),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 20),
                                 ElevatedButton(
-                                  onPressed: _loadActivityData,
+                                  onPressed: _controller.loadActivityData,
                                   child: const Text('Retry'),
                                 ),
                               ],
@@ -317,10 +134,10 @@ class _ActivityScreenState extends State<ActivityScreen> {
           child: CircleAvatar(
             radius: 28,
             backgroundColor: Colors.white,
-            backgroundImage: _userAvatarImage,
-            child: _userAvatarImage == null
+            backgroundImage: _controller.userAvatarImage,
+            child: _controller.userAvatarImage == null
                 ? Text(
-                    _userInitials,
+                    _controller.userInitials,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -333,7 +150,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
         const SizedBox(width: 16),
         Expanded(
           child: Text(
-            _userFirstName.isNotEmpty ? _userFirstName : 'Friend',
+            _controller.userFirstName.isNotEmpty ? _controller.userFirstName : 'Friend',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -366,8 +183,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _pointsNeeded > 0
-                ? "Earn $_pointsNeeded points to unlock next level"
+            _controller.pointsNeeded > 0
+                ? "Earn ${_controller.pointsNeeded} points to unlock next level"
                 : "You've reached the maximum rank!",
             style: TextStyle(
               fontSize: 16,
@@ -388,7 +205,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               children: [
                 // Filled portion
                 FractionallySizedBox(
-                  widthFactor: _progressPercentage / 100,
+                  widthFactor: _controller.progressPercentage / 100,
                   child: Container(
                     decoration: BoxDecoration(
                       color: kProgressBarColor,
@@ -399,8 +216,8 @@ class _ActivityScreenState extends State<ActivityScreen> {
                 // Text Overlay
                 Center(
                   child: Text(
-                    _pointsNeeded > 0
-                        ? "$_currentPoints/$_nextRankPoints"
+                    _controller.pointsNeeded > 0
+                        ? "${_controller.currentPoints}/${_controller.nextRankPoints}"
                         : "Max Rank",
                     style: const TextStyle(
                       fontSize: 13,
@@ -459,7 +276,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
             ),
           ),
           const SizedBox(height: 20),
-          if (_activities.isEmpty)
+          if (_controller.activities.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(20.0),
@@ -473,7 +290,7 @@ class _ActivityScreenState extends State<ActivityScreen> {
               ),
             )
           else
-            ..._activities.asMap().entries.map((entry) {
+            ..._controller.activities.asMap().entries.map((entry) {
               final index = entry.key;
               final activity = entry.value;
               return Column(

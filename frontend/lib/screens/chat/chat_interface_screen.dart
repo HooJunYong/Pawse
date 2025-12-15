@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import '../../services/chat_session_service.dart';
-import '../../services/api_service.dart';
-import '../../services/tts_service.dart';
 import '../../models/companion_model.dart';
-import '../../models/chat_message_model.dart';
 import '../../widgets/typing_indicator.dart';
+import 'controllers/chat_interface_controller.dart';
 
 
 class ChatInterfaceScreen extends StatefulWidget {
@@ -27,13 +23,7 @@ class ChatInterfaceScreen extends StatefulWidget {
 class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
-  
-  bool _isLoading = true;
-  bool _isSending = false;
-  bool _ttsEnabled = false; // TTS toggle state
-  String? _sessionId;
-  String? _errorMessage;
+  late ChatInterfaceController _controller;
 
   // Colors from the Figma design
   final Color _bgColor = const Color(0xFFF7F7F7);
@@ -45,175 +35,44 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.sessionId != null) {
-      _resumeExistingSession(widget.sessionId!);
-    } else {
-      _startNewSession();
-    }
+    _controller = ChatInterfaceController(
+      userId: widget.userId,
+      companion: widget.companion,
+      sessionId: widget.sessionId,
+    );
+    _controller.addListener(_onControllerUpdate);
+    _controller.initialize(widget.sessionId);
   }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
     super.dispose();
   }
 
-  /// Start a new chat session
-  Future<void> _startNewSession() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Start new session
-      final response = await ChatSessionService.startNewSession(
-        userId: widget.userId,
-        companionId: widget.companion.companionId,
-      );
-
-      if (response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        _sessionId = data['session_id'];
-
-        // Load initial messages (greeting)
-        await _loadMessages();
-      } else {
-        throw Exception('Failed to start session: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to start chat session: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  /// Resume an existing chat session
-  Future<void> _resumeExistingSession(String sessionId) async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      // Resume session
-      final response = await ChatSessionService.resumeSession(sessionId);
-
-      if (response.statusCode == 200) {
-        _sessionId = sessionId;
-
-        // Load existing messages
-        await _loadMessages();
-      } else {
-        throw Exception('Failed to resume session: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to resume chat session: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  /// Load messages for the current session
-  Future<void> _loadMessages() async {
-    if (_sessionId == null) return;
-
-    try {
-      final response = await ApiService.get('/api/chat/message/$_sessionId');
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final List<dynamic> messagesJson = data['messages'] ?? [];
-
-        setState(() {
-          _messages.clear();
-          _messages.addAll(
-            messagesJson.map((msg) => ChatMessage.fromJson(msg)).toList(),
-          );
-          _isLoading = false;
-        });
-
-        // Scroll to bottom after loading messages
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-      } else {
-        throw Exception('Failed to load messages: ${response.statusCode}');
-      }
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load messages: $e';
-        _isLoading = false;
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
+      // Scroll to bottom after state update
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
       });
     }
   }
 
   /// Send a message
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty || _sessionId == null) return;
+    if (_messageController.text.trim().isEmpty) return;
 
     final messageText = _messageController.text.trim();
     _messageController.clear();
 
-    // 1. Immediately add user message to the list
-    final userMessage = ChatMessage(
-      role: 'user',
-      messageText: messageText,
-      timestamp: DateTime.now(),
-      isLoading: false,
-    );
-    setState(() {
-      _messages.add(userMessage);
-    });
-    _scrollToBottom();
-
-    // 2. Add a temporary loading message for the AI
-    final loadingMessage = ChatMessage(
-      role: 'ai',
-      messageText: '...', // Placeholder text
-      timestamp: DateTime.now(),
-      isLoading: true, // Mark as loading
-    );
-    setState(() {
-      _messages.add(loadingMessage);
-    });
-    _scrollToBottom();
-
     try {
-      final response = await ApiService.post('/api/chat/message/send', {
-        'session_id': _sessionId,
-        'message_text': messageText,
-      });
- 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final aiResponse = ChatMessage.fromJson(data['ai_response']);
- 
-        // 3. Replace the loading message with the actual AI response
-        setState(() {
-          // Find the loading message and replace it
-          final loadingIndex = _messages.indexWhere((msg) => msg.isLoading);
-          if (loadingIndex != -1) {
-            _messages[loadingIndex] = aiResponse;
-          }
-        });
-        
-        // 4. If TTS is enabled, play the AI response
-        if (_ttsEnabled) {
-          TTSService.generateAndPlayAudio(
-            text: aiResponse.messageText,
-            companionId: widget.companion.companionId,
-          );
-        }
-        
-        // Scroll to the bottom to show the new AI message
-        _scrollToBottom(); 
-      } else {
-        throw Exception('Failed to send message: ${response.statusCode}');
-      }
+      await _controller.sendMessage(messageText);
+      _scrollToBottom();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -222,24 +81,13 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
             backgroundColor: Colors.red,
           ),
         );
-        // Remove the loading indicator on error
-        setState(() {
-          _messages.removeWhere((msg) => msg.isLoading);
-        });
       }
     }
   }
 
   /// End session and navigate back
   Future<void> _endSessionAndGoBack() async {
-    if (_sessionId != null) {
-      try {
-        await ChatSessionService.endSession(_sessionId!);
-      } catch (e) {
-        // Log error but still navigate back
-        debugPrint('Error ending session: $e');
-      }
-    }
+    await _controller.endSession();
     
     if (mounted) {
       Navigator.pop(context);
@@ -307,24 +155,17 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
           // TTS Toggle Button
           IconButton(
             icon: Icon(
-              _ttsEnabled ? Icons.volume_up : Icons.volume_off,
-              color: _ttsEnabled ? _btnBrown : Colors.grey,
+              _controller.ttsEnabled ? Icons.volume_up : Icons.volume_off,
+              color: _controller.ttsEnabled ? _btnBrown : Colors.grey,
             ),
             onPressed: () {
-              setState(() {
-                _ttsEnabled = !_ttsEnabled;
-              });
-              
-              // Stop audio if TTS is disabled
-              if (!_ttsEnabled) {
-                TTSService.stopAudio();
-              }
+              _controller.toggleTTS();
               
               // Show feedback
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
-                    _ttsEnabled 
+                    _controller.ttsEnabled 
                         ? 'Text-to-speech enabled' 
                         : 'Text-to-speech disabled'
                   ),
@@ -333,7 +174,7 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                 ),
               );
             },
-            tooltip: _ttsEnabled ? 'Disable TTS' : 'Enable TTS',
+            tooltip: _controller.ttsEnabled ? 'Disable TTS' : 'Enable TTS',
           ),
         ],
       ),
@@ -341,9 +182,9 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
         children: [
           // Messages area
           Expanded(
-            child: _isLoading
+            child: _controller.isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _errorMessage != null
+                : _controller.errorMessage != null
                     ? Center(
                         child: Padding(
                           padding: const EdgeInsets.all(20.0),
@@ -351,13 +192,13 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                _errorMessage!,
+                                _controller.errorMessage!,
                                 style: const TextStyle(color: Colors.red),
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 10),
                               ElevatedButton(
-                                onPressed: _startNewSession,
+                                onPressed: () => _controller.initialize(widget.sessionId),
                                 child: const Text('Retry'),
                               ),
                             ],
@@ -370,9 +211,9 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                           horizontal: 16,
                           vertical: 20,
                         ),
-                        itemCount: _messages.length,
+                        itemCount: _controller.messages.length,
                         itemBuilder: (context, index) {
-                          final message = _messages[index];
+                          final message = _controller.messages[index];
                           final isAI = message.role.toLowerCase() == 'ai';
 
                           return Align(
@@ -454,14 +295,14 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                         maxLines: null,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => _sendMessage(),
-                        enabled: !_isSending,
+                        enabled: !_controller.isSending,
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   // Send button
                   GestureDetector(
-                    onTap: _isSending ? null : _sendMessage,
+                    onTap: _controller.isSending ? null : _sendMessage,
                     child: Container(
                       width: 48,
                       height: 48,
@@ -469,7 +310,7 @@ class _ChatInterfaceScreenState extends State<ChatInterfaceScreen> {
                         color: _btnBrown,
                         shape: BoxShape.circle,
                       ),
-                      child: _isSending
+                      child: _controller.isSending
                           ? const Padding(
                               padding: EdgeInsets.all(12.0),
                               child: CircularProgressIndicator(

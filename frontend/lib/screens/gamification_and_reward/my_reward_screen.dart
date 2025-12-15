@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/reward_service.dart';
+import 'controllers/my_reward_controller.dart';
 
 class MyRewardScreen extends StatefulWidget {
   final String userId;
@@ -11,40 +11,30 @@ class MyRewardScreen extends StatefulWidget {
 }
 
 class _MyRewardScreenState extends State<MyRewardScreen> {
+  late MyRewardController _controller;
+  
   final Color kBackgroundColor = const Color(0xFFF7F4F2);
   final Color kBrownColor = const Color(0xFF5D2D05);
   final Color kOrangeColor = const Color(0xFFFF8C42);
 
-  bool _isLoading = true;
-  String? _errorMessage;
-  List<Map<String, dynamic>> _redeemedRewards = [];
-
   @override
   void initState() {
     super.initState();
-    _loadInventory();
+    _controller = MyRewardController(userId: widget.userId);
+    _controller.addListener(_onControllerUpdate);
+    _controller.loadInventory();
   }
 
-  Future<void> _loadInventory() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
 
-    try {
-      final inventoryData = await RewardService.getUserInventory(widget.userId);
-
-      setState(() {
-        _redeemedRewards = List<Map<String, dynamic>>.from(
-          inventoryData?['inventory'] ?? []
-        );
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load inventory: $e';
-      });
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -67,27 +57,27 @@ class _MyRewardScreenState extends State<MyRewardScreen> {
           ),
         ),
       ),
-      body: _isLoading
+      body: _controller.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _errorMessage != null
+          : _controller.errorMessage != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _errorMessage!,
+                        _controller.errorMessage!,
                         style: const TextStyle(color: Colors.red),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
-                        onPressed: _loadInventory,
+                        onPressed: _controller.loadInventory,
                         child: const Text('Retry'),
                       ),
                     ],
                   ),
                 )
-              : _redeemedRewards.isEmpty
+              : _controller.redeemedRewards.isEmpty
                   ? const Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -118,9 +108,9 @@ class _MyRewardScreenState extends State<MyRewardScreen> {
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(20),
-                      itemCount: _redeemedRewards.length,
+                      itemCount: _controller.redeemedRewards.length,
                       itemBuilder: (context, index) {
-                        final reward = _redeemedRewards[index];
+                        final reward = _controller.redeemedRewards[index];
                         return _buildRewardItem(reward);
                       },
                     ),

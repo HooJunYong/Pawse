@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../models/companion_model.dart';
-import '../../services/companion_service.dart';
+import 'controllers/change_companion_controller.dart';
 
 class ChangeCompanionScreen extends StatefulWidget {
   final String userId;
@@ -15,11 +15,7 @@ class ChangeCompanionScreen extends StatefulWidget {
 }
 
 class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
-  List<Companion> _companions = [];
-  Companion? _currentCompanion;
-  Companion? _selectedCompanion;
-  bool _isLoading = true;
-  String? _errorMessage;
+  late ChangeCompanionController _controller;
 
   // Colors from design
   final Color _bgColor = const Color(0xFFF7F4F2);
@@ -30,51 +26,28 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCompanions();
+    _controller = ChangeCompanionController();
+    _controller.addListener(_onControllerUpdate);
+    _controller.loadCompanions(widget.userId, widget.currentCompanionId);
   }
 
-  Future<void> _loadCompanions() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
 
-    try {
-      // Load available companions
-      final companions = await CompanionService.getAvailableCompanions(
-        widget.userId,
-        activeOnly: true,
-      );
-
-      // Load current companion data
-      final currentCompanion = await CompanionService.getCompanionById(
-        widget.currentCompanionId,
-      );
-
-      setState(() {
-        _companions = companions;
-        _currentCompanion = currentCompanion;
-        _selectedCompanion = null; // No selection yet
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load companions: $e';
-        _isLoading = false;
-      });
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
-  void _selectCompanion(Companion companion) {
-    setState(() {
-      _selectedCompanion = companion;
-    });
-  }
-
   void _confirmSelection() {
-    if (_selectedCompanion != null) {
-      // Return the selected companion ID to the previous screen
-      Navigator.pop(context, _selectedCompanion!.companionId);
+    final selectedId = _controller.getSelectedCompanionId();
+    if (selectedId != null) {
+      Navigator.pop(context, selectedId);
     }
   }
 
@@ -100,21 +73,24 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
 
             // Main scrollable content
             Expanded(
-              child: _isLoading
+              child: _controller.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : _errorMessage != null
+                  : _controller.errorMessage != null
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            _errorMessage!,
+                            _controller.errorMessage!,
                             style: const TextStyle(color: Colors.red),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: _loadCompanions,
+                            onPressed: () => _controller.loadCompanions(
+                              widget.userId,
+                              widget.currentCompanionId,
+                            ),
                             child: const Text('Retry'),
                           ),
                         ],
@@ -127,12 +103,12 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                           const SizedBox(height: 20),
 
                           // Current companion image at top
-                          if (_currentCompanion != null)
+                          if (_controller.currentCompanion != null)
                             Transform.translate(
                               offset: const Offset(0, -50),
                               child: Center(
                                 child: Image.asset(
-                                  'assets/images/${_currentCompanion!.image}',
+                                  'assets/images/${_controller.currentCompanion!.image}',
                                   width: 180,
                                   height: 180,
                                   fit: BoxFit.contain,
@@ -175,9 +151,9 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                           const SizedBox(height: 30),
 
                           // List of companion cards
-                          ..._companions.map((companion) {
+                          ..._controller.companions.map((companion) {
                             final isSelected =
-                                _selectedCompanion?.companionId ==
+                                _controller.selectedCompanion?.companionId ==
                                 companion.companionId;
                             return _buildCompanionCard(companion, isSelected);
                           }).toList(),
@@ -204,7 +180,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
             ),
 
             // Fixed Select button at bottom
-            if (!_isLoading && _errorMessage == null)
+            if (!_controller.isLoading && _controller.errorMessage == null)
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 24,
@@ -224,7 +200,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _selectedCompanion != null
+                    onPressed: _controller.selectedCompanion != null
                         ? _confirmSelection
                         : null,
                     style: ElevatedButton.styleFrom(
@@ -254,7 +230,7 @@ class _ChangeCompanionScreenState extends State<ChangeCompanionScreen> {
 
   Widget _buildCompanionCard(Companion companion, bool isSelected) {
     return GestureDetector(
-      onTap: () => _selectCompanion(companion),
+      onTap: () => _controller.selectCompanion(companion),
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.only(bottom: 20),

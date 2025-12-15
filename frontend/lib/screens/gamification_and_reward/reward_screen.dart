@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../widgets/bottom_nav.dart';
-import '../../services/reward_service.dart';
 import 'my_reward_screen.dart';
-import 'dart:convert';
+import 'controllers/reward_controller.dart';
 
 class RewardScreen extends StatefulWidget {
   final String userId;
@@ -15,49 +14,31 @@ class RewardScreen extends StatefulWidget {
 
 class _RewardScreenState extends State<RewardScreen> {
   int _currentIndex = 3; // Rewards icon index
+  late RewardController _controller;
 
   // Define Colors
   final Color kBackgroundColor = const Color(0xFFF7F4F2);
   final Color kBrownColor = const Color(0xFF5D2D05);
   final Color kOrangeColor = const Color(0xFFFF8C42);
 
-  // State variables
-  bool _isLoading = true;
-  String? _errorMessage;
-  int _currentPoints = 0;
-  List<Map<String, dynamic>> _availableRewards = [];
-
   @override
   void initState() {
     super.initState();
-    _loadRewardData();
+    _controller = RewardController(userId: widget.userId);
+    _controller.addListener(_onControllerUpdate);
+    _controller.loadRewardData();
   }
 
-  Future<void> _loadRewardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
 
-    try {
-      // Load user points
-      final points = await RewardService.getUserPoints(widget.userId);
-      
-      // Load available rewards
-      final rewardsData = await RewardService.getAvailableRewards(widget.userId);
-
-      setState(() {
-        _currentPoints = points;
-        _availableRewards = List<Map<String, dynamic>>.from(
-          rewardsData?['available_rewards'] ?? []
-        );
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Failed to load rewards: $e';
-      });
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
@@ -386,10 +367,7 @@ class _RewardScreenState extends State<RewardScreen> {
     );
 
     try {
-      final result = await RewardService.redeemReward(
-        userId: widget.userId,
-        rewardId: reward['reward_id'],
-      );
+      final result = await _controller.redeemReward(reward['reward_id']);
 
       if (mounted) {
         Navigator.pop(context); // Close loading
@@ -399,29 +377,14 @@ class _RewardScreenState extends State<RewardScreen> {
           _showSuccessDialog(
             'You have successfully redeemed ${reward['reward_name']}! 🎉'
           );
-
-          // Reload data
-          _loadRewardData();
         }
       }
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // Close loading
         
-        // Parse error message
-        String errorMsg = e.toString();
-        String displayMessage = "Looks like you don't have enough points to redeem this reward.";
-        
-        // Check for specific error types
-        if (errorMsg.contains('Insufficient points')) {
-          displayMessage = "Looks like you don't have enough points to redeem this reward.";
-        } else if (errorMsg.contains('already been redeemed')) {
-          displayMessage = "You have already redeemed this reward.";
-        } else if (errorMsg.contains('not found') || errorMsg.contains('inactive')) {
-          displayMessage = "This reward is no longer available.";
-        } else {
-          displayMessage = "Something went wrong. Please try again later.";
-        }
+        // Parse error message using controller
+        String displayMessage = _controller.parseErrorMessage(e.toString());
         
         // Show error dialog
         _showErrorDialog(displayMessage);
@@ -455,21 +418,21 @@ class _RewardScreenState extends State<RewardScreen> {
             bottom: false,
             child: LayoutBuilder(
               builder: (context, constraints) {
-                return _isLoading
+                return _controller.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : _errorMessage != null
+                    : _controller.errorMessage != null
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  _errorMessage!,
+                                  _controller.errorMessage!,
                                   style: const TextStyle(color: Colors.red),
                                   textAlign: TextAlign.center,
                                 ),
                                 const SizedBox(height: 20),
                                 ElevatedButton(
-                                  onPressed: _loadRewardData,
+                                  onPressed: _controller.loadRewardData,
                                   child: const Text('Retry'),
                                 ),
                               ],
@@ -549,7 +512,7 @@ class _RewardScreenState extends State<RewardScreen> {
           ),
           const SizedBox(width: 16),
           Text(
-            '$_currentPoints Points',
+            '${_controller.currentPoints} Points',
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -615,7 +578,7 @@ class _RewardScreenState extends State<RewardScreen> {
   }
 
   Widget _buildRewardsGrid() {
-    if (_availableRewards.isEmpty) {
+    if (_controller.availableRewards.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(40.0),
@@ -639,9 +602,9 @@ class _RewardScreenState extends State<RewardScreen> {
         mainAxisSpacing: 16,
         childAspectRatio: 0.85,
       ),
-      itemCount: _availableRewards.length,
+      itemCount: _controller.availableRewards.length,
       itemBuilder: (context, index) {
-        final reward = _availableRewards[index];
+        final reward = _controller.availableRewards[index];
         return _buildRewardCard(reward);
       },
     );

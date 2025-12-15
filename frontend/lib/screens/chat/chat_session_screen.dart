@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../widgets/bottom_nav.dart';
-import '../../services/chat_session_service.dart';
 import '../../services/companion_service.dart';
-import '../../models/chat_history_model.dart';
 import '../../models/companion_model.dart';
 import 'change_companion_screen.dart';
 import 'chat_interface_screen.dart';
+import 'controllers/chat_session_controller.dart';
 
 class ChatSessionScreen extends StatefulWidget {
   final String userId;
@@ -19,11 +18,7 @@ class ChatSessionScreen extends StatefulWidget {
 
 class _ChatSessionScreenState extends State<ChatSessionScreen> {
   int _currentIndex = 1; // Set to 1 to highlight the Chat icon
-  List<ChatHistoryItem> _chatHistory = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-  String? _currentCompanion; // Store current companion ID
-  Companion? _companionData; // Store companion data for display
+  late ChatSessionController _controller;
 
   // Colors extracted from design
   final Color _bgColor = const Color(0xFFF7F4F2);
@@ -33,75 +28,43 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
   @override
   void initState() {
     super.initState();
-    _loadChatHistoryAndCompanion();
+    _controller = ChatSessionController(userId: widget.userId);
+    _controller.addListener(_onControllerUpdate);
+    _controller.loadChatHistoryAndCompanion();
   }
 
-  /// Load chat history and determine current companion
-  Future<void> _loadChatHistoryAndCompanion() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+  @override
+  void dispose() {
+    _controller.removeListener(_onControllerUpdate);
+    _controller.dispose();
+    super.dispose();
+  }
 
-    try {
-      // Load chat history
-      final chatHistory = await ChatSessionService.getChatHistory(widget.userId);
-      
-      // Determine current companion
-      String companionId;
-      if (chatHistory.isNotEmpty) {
-        // Get companion from most recent session
-        companionId = chatHistory.first.companionId;
-      } else {
-        // Get default companion if no chat history
-        final defaultCompanion = await CompanionService.getDefaultCompanion();
-        if (defaultCompanion == null) {
-          throw Exception('No default companion available');
-        }
-        companionId = defaultCompanion.companionId;
-      }
-      
-      // Load companion data
-      final companion = await CompanionService.getCompanionById(companionId);
-      
-      setState(() {
-        _chatHistory = chatHistory;
-        _currentCompanion = companionId;
-        _companionData = companion;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Failed to load data: $e';
-        _isLoading = false;
-      });
+  void _onControllerUpdate() {
+    if (mounted) {
+      setState(() {});
     }
   }
 
   /// Navigate to change companion screen and handle result
   Future<void> _navigateToChangeCompanion() async {
-    if (_currentCompanion == null) return;
+    if (_controller.currentCompanionId == null) return;
     
     final result = await Navigator.push<String>(
       context,
       MaterialPageRoute(
         builder: (context) => ChangeCompanionScreen(
           userId: widget.userId,
-          currentCompanionId: _currentCompanion!,
+          currentCompanionId: _controller.currentCompanionId!,
         ),
       ),
     );
     
     // If a new companion was selected, update the current companion
-    if (result != null && result != _currentCompanion) {
+    if (result != null && result != _controller.currentCompanionId) {
       try {
-        final newCompanion = await CompanionService.getCompanionById(result);
-        setState(() {
-          _currentCompanion = result;
-          _companionData = newCompanion;
-        });
+        await _controller.updateCompanion(result);
       } catch (e) {
-        // Show error message if failed to load new companion
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -116,7 +79,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
 
   /// Navigate to new chat interface
   Future<void> _navigateToNewChat() async {
-    if (_companionData == null) {
+    if (_controller.companionData == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select a companion first'),
@@ -131,14 +94,14 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
       MaterialPageRoute(
         builder: (context) => ChatInterfaceScreen(
           userId: widget.userId,
-          companion: _companionData!,
+          companion: _controller.companionData!,
           sessionId: null, // null = new session
         ),
       ),
     );
 
     // Reload chat history after returning from chat
-    _loadChatHistoryAndCompanion();
+    _controller.loadChatHistoryAndCompanion();
   }
 
   /// Resume existing chat session
@@ -159,7 +122,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
       );
 
       // Reload chat history after returning from chat
-      _loadChatHistoryAndCompanion();
+      _controller.loadChatHistoryAndCompanion();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -199,19 +162,19 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Center(
-                                child: _companionData?.image != null
+                                child: _controller.companionData?.image != null
                                     ? Image.asset(
-                                        'assets/images/${_companionData!.image}',
+                                        'assets/images/${_controller.companionData!.image}',
                                         height: 200,
                                         width: 200,
                                         fit: BoxFit.contain,
                                       )
                                     : Image.asset('assets/images/americonsh1.png'),
                               ),
-                              if (_companionData != null) ...[
+                              if (_controller.companionData != null) ...[
                                 const SizedBox(height: 10),
                                 Text(
-                                  _companionData!.companionName,
+                                  _controller.companionData!.companionName,
                                   style: TextStyle(
                                     fontSize: 22,
                                     fontWeight: FontWeight.bold,
@@ -236,34 +199,34 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                         const SizedBox(height: 40),
 
                         // 3. History List or Loading/Error/Empty State
-                        if (_isLoading)
+                        if (_controller.isLoading)
                           const Center(
                             child: Padding(
                               padding: EdgeInsets.all(20.0),
                               child: CircularProgressIndicator(),
                             ),
                           )
-                        else if (_errorMessage != null)
+                        else if (_controller.errorMessage != null)
                           Center(
                             child: Padding(
                               padding: const EdgeInsets.all(20.0),
                               child: Column(
                                 children: [
                                   Text(
-                                    _errorMessage!,
+                                    _controller.errorMessage!,
                                     style: const TextStyle(color: Colors.red),
                                     textAlign: TextAlign.center,
                                   ),
                                   const SizedBox(height: 10),
                                   ElevatedButton(
-                                    onPressed: _loadChatHistoryAndCompanion,
+                                    onPressed: _controller.loadChatHistoryAndCompanion,
                                     child: const Text('Retry'),
                                   ),
                                 ],
                               ),
                             ),
                           )
-                        else if (_chatHistory.isEmpty)
+                        else if (_controller.chatHistory.isEmpty)
                           Center(
                             child: Padding(
                               padding: const EdgeInsets.all(20.0),
@@ -280,7 +243,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
                           )
                         else
                           // Map the chat history to widgets
-                          ..._chatHistory.map((chat) {
+                          ..._controller.chatHistory.map((chat) {
                             return _buildHistoryCard(
                               chat.lastMessage,
                               chat.getFormattedDate(),
@@ -341,7 +304,7 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
 
   Widget _buildHistoryCard(String message, String date, String sessionId, String companionId) {
     // Truncate message to first 10 words
-    String displayMessage = message.isEmpty ? 'No messages yet' : _truncateMessage(message, 10);
+    String displayMessage = message.isEmpty ? 'No messages yet' : _controller.truncateMessage(message, 10);
     
     return GestureDetector(
       onTap: () => _resumeChatSession(sessionId, companionId),
@@ -391,21 +354,5 @@ class _ChatSessionScreenState extends State<ChatSessionScreen> {
         ),
       ),
     );
-  }
-
-  /// Truncate message to specified number of words
-  String _truncateMessage(String message, int wordLimit) {
-    if (message.isEmpty) return message;
-    
-    // Split the message into words
-    List<String> words = message.split(' ');
-    
-    // If message has fewer words than the limit, return as is
-    if (words.length <= wordLimit) {
-      return message;
-    }
-    
-    // Take first 'wordLimit' words and add "..."
-    return '${words.take(wordLimit).join(' ')}...';
   }
 }
