@@ -15,9 +15,17 @@ from ..models.database import db
 router = APIRouter()
 
 @router.get("/therapist/check-license")
-def check_license_exists(license_number: str):
-    """Check if a license number already exists in therapist_profiles collection"""
-    existing = db.therapist_profiles.find_one({"license_number": license_number})
+def check_license_exists(license_number: str, user_id: Optional[str] = None):
+    """Check if a license number already exists in approved therapist_profile collection"""
+    query = {
+        "license_number": license_number,
+        "verification_status": "approved"
+    }
+    # Exclude current user's own record during resubmission
+    if user_id:
+        query["user_id"] = {"$ne": user_id}
+    
+    existing = db.therapist_profile.find_one(query)
     return {"exists": existing is not None}
 
 @router.post("/therapist/application", response_model=TherapistApplicationResponse)

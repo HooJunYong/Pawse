@@ -32,6 +32,14 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        
+        // Debug: Print first user data to check profile_picture field
+        if (data.isNotEmpty) {
+          print('First user data: ${data[0]}');
+          print('Profile picture: ${data[0]['profile_picture']}');
+          print('Profile picture length: ${data[0]['profile_picture']?.toString().length ?? 0}');
+        }
+        
         setState(() {
           _users = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -102,30 +110,12 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                         color: const Color(0xFF3B82F6).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(32),
                       ),
-                      child: user['profile_picture'] != null && 
-                             user['profile_picture'].toString().isNotEmpty &&
-                             user['profile_picture'] != ''
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(32),
-                              child: Image.network(
-                                user['profile_picture'],
-                                width: 64,
-                                height: 64,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.person,
-                                    color: Color(0xFF3B82F6),
-                                    size: 32,
-                                  );
-                                },
-                              ),
-                            )
-                          : const Icon(
-                              Icons.person,
-                              color: Color(0xFF3B82F6),
-                              size: 32,
-                            ),
+                      child: _buildProfileImage(
+                        user['profile_picture'],
+                        size: 64,
+                        iconColor: const Color(0xFF3B82F6),
+                        icon: Icons.person,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -234,6 +224,51 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
     );
   }
 
+  Widget _buildProfileImage(String? imageData, {required double size, required Color iconColor, required IconData icon}) {
+    if (imageData == null || imageData.isEmpty) {
+      return Icon(icon, color: iconColor, size: size / 2);
+    }
+
+    // Handle data URI (base64)
+    if (imageData.startsWith('data:image')) {
+      try {
+        final base64String = imageData.split(',').last;
+        final bytes = base64Decode(base64String);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(size / 2),
+          child: Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              print('Error loading image: $error');
+              return Icon(icon, color: iconColor, size: size / 2);
+            },
+          ),
+        );
+      } catch (e) {
+        print('Error decoding base64 image: $e');
+        return Icon(icon, color: iconColor, size: size / 2);
+      }
+    }
+
+    // Handle regular URL
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 2),
+      child: Image.network(
+        imageData,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network image: $error');
+          return Icon(icon, color: iconColor, size: size / 2);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -312,28 +347,12 @@ class _AdminUserListScreenState extends State<AdminUserListScreen> {
                                     color: const Color(0xFF3B82F6).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(24),
                                   ),
-                                  child: user['profile_picture'] != null && 
-                                         user['profile_picture'].toString().isNotEmpty &&
-                                         user['profile_picture'] != ''
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(24),
-                                          child: Image.network(
-                                            user['profile_picture'],
-                                            width: 48,
-                                            height: 48,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return const Icon(
-                                                Icons.person,
-                                                color: Color(0xFF3B82F6),
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.person,
-                                          color: Color(0xFF3B82F6),
-                                        ),
+                                  child: _buildProfileImage(
+                                    user['profile_picture'],
+                                    size: 48,
+                                    iconColor: const Color(0xFF3B82F6),
+                                    icon: Icons.person,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(

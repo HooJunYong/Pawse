@@ -130,12 +130,13 @@ class _ChatContactsScreenState extends State<ChatContactsScreen> {
         backgroundColor: _bgCream,
         elevation: 0,
         centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: _textDark),
-          onPressed: () {
-            Navigator.of(context).pop();
-          },
-        ),
+        automaticallyImplyLeading: false,
+        leading: widget.isTherapist
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: _textDark),
+                onPressed: () => Navigator.pop(context),
+              ),
         title: const Text(
           'Messages',
           style: TextStyle(

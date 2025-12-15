@@ -971,13 +971,13 @@ class _HomeScreenState extends State<HomeScreen> {
         final DateTime start = session.scheduledAt;
         final Duration timeUntilStart = start.difference(DateTime.now());
         final bool canCancel =
-            statusLower == 'scheduled' && timeUntilStart > const Duration(hours: 1);
+            statusLower == 'scheduled' && timeUntilStart > const Duration(minutes: 30);
 
         String? cancellationMessage;
         if (!canCancel) {
           if (statusLower == 'scheduled') {
             cancellationMessage =
-                'Sessions can only be cancelled more than 1 hour before the scheduled start time.';
+                'Sessions can only be cancelled more than 30 minutes before the scheduled start time.';
           } else if (statusLower != 'cancelled') {
             cancellationMessage = 'This session can no longer be cancelled.';
           }

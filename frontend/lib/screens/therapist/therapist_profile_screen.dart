@@ -149,7 +149,7 @@ class _TherapistProfileScreenState extends State<TherapistProfileScreen> {
                                    (lastName.isNotEmpty ? lastName[0] : '');
                   final profilePictureUrl = data['profile_picture_url'] as String?;
                   final double ratingValue = (data['average_rating'] as num?)?.toDouble() ?? 0.0;
-                  final int ratingCount = (data['rating_count'] as num?)?.toInt() ?? 0;
+                  final int ratingCount = (data['total_ratings'] as num?)?.toInt() ?? 0;
                   final bool hasRating = ratingCount > 0;
                   String? displayUrl = profilePictureUrl;
                   if (displayUrl != null && _isRemoteUrl(displayUrl) && _profileImageVersion != 0) {

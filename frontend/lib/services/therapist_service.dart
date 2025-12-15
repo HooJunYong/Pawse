@@ -75,7 +75,7 @@ class TherapistService {
     
     final address = addressParts.isNotEmpty ? addressParts : state;
       final ratingValue = (json['average_rating'] as num?)?.toDouble();
-      final ratingCount = (json['rating_count'] as num?)?.toInt() ?? 0;
+      final ratingCount = (json['total_ratings'] as num?)?.toInt() ?? 0;
     
     final imageUrl = _resolveImageCandidate(json);
     final initials = _getInitials(

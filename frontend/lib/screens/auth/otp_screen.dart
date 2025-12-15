@@ -85,21 +85,24 @@ class _OtpWidgetState extends State<OtpWidget> {
         );
       } else {
         final error = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error['detail'] ?? 'Invalid OTP code'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Clear input fields
+        for (var controller in _controllers) {
+          controller.clear();
+        }
+        _nodes[0].requestFocus();
+        
+        // Show error dialog
+        _showErrorDialog(error['detail'] ?? 'Invalid OTP code');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connection error: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Clear input fields
+      for (var controller in _controllers) {
+        controller.clear();
+      }
+      _nodes[0].requestFocus();
+      
+      _showErrorDialog('Connection error. Please try again.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -154,6 +157,82 @@ class _OtpWidgetState extends State<OtpWidget> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+        ),
+        backgroundColor: const Color(0xFFF7F4F2),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEF4444).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(32),
+                ),
+                child: const Icon(
+                  Icons.error_outline,
+                  color: Color(0xFFEF4444),
+                  size: 32,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Verification Failed',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontFamily: 'Nunito',
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF422006),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontFamily: 'Nunito',
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF422006),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    'Try Again',
+                    style: TextStyle(
+                      fontFamily: 'Nunito',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _otpBox(int index) {

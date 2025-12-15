@@ -55,7 +55,7 @@ class _SignupWidgetState extends State<SignupWidget> {
           setState(() {
             _isLoading = false;
           });
-          _showErrorDialog('This email is already registered. Please use a different email address or login instead.');
+          _showErrorDialog('Email Already Exists', 'This email is already registered. Please use a different email address or login instead.');
           return;
         }
 
@@ -83,19 +83,15 @@ class _SignupWidgetState extends State<SignupWidget> {
           Navigator.of(context).pop();
         } else if (response.statusCode == 409) {
           // Email already exists (backup check)
-          _showErrorDialog('Email already registered.');
+          _showErrorDialog('Email Already Registered', 'This email is already registered. Please use a different email address or login instead.');
         } else {
           // Other error
           final error = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${error['detail'] ?? 'Unknown error'}')),
-          );
+          _showErrorDialog('Registration Failed', error['detail'] ?? 'An unknown error occurred. Please try again.');
         }
       } catch (e) {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to connect to server: $e')),
-        );
+        _showErrorDialog('Connection Error', 'Failed to connect to server. Please check your internet connection and try again.');
       } finally {
         if (mounted) {
           setState(() {
@@ -110,37 +106,24 @@ class _SignupWidgetState extends State<SignupWidget> {
     try {
       final apiUrl = dotenv.env['API_BASE_URL'] ?? 'http://localhost:8000';
       
-      // Check both users and therapist_users collections
-      final userResponse = await http.get(
+      // The backend endpoint /check-email-exists checks both users and approved therapists
+      final response = await http.get(
         Uri.parse('$apiUrl/check-email-exists?email=${Uri.encodeComponent(email)}'),
       );
-      
-      final therapistResponse = await http.get(
-        Uri.parse('$apiUrl/check-therapist-email-exists?email=${Uri.encodeComponent(email)}'),
-      );
 
-      bool userExists = false;
-      bool therapistExists = false;
-
-      if (userResponse.statusCode == 200) {
-        final data = jsonDecode(userResponse.body);
-        userExists = data['exists'] == true;
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return data['exists'] == true;
       }
 
-      if (therapistResponse.statusCode == 200) {
-        final data = jsonDecode(therapistResponse.body);
-        therapistExists = data['exists'] == true;
-      }
-
-      // Return true if email exists in either collection
-      return userExists || therapistExists;
+      return false;
     } catch (e) {
       print('Error checking email: $e');
       return false;
     }
   }
 
-  void _showErrorDialog(String message) {
+  void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -167,9 +150,9 @@ class _SignupWidgetState extends State<SignupWidget> {
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Email Already Exists',
-                style: TextStyle(
+              Text(
+                title,
+                style: const TextStyle(
                   fontSize: 20,
                   fontFamily: 'Nunito',
                   fontWeight: FontWeight.bold,
@@ -226,45 +209,77 @@ class _SignupWidgetState extends State<SignupWidget> {
     Widget? suffixIcon,
     TextInputType keyboardType = TextInputType.text,
   }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color.fromRGBO(75, 85, 99, 1),
-            fontFamily: 'Nunito',
-            fontSize: 14,
-            fontWeight: FontWeight.normal,
-            height: 1.4285714285714286,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: kPillShadow,
-            color: const Color.fromRGBO(255, 255, 255, 1),
-            border: Border.all(
-              color: const Color.fromRGBO(229, 231, 235, 1),
-              width: 1,
+    return FormField<String>(
+      validator: validator,
+      initialValue: controller.text,
+      builder: (FormFieldState<String> state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontFamily: 'Nunito',
+                fontWeight: FontWeight.w600,
+                color: Color.fromRGBO(66, 32, 6, 1),
+              ),
             ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            obscureText: obscureText,
-            decoration: InputDecoration(
-              hintText: hintText,
-              border: InputBorder.none,
-              suffixIcon: suffixIcon,
+            const SizedBox(height: 8),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: kPillShadow,
+                color: Colors.white,
+                border: Border.all(
+                  color: state.hasError
+                      ? const Color(0xFFEF4444)
+                      : const Color.fromRGBO(229, 231, 235, 1),
+                  width: 1,
+                ),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: TextField(
+                controller: controller,
+                keyboardType: keyboardType,
+                obscureText: obscureText,
+                onChanged: (value) {
+                  state.didChange(value);
+                },
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  hintStyle: const TextStyle(
+                    color: Color.fromRGBO(156, 163, 175, 1),
+                    fontSize: 16,
+                    fontFamily: 'Nunito',
+                  ),
+                  border: InputBorder.none,
+                  suffixIcon: suffixIcon,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontFamily: 'Nunito',
+                  color: Color.fromRGBO(66, 32, 6, 1),
+                ),
+              ),
             ),
-            validator: validator,
-          ),
-        ),
-      ],
+            if (state.hasError)
+              Padding(
+                padding: const EdgeInsets.only(top: 6, left: 4),
+                child: Text(
+                  state.errorText!,
+                  style: const TextStyle(
+                    color: Color(0xFFEF4444),
+                    fontSize: 12,
+                    fontFamily: 'Nunito',
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

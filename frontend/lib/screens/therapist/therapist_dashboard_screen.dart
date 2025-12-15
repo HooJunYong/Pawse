@@ -2153,8 +2153,7 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                 schedule['slot_released'] == true;
                             final bool revealCancel = !isCancelled &&
                                 _activeCancelSessionId == sessionId;
-                            final bool canCancel =
-                                !isCancelled && minutesUntilSession >= 720;
+                            final bool canCancel = !isCancelled;
                             final bool revealUpcomingRelease = isCancelled &&
                               _activeUpcomingReleaseSessionId == sessionId;
                             final bool meetsReleaseWindow = true; // Allow release at any time
@@ -2381,14 +2380,12 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                                     SizedBox(
                                                       width: double.infinity,
                                                       child: ElevatedButton(
-                                                        onPressed: canCancel
-                                                            ? () {
+                                                        onPressed: () {
                                                                 _cancelButtonTimer
                                                                     ?.cancel();
                                                                 _showCancelBookingDialog(
                                                                     schedule);
-                                                              }
-                                                            : null,
+                                                              },
                                                         style: ElevatedButton.styleFrom(
                                                           backgroundColor: _accentOrange,
                                                           foregroundColor: Colors.white,
@@ -2403,19 +2400,6 @@ class _TherapistDashboardScreenState extends State<TherapistDashboardScreen> {
                                                         child: const Text('Cancel Booking'),
                                                       ),
                                                     ),
-                                                    if (!canCancel)
-                                                      Padding(
-                                                        padding:
-                                                            const EdgeInsets.only(top: 8),
-                                                        child: Text(
-                                                          'Too late to cancel (12h rule)',
-                                                          style: TextStyle(
-                                                            fontSize: 12,
-                                                            color: Colors.grey[500],
-                                                            fontStyle: FontStyle.italic,
-                                                          ),
-                                                        ),
-                                                      ),
                                                   ],
                                                 )
                                               : const SizedBox.shrink(),

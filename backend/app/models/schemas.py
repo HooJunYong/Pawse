@@ -152,6 +152,7 @@ class TherapistProfileResponse(BaseModel):
     languages_spoken: list[str]
     hourly_rate: float
     profile_picture_url: Optional[str] = None
+    profile_picture_base64: Optional[str] = None
     verification_status: str
     verified_at: Optional[datetime] = None
     rejection_reason: Optional[str] = None

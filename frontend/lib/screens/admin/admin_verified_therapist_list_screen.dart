@@ -35,11 +35,14 @@ class _AdminVerifiedTherapistListScreenState
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         
-        // Debug: Print first therapist data to check rating fields
+        // Debug: Print first therapist data to check rating and image fields
         if (data.isNotEmpty) {
           print('First therapist data: ${data[0]}');
           print('Average rating: ${data[0]['average_rating']}');
           print('Total ratings: ${data[0]['total_ratings']}');
+          print('Profile picture URL: ${data[0]['profile_picture_url']}');
+          print('Profile picture URL length: ${data[0]['profile_picture_url']?.toString().length ?? 0}');
+          print('Profile picture base64: ${data[0]['profile_picture_base64']?.toString().substring(0, 50) ?? 'null'}...');
         }
         
         setState(() {
@@ -140,28 +143,12 @@ class _AdminVerifiedTherapistListScreenState
                         color: const Color(0xFF10B981).withOpacity(0.1),
                         borderRadius: BorderRadius.circular(32),
                       ),
-                      child: hasValidProfilePicture
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(32),
-                              child: Image.network(
-                                profilePictureUrl,
-                                width: 64,
-                                height: 64,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return const Icon(
-                                    Icons.verified_user,
-                                    color: Color(0xFF10B981),
-                                    size: 32,
-                                  );
-                                },
-                              ),
-                            )
-                          : const Icon(
-                              Icons.verified_user,
-                              color: Color(0xFF10B981),
-                              size: 32,
-                            ),
+                      child: _buildProfileImage(
+                        therapist['profile_picture_url'],
+                        size: 64,
+                        iconColor: const Color(0xFF10B981),
+                        icon: Icons.verified_user,
+                      ),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -276,6 +263,51 @@ class _AdminVerifiedTherapistListScreenState
     );
   }
 
+  Widget _buildProfileImage(String? imageData, {required double size, required Color iconColor, required IconData icon}) {
+    if (imageData == null || imageData.isEmpty) {
+      return Icon(icon, color: iconColor, size: size / 2);
+    }
+
+    // Handle data URI (base64)
+    if (imageData.startsWith('data:image')) {
+      try {
+        final base64String = imageData.split(',').last;
+        final bytes = base64Decode(base64String);
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(size / 2),
+          child: Image.memory(
+            bytes,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              print('Error loading image: $error');
+              return Icon(icon, color: iconColor, size: size / 2);
+            },
+          ),
+        );
+      } catch (e) {
+        print('Error decoding base64 image: $e');
+        return Icon(icon, color: iconColor, size: size / 2);
+      }
+    }
+
+    // Handle regular URL
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size / 2),
+      child: Image.network(
+        imageData,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading network image: $error');
+          return Icon(icon, color: iconColor, size: size / 2);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -359,26 +391,12 @@ class _AdminVerifiedTherapistListScreenState
                                     color: const Color(0xFF10B981).withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(24),
                                   ),
-                                  child: therapist['profile_picture_url'] != null && therapist['profile_picture_url'].isNotEmpty
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(24),
-                                          child: Image.network(
-                                            therapist['profile_picture_url'],
-                                            width: 48,
-                                            height: 48,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return const Icon(
-                                                Icons.verified_user,
-                                                color: Color(0xFF10B981),
-                                              );
-                                            },
-                                          ),
-                                        )
-                                      : const Icon(
-                                          Icons.verified_user,
-                                          color: Color(0xFF10B981),
-                                        ),
+                                  child: _buildProfileImage(
+                                    therapist['profile_picture_url'],
+                                    size: 48,
+                                    iconColor: const Color(0xFF10B981),
+                                    icon: Icons.verified_user,
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
