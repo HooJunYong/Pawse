@@ -48,7 +48,7 @@ class MusicService:
         MoodType.awful: "stressed",
         MoodType.neutral: "tired",
         MoodType.happy: "happy",
-        MoodType.very_happy: "happy",
+        MoodType.very_happy: "very_happy", # Keeping distinct internally for blueprint key
     }
 
     THEME_COLORS: List[str] = [
@@ -68,46 +68,138 @@ class MusicService:
         "music_note", "album", "headphones", "queue_music", "playlist_play", "radio", "library_music"
     ]
 
-    # Curated blueprints for each mood bracket used when assembling playlists.
+    # --- EDITED: Removed 'angry' blueprint entirely ---
     THERAPY_BLUEPRINTS: Dict[str, List[Dict[str, Any]]] = {
+        # -----------------------------------------------------------------------
+        # 1. MOOD: sad (Your MoodType.sad)
+        # -----------------------------------------------------------------------
         "sad": [
             {
                 "playlist_type": "catharsis",
-                "title": "Catharsis",
+                "title": "Acknowledge",
                 "icon": "water_drop",
-                "strategy": "Match the mood to process emotions safely.",
+                "strategy": "Match the mood gently to process emotions safely and feel understood.",
                 "search_terms": [
-                    "Blues",
-                    "Sentimental Ballad",
+                    "Sentimental Indie",
+                    "Emotional Ballad",
                     "Acoustic Folk",
                     "Sad Piano",
                 ],
             },
             {
-                "playlist_type": "mood_boost",
-                "title": "Mood Boost",
-                "icon": "wb_sunny",
-                "strategy": "Offer uplifting energy without feeling forced.",
+                "playlist_type": "comfort",
+                "title": "Soft Comfort",
+                "icon": "self_improvement",
+                "strategy": "Warm, reassuring tunes to provide gentle relief.",
                 "search_terms": [
-                    "Upbeat Pop",
-                    "Funk Soul",
-                    "Reggae",
-                    "Motivating Rock",
+                    "Comfort Pop",
+                    "Indie Chill",
+                    "Ambient Guitar",
+                    "Relaxing Jazz",
                 ],
             },
             {
-                "playlist_type": "deep_focus",
-                "title": "Deep Focus",
-                "icon": "book",
-                "strategy": "Provide calm, neutral ambience for gentle distraction.",
+                "playlist_type": "mood_lift",
+                "title": "Gentle Headspace",
+                "icon": "wb_sunny",
+                "strategy": "Slightly uplifting rhythms to slowly shift perspective.",
                 "search_terms": [
-                    "Dark Classical",
-                    "Instrumental",
-                    "Ambient",
-                    "Cinematic Piano",
+                    "Positive Acoustic",
+                    "Upbeat Chillhop",
+                    "Motivating Soul",
+                    "Soft Rock Anthems",
                 ],
             },
         ],
+        # -----------------------------------------------------------------------
+        # 2. MOOD: anxious (Your MoodType.awful alias "stressed")
+        # -----------------------------------------------------------------------
+        # -----------------------------------------------------------------------
+    # 2. MOOD: anxious (Your MoodType.awful alias "stressed")
+    # Strategy: Focus on slowing the heart rate, reducing mental clutter, and gentle grounding.
+    # -----------------------------------------------------------------------
+    "anxious": [
+        {
+            "playlist_type": "steady",
+            "title": "Steady",  # <-- EDITED TO BE SHORT
+            "icon": "air",
+            "strategy": "Music with a steady, predictable rhythm to regulate breathing and heart rate.",
+            "search_terms": [
+                "Calming Piano",
+                "Binaural Beats",
+                "Ambient Drone",
+                "Minimalist Classical",
+            ],
+        },
+        {
+            "playlist_type": "release_focus",
+            "title": "Restful Focus",
+            "icon": "headphones",
+            "strategy": "Provide steady background sound for mindfulness or task focus, distracting from worry.",
+            "search_terms": [
+                "Lo-Fi Study Beats",
+                "Instrumental Focus",
+                "Meditative Flute",
+                "Nature Sounds Ambient",
+            ],
+        },
+        {
+            "playlist_type": "gentle_lift",
+            "title": "Hopeful Horizon",
+            "icon": "spa",
+            "strategy": "Introduce positive tones without sudden bursts of energy that could increase tension.",
+            "search_terms": [
+                "Soft Pop Positive",
+                "Warm Indie Folk",
+                "Quiet Hopeful Acoustic",
+                "Uplifting Instrumental",
+            ],
+        },
+    ],
+        # -----------------------------------------------------------------------
+        # 3. MOOD: generic (Your MoodType.neutral alias "tired")
+        # -----------------------------------------------------------------------
+        "generic": [
+            {
+                "playlist_type": "unwind",
+                "title": "Unwind",
+                "icon": "nightlight_round",
+                "strategy": "Ideal for relaxation or preparing to sleep after a long, draining day.",
+                "search_terms": [
+                    "Chillhop",
+                    "Peaceful Piano",
+                    "Downtempo Electronic",
+                    "Rain Sounds",
+                ],
+            },
+            {
+                "playlist_type": "subtle_momentum",
+                "title": "Gentle Momentum",
+                "icon": "trending_up",
+                "strategy": "A light, rhythmic push to get moving without overwhelming a tired mind.",
+                "search_terms": [
+                    "Morning Acoustic Pop",
+                    "Indie Upbeat Chill",
+                    "Smooth Jazz",
+                    "Motivating Lo-Fi",
+                ],
+            },
+            {
+                "playlist_type": "focus",
+                "title": "Passive Focus",
+                "icon": "book",
+                "strategy": "Ambient soundscapes for passive listening while working or studying.",
+                "search_terms": [
+                    "Instrumental Study",
+                    "Ambient Concentration",
+                    "Deep House Chill",
+                    "Cinematic Score",
+                ],
+            },
+        ],
+        # -----------------------------------------------------------------------
+        # 4. MOOD: happy (Your MoodType.happy)
+        # -----------------------------------------------------------------------
         "happy": [
             {
                 "playlist_type": "celebrate",
@@ -146,12 +238,15 @@ class MusicService:
                 ],
             },
         ],
+        # -----------------------------------------------------------------------
+        # 5. MOOD: very_happy (Your MoodType.very_happy)
+        # -----------------------------------------------------------------------
         "very_happy": [
             {
                 "playlist_type": "euphoria",
                 "title": "Total Euphoria",
                 "icon": "bolt",
-                "strategy": "High-octane energy for peak moods.",
+                "strategy": "High-octane energy for peak moods and celebration.",
                 "search_terms": [
                     "Big Room House",
                     "Hyperpop",
@@ -161,9 +256,9 @@ class MusicService:
             },
             {
                 "playlist_type": "hype",
-                "title": "Hype Mode",
+                "title": "Unstoppable Hype",
                 "icon": "celebration",
-                "strategy": "Unstoppable momentum.",
+                "strategy": "Unstoppable momentum for intense activity or confidence.",
                 "search_terms": [
                     "Workout Hype",
                     "Rap Bangers",
@@ -175,7 +270,7 @@ class MusicService:
                 "playlist_type": "party",
                 "title": "Party Protocol",
                 "icon": "nightlife",
-                "strategy": "Celebrate with intense vibes.",
+                "strategy": "Celebrate with intense vibes and well-known crowd-pleasers.",
                 "search_terms": [
                     "Party Hits",
                     "Club Classics",
@@ -184,127 +279,13 @@ class MusicService:
                 ],
             },
         ],
-        "angry": [
-            {
-                "playlist_type": "release",
-                "title": "Release Fire",
-                "icon": "local_fire_department",
-                "strategy": "Channel intensity through powerful sounds.",
-                "search_terms": [
-                    "Heavy Metal",
-                    "Hard Rock",
-                    "Rap Rock",
-                    "Industrial",
-                ],
-            },
-            {
-                "playlist_type": "calm",
-                "title": "Calm Down",
-                "icon": "spa",
-                "strategy": "Lower the pulse with gentle textures.",
-                "search_terms": [
-                    "Lo-Fi Beats",
-                    "Chillhop",
-                    "Neo Classical",
-                    "Ambient Guitar",
-                ],
-            },
-            {
-                "playlist_type": "channel",
-                "title": "Channel Energy",
-                "icon": "bolt",
-                "strategy": "Transform energy into forward motion.",
-                "search_terms": [
-                    "Workout Motivation",
-                    "Power EDM",
-                    "Trap Workout",
-                    "High Energy Pop",
-                ],
-            },
-        ],
-        "anxious": [
-            {
-                "playlist_type": "steady",
-                "title": "Steady Breath",
-                "icon": "air",
-                "strategy": "Regulate breathing with guided calm.",
-                "search_terms": [
-                    "Guided Meditation",
-                    "Calming Piano",
-                    "Breathwork Ambient",
-                    "Soothing Drone",
-                ],
-            },
-            {
-                "playlist_type": "lift",
-                "title": "Gentle Lift",
-                "icon": "spa",
-                "strategy": "Introduce hopeful tones without overwhelm.",
-                "search_terms": [
-                    "Soft Pop",
-                    "Positive Acoustic",
-                    "Comfort Folk",
-                    "Warm Indie",
-                ],
-            },
-            {
-                "playlist_type": "focus",
-                "title": "Restful Focus",
-                "icon": "headphones",
-                "strategy": "Offer steady background for mindful tasks.",
-                "search_terms": [
-                    "Lo-Fi Study",
-                    "Instrumental Study",
-                    "Binaural Beats",
-                    "Ambient Concentration",
-                ],
-            },
-        ],
-        "generic": [
-            {
-                "playlist_type": "reset",
-                "title": "Daily Reset",
-                "icon": "refresh",
-                "strategy": "Balanced mix for any starting point.",
-                "search_terms": [
-                    "Feel Good Pop",
-                    "Indie Chill",
-                    "Morning Acoustic",
-                    "Lofi Sunshine",
-                ],
-            },
-            {
-                "playlist_type": "motivate",
-                "title": "Momentum",
-                "icon": "trending_up",
-                "strategy": "Spark momentum with bright rhythms.",
-                "search_terms": [
-                    "Confidence Pop",
-                    "Workout Pop",
-                    "Electro Motivation",
-                    "Feelgood EDM",
-                ],
-            },
-            {
-                "playlist_type": "unwind",
-                "title": "Unwind",
-                "icon": "nightlight_round",
-                "strategy": "Ease tension with tranquil instrumentals.",
-                "search_terms": [
-                    "Chillhop",
-                    "Peaceful Piano",
-                    "Dream Ambient",
-                    "Downtempo",
-                ],
-            },
-        ],
     }
 
+    # --- EDITED: Removed 'angry' and related moods ---
     THERAPY_CATEGORY_BY_KEY: Dict[str, Optional[MoodCategory]] = {
         "sad": MoodCategory.comfort,
         "happy": MoodCategory.hopeful,
         "very_happy": MoodCategory.empowered,
-        "angry": MoodCategory.empowered,
         "anxious": MoodCategory.anxious,
         "generic": MoodCategory.calm,
     }
@@ -315,7 +296,7 @@ class MusicService:
         "down": "sad",
         "low": "sad",
         "blue": "sad",
-        "awful": "sad",
+        "awful": "anxious",         # Maps 'awful' to anxious (stressed) blueprint
         "upset": "sad",
         "crying": "sad",
         "tearful": "sad",
@@ -325,11 +306,6 @@ class MusicService:
         "excited": "very_happy",
         "very happy": "very_happy",
         "positive": "happy",
-        "angry": "angry",
-        "mad": "angry",
-        "furious": "angry",
-        "frustrated": "angry",
-        "irritated": "angry",
         "anxious": "anxious",
         "worried": "anxious",
         "nervous": "anxious",
@@ -340,6 +316,7 @@ class MusicService:
         "calm": "generic",
         "fine": "generic",
     }
+    # -------------------------------------------------
 
     MOOD_TIMESTAMP_FIELDS: Tuple[str, ...] = (
         "recorded_at",
@@ -555,7 +532,19 @@ class MusicService:
 
     def get_mood_playlists(self, user_id: str) -> List[MoodTherapyPlaylist]:
         mood_key, mood_label = self._resolve_user_mood(user_id)
-        blueprints = self.THERAPY_BLUEPRINTS.get(mood_key) or self.THERAPY_BLUEPRINTS["generic"]
+        
+        # Check if a specific blueprint exists for the resolved mood key
+        blueprints = self.THERAPY_BLUEPRINTS.get(mood_key)
+        
+        # Fallback to 'generic' if the mood_key blueprint is missing
+        if not blueprints:
+             blueprints = self.THERAPY_BLUEPRINTS.get("generic")
+             mood_key = "generic"
+
+        # If still no blueprints, return an empty list or raise an error
+        if not blueprints:
+             return []
+             
         category = self.THERAPY_CATEGORY_BY_KEY.get(mood_key) or MoodCategory.calm
 
         playlists: List[MoodTherapyPlaylist] = []
@@ -849,23 +838,25 @@ class MusicService:
         if isinstance(raw, str) and raw.strip():
             return raw.strip().title()[:64]
 
+        # --- EDITED: Removed 'angry' label ---
         fallback_labels = {
             "sad": "Sad",
             "happy": "Happy",
-            "angry": "Angry",
-            "anxious": "Anxious",
-            "generic": "Balanced",
+            "very_happy": "Very Happy", 
+            "anxious": "Anxious/Stressed",
+            "generic": "Tired/Neutral",
         }
         return fallback_labels.get(mood_key, "Balanced")
+        # -------------------------------------
 
     def _mood_from_score(self, score: float) -> str:
         if score >= 4.0:
-            return "happy"
+            return "very_happy"
         if score >= 3.0:
-            return "generic"
+            return "happy"
         if score >= 2.0:
             return "sad"
-        return "anxious"
+        return "anxious" # Maps low score to anxious (formerly awful)
 
     def _search_itunes_via_requests(
         self,
