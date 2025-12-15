@@ -2,36 +2,19 @@ from typing import List, Optional
 from datetime import date as date_type, datetime
 from fastapi import HTTPException
 from ..models.database import db
+from ..models.database import mood_collection
 from ..models.mood_model import MoodCreate, MoodUpdate, MoodResponse
 from ..config.timezone import now_my
 from .activity_service import ActivityService
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 
 def generate_mood_id() -> str:
-    """Generate a unique mood ID in format MOOD001, MOOD002, etc."""
-    try:
-        # Find the highest mood_id
-        last_mood = db.mood_tracking.find_one(
-            {"mood_id": {"$regex": "^MOOD[0-9]+$"}},
-            sort=[("mood_id", -1)]
-        )
-        
-        if last_mood and "mood_id" in last_mood:
-            # Extract number from MOOD001 format
-            last_num = int(last_mood["mood_id"].replace("MOOD", ""))
-            new_num = last_num + 1
-        else:
-            new_num = 1
-        
-        # Return formatted ID with zero padding
-        return f"MOOD{new_num:03d}"
-    
-    except Exception as e:
-        logger.error(f"Error generating mood ID: {str(e)}")
-        raise HTTPException(status_code=500, detail="Failed to generate mood ID")
+    """Generate a unique mood ID using UUID."""
+    return str(uuid.uuid4())
 
 
 def check_today_log(user_id: str) -> bool:

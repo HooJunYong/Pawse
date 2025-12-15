@@ -17,6 +17,13 @@ user_breathing_sessions_collection = db.user_breathing_sessions
 music_tracks_collection = db.music_tracks
 user_playlists_collection = db.user_playlists
 music_listening_sessions_collection = db.music_listening_sessions
+mood_collection = db.mood_tracking
+drift_bottles_collection = db.drift_bottles
+bottle_pickups_collection = db.bottle_pickups
+rewards_collection = db.rewards
+user_rewards_collection = db.user_rewards
+activities_collection = db.activities
+user_activities_collection = db.user_activities
 
 # Ensure indexes (idempotent)
 # Users collection
@@ -101,7 +108,7 @@ db.chat_sessions.create_index("user_id")
 db.chat_sessions.create_index([("user_id", 1), ("start_time", -1)])
         
 db.chat_messages.create_index("message_id", unique=True)
-db.chat_messages.create_index("session_id")
+db.chat_messages.create_index([("session_id", ASCENDING), ("timestamp", ASCENDING)])
         
 # AI companions collection
 db.ai_companions.create_index("companion_id", unique=True)
@@ -115,6 +122,29 @@ db.personalities.create_index("is_active")
 db.mood_tracking.create_index("mood_id", unique=True)
 db.mood_tracking.create_index("user_id")
 db.mood_tracking.create_index([("user_id", 1), ("date", -1)])
+
+# Drift Bottles collection
+db.drift_bottles.create_index("bottle_id", unique=True)
+db.drift_bottles.create_index("user_id")
+db.drift_bottles.create_index("created_at")
+db.drift_bottles.create_index("status") 
+
+db.bottle_pickups.create_index("pickup_id", unique=True)
+db.bottle_pickups.create_index("user_id")
+db.bottle_pickups.create_index("bottle_id")
+
+# Rewards and Activities collections
+db.rewards.create_index("reward_id", unique=True)
+db.rewards.create_index("category")
+
+db.user_rewards.create_index("user_id")
+db.user_rewards.create_index([("user_id", ASCENDING), ("reward_id", ASCENDING)])
+
+db.activities.create_index("activity_id", unique=True)
+db.activities.create_index("category")
+
+db.user_activities.create_index("user_id")
+db.user_activities.create_index("completed_at")
 
 # Scheduled notifications collection
 db.scheduled_notifications.create_index("notification_id", unique=True)

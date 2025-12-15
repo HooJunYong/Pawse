@@ -30,25 +30,18 @@ class DriftBottleService:
 
     @staticmethod
     def _generate_bottle_id() -> str:
-        """Generate a unique bottle ID"""
-        db = get_database()
-        # Get the count of existing bottles to generate sequential ID
-        count = db.drift_bottles.count_documents({})
-        return f"BTL{str(count + 1).zfill(3)}"
+        """Generate a unique bottle ID using UUID"""
+        return str(uuid.uuid4())
 
     @staticmethod
     def _generate_pickup_id() -> str:
-        """Generate a unique pickup ID"""
-        db = get_database()
-        count = db.bottle_pickups.count_documents({})
-        return f"PU{str(count + 1).zfill(3)}"
+        """Generate a unique pickup ID using UUID"""
+        return str(uuid.uuid4())
 
     @staticmethod
     def _generate_reply_id() -> str:
-        """Generate a unique reply ID"""
-        db = get_database()
-        count = db.bottle_replies.count_documents({})
-        return f"REP{str(count + 1).zfill(3)}"
+        """Generate a unique reply ID using UUID"""
+        return str(uuid.uuid4())
 
     @staticmethod
     def _bottle_to_response(bottle: dict) -> DriftBottleResponse:

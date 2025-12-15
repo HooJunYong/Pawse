@@ -2,6 +2,7 @@ import google.generativeai as genai
 from typing import List, Dict, Optional
 from datetime import datetime
 import logging
+import uuid
 from pymongo.collection import Collection
 from pymongo import DESCENDING
 
@@ -168,71 +169,25 @@ SYSTEM INSTRUCTIONS:
     
     async def generate_session_id(self) -> str:
         """
-        Generate auto-incremented session ID (SESS001, SESS002, etc.)
+        Generate session ID using UUID.
         
         Returns:
             New session ID
         """
-        try:
-            collection: Collection = self.db.chat_sessions
-            
-            # Find the latest session ID
-            latest_session = collection.find_one(
-                {},
-                sort=[("session_id", DESCENDING)]
-            )
-            
-            if latest_session:
-                # Extract number from session_id (e.g., "SESS001" -> 1)
-                latest_id = latest_session["session_id"]
-                number = int(latest_id.replace(settings.session_id_prefix, ""))
-                new_number = number + 1
-            else:
-                new_number = 1
-            
-            # Format with leading zeros (SESS001, SESS002, etc.)
-            new_session_id = f"{settings.session_id_prefix}{new_number:03d}"
-            logger.info(f"Generated new session ID: {new_session_id}")
-            return new_session_id
-            
-        except Exception as e:
-            logger.error(f"Error generating session ID: {str(e)}")
-            # Fallback to timestamp-based ID
-            return f"{settings.session_id_prefix}{int(datetime.utcnow().timestamp())}"
+        new_session_id = str(uuid.uuid4())
+        logger.info(f"Generated new session ID: {new_session_id}")
+        return new_session_id
     
     async def generate_message_id(self) -> str:
         """
-        Generate auto-incremented message ID (MSG001, MSG002, etc.)
+        Generate message ID using UUID.
         
         Returns:
             New message ID
         """
-        try:
-            collection: Collection = self.db.chat_messages
-            
-            # Find the latest message ID
-            latest_message = collection.find_one(
-                {},
-                sort=[("message_id", DESCENDING)]
-            )
-            
-            if latest_message:
-                # Extract number from message_id (e.g., "MSG001" -> 1)
-                latest_id = latest_message["message_id"]
-                number = int(latest_id.replace(settings.message_id_prefix, ""))
-                new_number = number + 1
-            else:
-                new_number = 1
-            
-            # Format with leading zeros (MSG001, MSG002, etc.)
-            new_message_id = f"{settings.message_id_prefix}{new_number:03d}"
-            logger.info(f"Generated new message ID: {new_message_id}")
-            return new_message_id
-            
-        except Exception as e:
-            logger.error(f"Error generating message ID: {str(e)}")
-            # Fallback to timestamp-based ID
-            return f"{settings.message_id_prefix}{int(datetime.utcnow().timestamp())}"
+        new_message_id = str(uuid.uuid4())
+        logger.info(f"Generated new message ID: {new_message_id}")
+        return new_message_id
     
     async def get_companion_personality(self, companion_id: str) -> Optional[Dict]:
         """

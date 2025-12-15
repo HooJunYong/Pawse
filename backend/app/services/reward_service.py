@@ -3,6 +3,7 @@ Reward Service
 Handles reward redemption, user inventory, and available rewards
 """
 import logging
+import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
@@ -18,23 +19,8 @@ class RewardService:
 
     @staticmethod
     def _generate_user_reward_id() -> str:
-        """Generate unique user_reward_id in format UR001, UR002, etc."""
-        db = get_database()
-        
-        # Find the highest user_reward_id
-        last_user_reward = db.user_rewards.find_one(
-            {"user_reward_id": {"$regex": "^UR[0-9]+$"}},
-            sort=[("user_reward_id", -1)]
-        )
-        
-        if last_user_reward and "user_reward_id" in last_user_reward:
-            # Extract number from UR001 format
-            last_num = int(last_user_reward["user_reward_id"].replace("UR", ""))
-            new_num = last_num + 1
-        else:
-            new_num = 1
-        
-        return f"UR{new_num:03d}"
+        """Generate unique user_reward_id using UUID."""
+        return str(uuid.uuid4())
 
     # ==================== Get All Rewards ====================
 
