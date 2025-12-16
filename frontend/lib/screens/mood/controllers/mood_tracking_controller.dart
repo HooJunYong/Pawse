@@ -4,7 +4,6 @@ import '../../../models/mood_entry.dart';
 import '../../../services/mood_service.dart';
 
 /// Controller for mood tracking business logic and state management
-/// Follows the Controller pattern in N-tier architecture
 class MoodTrackingController extends ChangeNotifier {
   final String userId;
 

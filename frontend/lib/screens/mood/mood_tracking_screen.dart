@@ -7,13 +7,6 @@ import 'widgets/mood_chart_card.dart';
 import 'widgets/mood_details_dialog.dart';
 import 'widgets/mood_dialogs.dart';
 
-/// Main screen for mood tracking feature
-/// 
-/// This screen follows N-tier architecture:
-/// - Presentation Layer: This screen and widget files
-/// - Business Logic Layer: MoodTrackingController
-/// - Data Access Layer: MoodService
-/// - Model Layer: MoodEntry, WeeklyChartDataPoint, MonthlyMoodStats
 class MoodTrackingScreen extends StatefulWidget {
   final String userId;
 
