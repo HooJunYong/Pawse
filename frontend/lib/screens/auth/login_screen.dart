@@ -5,7 +5,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 import '../../services/notification_manager.dart';
-import '../admin/admin_therapist_management.dart';
 import '../admin/admin_dashboard_screen.dart';
 import '../homepage_screen.dart';
 import '../mood/mood_check_in_screen.dart';
@@ -84,7 +83,7 @@ class _LoginWidgetState extends State<LoginWidget> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => AdminTherapistManagement(adminUserId: userId),
+                builder: (context) => AdminDashboardScreen(adminUserId: userId),
               ),
             );
           } else {
