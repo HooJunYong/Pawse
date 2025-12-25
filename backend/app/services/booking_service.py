@@ -373,8 +373,8 @@ def create_booking(request: BookingRequest) -> BookingResponse:
     ]
     center_address = ", ".join([part for part in address_parts if part]) or therapist.get('office_address') or ""
     
-    # Get client name from user_profile
-    client_profile = db.user_profile.find_one({"user_id": request.client_user_id})
+    # Get client name from user_profiles
+    client_profile = db.user_profiles.find_one({"user_id": request.client_user_id})
     if client_profile:
         first_name = client_profile.get('first_name', '')
         last_name = client_profile.get('last_name', '')
@@ -438,20 +438,12 @@ def create_booking(request: BookingRequest) -> BookingResponse:
     except Exception as exc:  # pragma: no cover - best effort notification
         logger.warning("Failed to send booking confirmation chat message: %s", exc)
 
-    # Notify therapist about new booking - get client name from user_profile
-    client_profile_for_notification = db.user_profile.find_one({"user_id": request.client_user_id})
-    if client_profile_for_notification:
-        first_name = client_profile_for_notification.get('first_name', '')
-        last_name = client_profile_for_notification.get('last_name', '')
-        client_name_for_notification = f"{first_name} {last_name}".strip() or client_name
-    else:
-        client_name_for_notification = client_name
-    
+    # Notify therapist about new booking
     create_notification(
         user_id=request.therapist_user_id,
         type="booking_update",
         title="New Booking Request",
-        body=f"You have a new booking request from {client_name_for_notification} for {booking_label}.",
+        body=f"You have a new booking request from {client_name} for {booking_label}.",
         data={"session_id": session_id}
     )
 
@@ -491,7 +483,7 @@ def create_booking(request: BookingRequest) -> BookingResponse:
                 "notification_data": {
                     "session_id": session_id,
                     "title": "📅 Therapy Session Starting Soon",
-                    "body": f"Your therapy session with Dr.{therapist_name} is starting in 10 minutes at {normalized_start_time}.",
+                    "body": f"Your therapy session with {therapist_name} is starting in 10 minutes at {normalized_start_time}.",
                     "data": {"session_id": session_id, "action": "open_booking"}
                 },
                 "created_at": now_ts
@@ -504,13 +496,8 @@ def create_booking(request: BookingRequest) -> BookingResponse:
         current_time = now_my()
         
         # Get client name for therapist notification
-        client_profile = db.user_profile.find_one({"user_id": request.client_user_id})
-        if client_profile:
-            first_name = client_profile.get('first_name', '')
-            last_name = client_profile.get('last_name', '')
-            client_name_for_therapist = f"{first_name} {last_name}".strip() or 'A client'
-        else:
-            client_name_for_therapist = 'A client'
+        client_profile = db.user_profiles.find_one({"user_id": request.client_user_id})
+        client_name_for_therapist = client_profile.get('name', 'A client') if client_profile else 'A client'
         
         # 1-hour reminder for therapist
         reminder_1h = scheduled_datetime - timedelta(hours=1)
@@ -969,8 +956,8 @@ def cancel_client_booking(request: CancelBookingRequest) -> CancelBookingRespons
     therapist = db.therapist_profile.find_one({"user_id": therapist_user_id})
     therapist_name = f"Dr. {therapist.get('first_name', '')} {therapist.get('last_name', '')}" if therapist else "Your therapist"
     
-    # Get client name from user_profile first_name and last_name
-    client = db.user_profile.find_one({"user_id": client_user_id})
+    # Get client name from user_profiles first_name and last_name
+    client = db.user_profiles.find_one({"user_id": client_user_id})
     if client:
         first_name = client.get('first_name', '')
         last_name = client.get('last_name', '')
